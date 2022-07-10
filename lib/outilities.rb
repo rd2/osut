@@ -29,9 +29,11 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 begin # try to load from the gem
+  require "oslg/oslog"
   require "outilities/utils"
   require "outilities/version"
 rescue LoadError
-  require_relative "outilities/oslog"
+  require_relative "oslg/oslog"
+  require_relative "outilities/utils"
   require_relative "outilities/version"
 end

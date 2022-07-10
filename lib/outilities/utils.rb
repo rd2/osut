@@ -33,6 +33,11 @@ require "json"
 require "csv"
 
 module Outilities
+  extend OSlg
+
+  TOL = 0.01
+  TOL2 = TOL * TOL
+
   # This first set of utilities helps distinguishing surfaces enclosing spaces
   # that are directly vs indirectly CONDITIONED, vs SEMI-HEATED. In many
   # cases, it is desirable to set aside surfaces in UNCONDITIONED or UNENCLOSED
@@ -118,11 +123,12 @@ module Outilities
   # "plenum?" method.
 
   ##
-  # Return min & max values for schedule (ruleset).
+  # Return min & max values of a schedule (ruleset).
   #
-  # @param [OpenStudio::Model::ScheduleRuleset] sched A schedule (ruleset)
+  # @param sched [OpenStudio::Model::ScheduleRuleset] schedule (ruleset)
   #
-  # @return [Hash] :min & :max; else Hash values nilled.
+  # @return [Hash] min: (Float), max (Float):
+  # @return [Hash] min: nil, max: nil (if invalid input)
   def scheduleRulesetMinMax(sched)
     # Largely inspired from David Goldwasser's
     # "schedule_ruleset_annual_min_max_value":
@@ -130,9 +136,9 @@ module Outilities
     # github.com/NREL/openstudio-standards/blob/
     # 99cf713750661fe7d2082739f251269c2dfd9140/lib/openstudio-standards/
     # standards/Standards.ScheduleRuleset.rb#L124
-    result = { min: nil, max: nil }
+    res = { min: nil, max: nil }
     cl = OpenStudio::Model::ScheduleRuleset
-    return result unless sched && sched.is_a?(cl)
+    return res unless sched && sched.is_a?(cl)
 
     profiles = []
     profiles << sched.defaultDaySchedule
@@ -160,17 +166,18 @@ module Outilities
       end
     end
 
-    result[:min] = min
-    result[:max] = max
-    result
+    res[:min] = min
+    res[:max] = max
+    res
   end
 
   ##
-  # Return min & max values for schedule (constant).
+  # Return min & max values of a schedule (constant).
   #
-  # @param [OpenStudio::Model::ScheduleConstant] sched A schedule (constant)
+  # @param sched [OpenStudio::Model::ScheduleConstant] schedule (constant)
   #
-  # @return [Hash] :min & :max; else Hash values nilled.
+  # @return [Hash] min: (Float), max: (Float)
+  # @return [Hash] min: nil, max: nil (if invalid input)
   def scheduleConstantMinMax(sched)
     # Largely inspired from David Goldwasser's
     # "schedule_constant_annual_min_max_value":
@@ -178,25 +185,26 @@ module Outilities
     # github.com/NREL/openstudio-standards/blob/
     # 99cf713750661fe7d2082739f251269c2dfd9140/lib/openstudio-standards/
     # standards/Standards.ScheduleConstant.rb#L21
-    result = { min: nil, max: nil }
+    res = { min: nil, max: nil }
     cl = OpenStudio::Model::ScheduleConstant
-    return result unless sched && sched.is_a?(cl)
+    return res unless sched && sched.is_a?(cl)
 
     min = nil
     min = sched.value if sched.value.is_a?(Numeric)
     max = min
 
-    result[:min] = min
-    result[:max] = max
-    result
+    res[:min] = min
+    res[:max] = max
+    res
   end
 
   ##
-  # Return min & max values for schedule (compact).
+  # Return min & max values of a schedule (compact).
   #
-  # @param [OpenStudio::Model::ScheduleCompact] sched A schedule (compact)
+  # @param sched [OpenStudio::Model::ScheduleCompact] schedule (compact)
   #
-  # @return [Hash] :min & :max; else Hash values nilled.
+  # @return [Hash] min: (Float), max: (Float)
+  # @return [Hash] min: nil, max: nil (if invalid input)
   def scheduleCompactMinMax(sched)
     # Largely inspired from Andrew Parker's
     # "schedule_compact_annual_min_max_value":
@@ -204,9 +212,9 @@ module Outilities
     # github.com/NREL/openstudio-standards/blob/
     # 99cf713750661fe7d2082739f251269c2dfd9140/lib/openstudio-standards/
     # standards/Standards.ScheduleCompact.rb#L8
-    result = { min: nil, max: nil }
+    res = { min: nil, max: nil }
     cl = OpenStudio::Model::ScheduleCompact
-    return result unless sched && sched.is_a?(cl)
+    return res unless sched && sched.is_a?(cl)
 
     min = nil
     max = nil
@@ -228,18 +236,19 @@ module Outilities
       max = vals.max if vals.min.is_a?(Numeric)
     end
 
-    result[:min] = min
-    result[:max] = max
-    result
+    res[:min] = min
+    res[:max] = max
+    res
   end
 
   ##
-  # Return max zone heating temperature schedule setpoint [°C].
+  # Return max zone heating temperature schedule setpoint [°C] and whether
+  # zone has active dual setpoint thermostat.
   #
-  # @param [OpenStudio::Model::ThermalZone] zone A thermal zone
+  # @param zone [OpenStudio::Model::ThermalZone] a thermal zone
   #
-  # @return [Float] Returns max setpoint (nil if invalid)
-  # @return [Bool] Returns true if zone has (active?) dual setpoint thermostat.
+  # @return [Hash] setpoint: (Float), dual: (Bool)
+  # @return [Hash] setpoint: nil, dual: false (if invalid input)
   def maxHeatScheduledSetpoint(zone)
     # Largely inspired from Parker & Marrec's "thermal_zone_heated?" procedure.
     # The solution here is a tad more relaxed to encompass SEMI-HEATED zones as
@@ -249,10 +258,9 @@ module Outilities
     # github.com/NREL/openstudio-standards/blob/
     # 58964222d25783e9da4ae292e375fb0d5c902aa5/lib/openstudio-standards/
     # standards/Standards.ThermalZone.rb#L910
-    setpoint = nil
-    dual = false
+    res = { setpoint: nil, dual: false }
     cl = OpenStudio::Model::ThermalZone
-    return setpoint, dual unless zone && zone.is_a?(cl)
+    return res unless zone && zone.is_a?(cl)
 
     # Zone radiant heating? Get schedule from radiant system.
     zone.equipment.each do |equip|
@@ -307,10 +315,10 @@ module Outilities
         max = scheduleRulesetMinMax(sched)[:max]
 
         if max
-          if setpoint
-            setpoint = max if max > setpoint
+          if res[:setpoint]
+            res[:setpoint] = max if max > res[:setpoint]
           else
-            setpoint = max
+            res[:setpoint] = max
           end
         end
       end
@@ -320,10 +328,10 @@ module Outilities
         max = scheduleConstantMinMax(sched)[:max]
 
         if max
-          if setpoint
-            setpoint = max if max > setpoint
+          if res[:setpoint]
+            res[:setpoint] = max if max > res[:setpoint]
           else
-            setpoint = max
+            res[:setpoint] = max
           end
         end
       end
@@ -333,22 +341,22 @@ module Outilities
         max = scheduleCompactMinMax(sched)[:max]
 
         if max
-          if setpoint
-            setpoint = max if max > setpoint
+          if res[:setpoint]
+            res[:setpoint] = max if max > res[:setpoint]
           else
-            setpoint = max
+            res[:setpoint] = max
           end
         end
       end
     end
 
-    return setpoint, dual if setpoint
-    return setpoint, dual if zone.thermostat.empty?
+    return res if res[:setpoint]
+    return res if zone.thermostat.empty?
     tstat = zone.thermostat.get
 
     unless tstat.to_ThermostatSetpointDualSetpoint.empty? &&
            tstat.to_ZoneControlThermostatStagedDualSetpoint.empty?
-      dual = true
+      res[:dual] = true
 
       unless tstat.to_ThermostatSetpointDualSetpoint.empty?
         tstat = tstat.to_ThermostatSetpointDualSetpoint.get
@@ -364,20 +372,20 @@ module Outilities
           max = scheduleRulesetMinMax(sched)[:max]
 
           if max
-            if setpoint
-              setpoint = max if max > setpoint
+            if res[:setpoint]
+              res[:setpoint] = max if max > res[:setpoint]
             else
-              setpoint = max
+              res[:setpoint] = max
             end
           end
 
           dd = sched.winterDesignDaySchedule
 
           unless dd.values.empty?
-            if setpoint
-              setpoint = dd.values.max if dd.values.max > setpoint
+            if res[:setpoint]
+              res[:setpoint] = dd.values.max if dd.values.max > res[:setpoint]
             else
-              setpoint = dd.values.max
+              res[:setpoint] = dd.values.max
             end
           end
         end
@@ -387,10 +395,10 @@ module Outilities
           max = scheduleConstantMinMax(sched)[:max]
 
           if max
-            if setpoint
-              setpoint = max if max > setpoint
+            if res[:setpoint]
+              res[:setpoint] = max if max > res[:setpoint]
             else
-              setpoint = max
+              res[:setpoint] = max
             end
           end
         end
@@ -400,10 +408,10 @@ module Outilities
           max = scheduleCompactMinMax(sched)[:max]
 
           if max
-            if setpoint
-              setpoint = max if max > setpoint
+            if res[:setpoint]
+              res[:setpoint] = max if max > res[:setpoint]
             else
-              setpoint = max
+              res[:setpoint] = max
             end
           end
         end
@@ -416,25 +424,25 @@ module Outilities
             dd = week.winterDesignDaySchedule.get
             next unless dd.values.empty?
 
-            if setpoint
-              setpoint = dd.values.max if dd.values.max > setpoint
+            if res[:setpoint]
+              res[:setpoint] = dd.values.max if dd.values.max > res[:setpoint]
             else
-              setpoint = dd.values.max
+              res[:setpoint] = dd.values.max
             end
           end
         end
       end
     end
 
-    return setpoint, dual
+    res
   end
 
   ##
   # Validate if model has zones with valid heating temperature setpoints.
   #
-  # @param [OpenStudio::Model::Model] model An OpenStudio model
+  # @param model [OpenStudio::Model::Model] a model
   #
-  # @return [Bool] Returns true if valid heating temperature setpoints.
+  # @return [Bool] true if valid heating temperature setpoints
   def heatingTemperatureSetpoints?(model)
     return false unless model && model.is_a?(OpenStudio::Model::Model)
 
@@ -447,22 +455,22 @@ module Outilities
   end
 
   ##
-  # Return min zone cooling temperature schedule setpoint [°C].
+  # Return min zone cooling temperature schedule setpoint [°C] and whether
+  # zone has active dual setpoint thermostat.
   #
-  # @param [OpenStudio::Model::ThermalZone] zone A thermal zone
+  # @param zone [OpenStudio::Model::ThermalZone] a thermal zone
   #
-  # @return [Float] Returns min setpoint (nil if invalid)
-  # @return [Bool] Returns true if zone has (active?) dual setpoint thermostat.
+  # @return [Hash] setpoint: (Float), dual: (Bool)
+  # @return [Hash] setpoint: nil, dual: false (if invalid input)
   def minCoolScheduledSetpoint(zone)
     # Largely inspired from Parker & Marrec's "thermal_zone_cooled?" procedure.
     #
     # github.com/NREL/openstudio-standards/blob/
     # 99cf713750661fe7d2082739f251269c2dfd9140/lib/openstudio-standards/
     # standards/Standards.ThermalZone.rb#L1058
-    setpoint = nil
-    dual = false
+    res = { setpoint: nil, dual: false }
     cl = OpenStudio::Model::ThermalZone
-    return setpoint, dual unless zone && zone.is_a?(cl)
+    return res unless zone && zone.is_a?(cl)
 
     # Zone radiant cooling? Get schedule from radiant system.
     zone.equipment.each do |equip|
@@ -501,10 +509,10 @@ module Outilities
         min = scheduleRulesetMinMax(sched)[:min]
 
         if min
-          if setpoint
-            setpoint = min if min < setpoint
+          if res[:setpoint]
+            res[:setpoint] = min if min < res[:setpoint]
           else
-            setpoint = min
+            res[:setpoint] = min
           end
         end
       end
@@ -514,10 +522,10 @@ module Outilities
         min = scheduleConstantMinMax(sched)[:min]
 
         if min
-          if setpoint
-            setpoint = min if min < setpoint
+          if res[:setpoint]
+            res[:setpoint] = min if min < res[:setpoint]
           else
-            setpoint = min
+            res[:setpoint] = min
           end
         end
       end
@@ -527,17 +535,17 @@ module Outilities
         min = scheduleCompactMinMax(sched)[:min]
 
         if min
-          if setpoint
-            setpoint = min if min < setpoint
+          if res[:setpoint]
+            res[:setpoint] = min if min < res[:setpoint]
           else
-            setpoint = min
+            res[:setpoint] = min
           end
         end
       end
     end
 
-    return setpoint, dual if setpoint
-    return setpoint, dual if zone.thermostat.empty?
+    return res if res[:setpoint]
+    return res if zone.thermostat.empty?
     tstat = zone.thermostat.get
 
     unless tstat.to_ThermostatSetpointDualSetpoint.empty? &&
@@ -558,20 +566,20 @@ module Outilities
           min = scheduleRulesetMinMax(sched)[:min]
 
           if min
-            if setpoint
-              setpoint = min if min < setpoint
+            if res[:setpoint]
+              res[:setpoint] = min if min < res[:setpoint]
             else
-              setpoint = min
+              res[:setpoint] = min
             end
           end
 
           dd = sched.summerDesignDaySchedule
 
           unless dd.values.empty?
-            if setpoint
-              setpoint = dd.values.min if dd.values.min < setpoint
+            if res[:setpoint]
+              res[:setpoint] = dd.values.min if dd.values.min < setpoint
             else
-              setpoint = dd.values.min
+              res[:setpoint] = dd.values.min
             end
           end
         end
@@ -581,10 +589,10 @@ module Outilities
           min = scheduleConstantMinMax(sched)[:min]
 
           if min
-            if setpoint
-              setpoint = min if min < setpoint
+            if res[:setpoint]
+              res[:setpoint] = min if min < res[:setpoint]
             else
-              setpoint = min
+              res[:setpoint] = min
             end
           end
         end
@@ -594,10 +602,10 @@ module Outilities
           min = scheduleCompactMinMax(sched)[:min]
 
           if min
-            if setpoint
-              setpoint = min if min < setpoint
+            if res[:setpoint]
+              res[:setpoint] = min if min < res[:setpoint]
             else
-              setpoint = min
+              res[:setpoint] = min
             end
           end
         end
@@ -610,24 +618,25 @@ module Outilities
             dd = week.summerDesignDaySchedule.get
             next unless dd.values.empty?
 
-            if setpoint
-              setpoint = dd.values.min if dd.values.min < setpoint
+            if res[:setpoint]
+              res[:setpoint] = dd.values.min if dd.values.min < res[:setpoint]
             else
-              setpoint = dd.values.min
+              res[:setpoint] = dd.values.min
             end
           end
         end
       end
     end
-    return setpoint, dual
+
+    res
   end
 
   ##
   # Validate if model has zones with valid cooling temperature setpoints.
   #
-  # @param [OpenStudio::Model::Model] model An OpenStudio model
+  # @param model [OpenStudio::Model::Model] a model
   #
-  # @return [Bool] Returns true if valid cooling temperature setpoints.
+  # @return [Bool] true if valid cooling temperature setpoints
   def coolingTemperatureSetpoints?(model)
     return false unless model && model.is_a?(OpenStudio::Model::Model)
 
@@ -642,9 +651,9 @@ module Outilities
   ##
   # Validate if model has zones with HVAC air loops.
   #
-  # @param [OpenStudio::Model::Model] model An OpenStudio model
+  # @param model [OpenStudio::Model::Model] a model
   #
-  # @return [Bool] Returns true if HVAC air loops.
+  # @return [Bool] true if model has one or more HVAC air loops
   def airLoopsHVAC?(model)
     answer = false
     return answer unless model && model.is_a?(OpenStudio::Model::Model)
@@ -662,11 +671,11 @@ module Outilities
   ##
   # Validate whether space should be processed as a plenum.
   #
-  # @param [OpenStudio::Model::Space] space A space
-  # @param [Bool] loops True if model has airLoopHVAC objects
-  # @param [Bool] setpoints True if model has valid temperature setpoints
+  # @param space [OpenStudio::Model::Space] a space
+  # @param loops [Bool] true if model has airLoopHVAC object(s)
+  # @param setpoints [Bool] true if model has valid temperature setpoints
   #
-  # @return [Bool] Returns true if should be tagged as plenum.
+  # @return [Bool] true if should be tagged as plenum.
   def plenum?(space, loops, setpoints)
     # Largely inspired from NREL's "space_plenum?" procedure.
     #
@@ -720,10 +729,11 @@ module Outilities
   ##
   # Generate an HVAC availability schedule.
   #
-  # @param [OpenStudio::Model::Model] model An OpenStudio model
-  # @param [String] avl Seasonal availability option (default "ON")
+  # @param model [OpenStudio::Model::Model] a model
+  # @param avl [String] seasonal availability option (default "ON")
   #
-  # @return [OpenStudio::Model::Schedule] Returns HVAC avail sched; else nil.
+  # @return [OpenStudio::Model::Schedule] HVAC avail sched
+  # @return [nil] if in valid input
   def availabilitySchedule(model, avl = "")
     return nil unless model && model.is_a?(OpenStudio::Model::Model)
 
@@ -854,13 +864,13 @@ module Outilities
   end
 
   ##
-  # Return OpenStudio site/space transformation & rotation; nil if unsuccessful.
+  # Return OpenStudio site/space transformation & rotation angle [0,2PI) rads.
   #
-  # @param [OpenStudio::Model::Model] model An OpenStudio model
-  # @param [OpenStudio::Model::Space or ::ShadingSurfaceGroup] group A group
+  # @param model [OpenStudio::Model::Model] a model
+  # @param group [OpenStudio::Model::PlanarSurfaceGroup] a group
   #
-  # @return [OpenStudio::Transformation] Returns transformation; else nil
-  # @return [Float] Returns rotation angle [0,2PI) rads; else nil.
+  # @return [Hash] t: (OpenStudio::Transformation), r: Float
+  # @return [Hash] t: nil, r: nil (if invalid input)
   def transforms(model, group)
     cl1 = OpenStudio::Model::Model
     cl2 = OpenStudio::Model::Space
@@ -875,15 +885,15 @@ module Outilities
   end
 
   ##
-  # Validates if default construction set holds a base ground construction.
+  # Validate if default construction set holds a base ground construction.
   #
-  # @param [OpenStudio::Model::DefaultConstructionSet] set An default set
-  # @param [OpensStudio::Model::ConstructionBase] base A construction base
-  # @param [String] type A surface type
-  # @param [Bool] ground True if ground-facing surface
-  # @param [Bool] exterior True if exterior-facing surface
+  # @param set [OpenStudio::Model::DefaultConstructionSet] a default set
+  # @param base [OpensStudio::Model::ConstructionBase] a construction base
+  # @param type [String] a surface type
+  # @param ground [Bool] true if ground-facing surface
+  # @param exterior [Bool] true if exterior-facing surface
   #
-  # @return [Bool] Returns true if default construction set holds construction.
+  # @return [Bool] true if default construction set holds construction
   def holdsConstruction?(set, base, ground, exterior, type)
     cl = OpenStudio::Model::DefaultConstructionSet
     return false unless set && set.is_a?(cl)
@@ -934,12 +944,13 @@ module Outilities
   end
 
   ##
-  # Returns a surface's default construction set.
+  # Return a surface's default construction set.
   #
-  # @param [OpenStudio::Model::Model] model An OpenStudio model
-  # @param [OpenStudio::Model::Surface] s An OpenStudio surface
+  # @param model [OpenStudio::Model::Model] a model
+  # @param s [OpenStudio::Model::Surface] a surface
   #
-  # @return [OpenStudio::Model::DefaultConstructionSet] Returns set; else nil.
+  # @return [OpenStudio::Model::DefaultConstructionSet] default set
+  # @return [nil] if invalid input
   def defaultConstructionSet(model, s)
     return nil unless model && model.is_a?(OpenStudio::Model::Model)
     return nil unless s && s.is_a?(OpenStudio::Model::Surface)
@@ -989,26 +1000,55 @@ module Outilities
   end
 
   ##
-  # Validates if every material in a layered construction is standard & opaque.
+  # Validate if every material in a layered construction is standard & opaque.
   #
-  # @param [OpenStudio::LayeredConstruction] lc A layered construction
+  # @param lc [OpenStudio::LayeredConstruction] a layered construction
   #
-  # @return [Bool] Returns true if all layers are valid; false if invalid input
+  # @return [Bool] true if all layers are valid
+  # @return [Bool] false if invalid input
   def standardOpaqueLayers?(lc)
-    return false unless lc && lc.is_a?(OpenStudio::Model::LayeredConstruction)
+    cl = OpenStudio::Model::LayeredConstruction
+
+    unless lc
+      Outilities.log(Outilities::ERROR,
+        "Invalid argument in Outilities::standardOpaqueLayers?")
+      return false
+    end
+    unless lc.is_a?(cl)
+      Outilities.log(Outilities::ERROR,
+        "#{lc.class}? expecting #{cl} in Outilities::standardOpaqueLayers?")
+      return false
+    end
+
     lc.layers.each { |m| return false if m.to_StandardOpaqueMaterial.empty? }
     true
   end
 
   ##
-  # Total (standard opaque) layered construction thickness (in m)
+  # Total (standard opaque) layered construction thickness (in m).
   #
-  # @param [OpenStudio::LayeredConstruction] lc A layered construction
+  # @param lc [OpenStudio::LayeredConstruction] a layered construction
   #
-  # @return [Double] Returns total layered construction thickness; else 0.
+  # @return [Double] total layered construction thickness
+  # @return [Double] 0 if invalid input
   def thickness(lc)
-    return 0 unless lc && lc.is_a?(OpenStudio::Model::LayeredConstruction)
-    return 0 unless standardOpaqueLayers?(lc)
+    cl = OpenStudio::Model::LayeredConstruction
+
+    unless lc
+      Outilities.log(Outilities::ERROR,
+        "Invalid argument in Outilities::thickness")
+      return 0
+    end
+    unless lc.is_a?(cl)
+      Outilities.log(Outilities::ERROR,
+        "#{lc.class}? expecting #{cl} in Outilities::thickness")
+      return 0
+    end
+    unless standardOpaqueLayers?(lc)
+      Outilities.log(Outilities::ERROR,
+        "#{lc.nameString} holds invalid material(s), Outilities::thickness")
+      return 0
+    end
 
     thickness = 0.0
     lc.layers.each { |m| thickness += m.thickness }
