@@ -30,10 +30,10 @@
 
 begin # try to load from the gem
   require "oslg/oslog"
-  require "outilities/utils"
-  require "outilities/version"
+  require "osut/utils"
+  require "osut/version"
 rescue LoadError
   require_relative "oslg/oslog"
-  require_relative "outilities/utils"
-  require_relative "outilities/version"
+  require_relative "osut/utils"
+  require_relative "osut/version"
 end

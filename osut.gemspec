@@ -1,18 +1,17 @@
 lib = File.expand_path("lib", __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require "outilities/version"
+require "osut/version"
 
 Gem::Specification.new do |spec|
-  spec.name          = "outilities"
-  spec.version       = Outilities::VERSION
+  spec.name          = "osut"
+  spec.version       = OSut::VERSION
   spec.platform      = Gem::Platform::RUBY
   spec.authors       = ["Denis Bourgeois"]
   spec.email         = ["denis@rd2.ca"]
 
-  spec.summary       = "General purpose Ruby utilities for OpenStudio"
-  spec.description   = "Utilities for OpenStudio Measures or other OpenStudio "\
-                       "SDK-based applications."
-  spec.homepage      = "https://github.com/rd2/outilities"
+  spec.summary       = "OpenStudio UTilities"
+  spec.description   = "General purpose utilities for OpenStudio SDK-based apps"
+  spec.homepage      = "https://github.com/rd2/osut"
   spec.license       = "BSD-3-Clause"
 
   # Prevent pushing this gem to RubyGems.org. To allow pushes either set the

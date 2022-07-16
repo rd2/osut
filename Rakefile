@@ -3,7 +3,7 @@ RSpec::Core::RakeTask.new(:spec)
 
 require "yard"
 YARD::Rake::YardocTask.new do |t|
-  t.files = ["lib/outilities/utils.rb"]
+  t.files = ["lib/osut/utils.rb"]
 end
 
 task default: :spec

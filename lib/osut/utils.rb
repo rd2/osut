@@ -32,13 +32,17 @@ require "openstudio"
 require "json"
 require "csv"
 
-module Outilities
+module OSut
   extend OSlg
 
-  TOL = 0.01
-  TOL2 = TOL * TOL
+  NS  = "nameString"                    # OpenStudio IdfObject nameString method
+  DBG = OSut::DEBUG                                             # OSlg constants
+  INF = OSut::INFO
+  WRN = OSut::WARN
+  ERR = OSut::ERROR
+  FTL = OSut::FATAL
 
-  # This first set of utilities helps distinguishing surfaces enclosing spaces
+  # This next set of utilities helps distinguishing surfaces enclosing spaces
   # that are directly vs indirectly CONDITIONED, vs SEMI-HEATED. In many
   # cases, it is desirable to set aside surfaces in UNCONDITIONED or UNENCLOSED
   # spaces. The solution here relies as much as possible on space conditioning
@@ -125,9 +129,9 @@ module Outilities
   ##
   # Return min & max values of a schedule (ruleset).
   #
-  # @param sched [OpenStudio::Model::ScheduleRuleset] schedule (ruleset)
+  # @param sched [OpenStudio::Model::ScheduleRuleset] schedule
   #
-  # @return [Hash] min: (Float), max (Float):
+  # @return [Hash] min: (Float), max: (Float)
   # @return [Hash] min: nil, max: nil (if invalid input)
   def scheduleRulesetMinMax(sched)
     # Largely inspired from David Goldwasser's
@@ -136,45 +140,50 @@ module Outilities
     # github.com/NREL/openstudio-standards/blob/
     # 99cf713750661fe7d2082739f251269c2dfd9140/lib/openstudio-standards/
     # standards/Standards.ScheduleRuleset.rb#L124
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::ScheduleRuleset
     res = { min: nil, max: nil }
-    cl = OpenStudio::Model::ScheduleRuleset
-    return res unless sched && sched.is_a?(cl)
+
+    return invalid("sched", mth, 1, DBG, res) unless lc.respond_to?(NS)
+    id = sched.nameString
+    return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
 
     profiles = []
     profiles << sched.defaultDaySchedule
-    rules = sched.scheduleRules
-    rules.each { |rule| profiles << rule.daySchedule }
-
-    min = nil
-    max = nil
+    sched.scheduleRules.each { |rule| profiles << rule.daySchedule }
 
     profiles.each do |profile|
+      id = profile.nameString
       profile.values.each do |value|
-        next unless value.is_a?(Numeric)
-
-        if min
-          min = value if min > value
-        else
-          min = value
+        unless value.is_a?(Numeric)
+          log(DBG, "Ignoring non-numeric: profile '#{id}' (#{mth})")
+          next
         end
 
-        if max
-          max = value if max < value
+        if res[:min]
+          res[:min] = value if res[:min] > value
         else
-          max = value
+          res[:min] = value
+        end
+
+        if res[:max]
+          res[:max] = value if res[:max] < value
+        else
+          res[:max] = value
         end
       end
     end
 
-    res[:min] = min
-    res[:max] = max
+    valid = res[:min] && res[:max]
+    log(ERR, "Can't find valid MIN/MAX in '#{id}' (#{mth})") unless valid
+
     res
   end
 
   ##
   # Return min & max values of a schedule (constant).
   #
-  # @param sched [OpenStudio::Model::ScheduleConstant] schedule (constant)
+  # @param sched [OpenStudio::Model::ScheduleConstant] schedule
   #
   # @return [Hash] min: (Float), max: (Float)
   # @return [Hash] min: nil, max: nil (if invalid input)
@@ -185,23 +194,39 @@ module Outilities
     # github.com/NREL/openstudio-standards/blob/
     # 99cf713750661fe7d2082739f251269c2dfd9140/lib/openstudio-standards/
     # standards/Standards.ScheduleConstant.rb#L21
+    mth = "scheduleConstantMinMax"
+    cl  = OpenStudio::Model::ScheduleConstant
     res = { min: nil, max: nil }
-    cl = OpenStudio::Model::ScheduleConstant
-    return res unless sched && sched.is_a?(cl)
 
-    min = nil
-    min = sched.value if sched.value.is_a?(Numeric)
-    max = min
+    # unless sched
+    #   OSut.log(err, "Invalid argument (#{mth})")
+    #   return res
+    # end
+    #
+    # id = sched.nameString
 
-    res[:min] = min
-    res[:max] = max
+    # unless sched.is_a?(cl1)
+    #   OSut.log(err, "'#{id}': #{sched.class}? expecting #{cl1} (#{mth})")
+    #   return res
+    # end
+    # return OSut.mismatch(sched, cl1, mth = "", res = nil)
+    return mismatch(sched, cl, mth, res, dbg) unless sched.is_a?(cl)
+
+    if sched.value.is_a?(Numeric)
+      res[:min] = sched.value
+      res[:max] = res[:min]
+    else
+      id = sched.nameString
+      OSut.log(ERR, "Non-numeric constant value in '#{id}' (#{mth})")
+    end
+
     res
   end
 
   ##
   # Return min & max values of a schedule (compact).
   #
-  # @param sched [OpenStudio::Model::ScheduleCompact] schedule (compact)
+  # @param sched [OpenStudio::Model::ScheduleCompact] schedule
   #
   # @return [Hash] min: (Float), max: (Float)
   # @return [Hash] min: nil, max: nil (if invalid input)
@@ -212,15 +237,21 @@ module Outilities
     # github.com/NREL/openstudio-standards/blob/
     # 99cf713750661fe7d2082739f251269c2dfd9140/lib/openstudio-standards/
     # standards/Standards.ScheduleCompact.rb#L8
-    res = { min: nil, max: nil }
-    cl = OpenStudio::Model::ScheduleCompact
-    return res unless sched && sched.is_a?(cl)
-
-    min = nil
-    max = nil
-
-    vals = []
+    mth      = "scheduleCompactMinMax"
+    cl       = OpenStudio::Model::ScheduleCompact
+    dbg      = OSut::DEBUG
+    err      = OSut::ERROR
+    vals     = []
     prev_str = ""
+    res      = { min: nil, max: nil }
+
+    return mismatch(sched, cl, mth, res, dbg) unless sched.is_a?(cl)
+    log(ERROR, "hello")
+
+    # return res unless sched && sched.is_a?(cl)
+
+    # min = nil
+    # max = nil
 
     sched.extensibleGroups.each do |eg|
       if prev_str.include?("until")
@@ -231,14 +262,63 @@ module Outilities
       prev_str = str.get.downcase unless str.empty?
     end
 
-    unless vals.empty?
-      min = vals.min if vals.min.is_a?(Numeric)
-      max = vals.max if vals.min.is_a?(Numeric)
+    if vals.empty?
+      id = sched.nameString
+      OSut.log(err, "Can't extract setpoints from '#{id}' (#{mth})")
+    else
+      if vals.min.is_a?(Numeric) && vals.max.is_a?(Numeric)
+        res[:min] = vals.min
+        res[:max] = vals.max
+      else
+        id = sched.nameString
+        OSut.log(err, "Non-numeric value in '#{id}' (#{mth})")
+      end
     end
+
+    res
+  end
+
+  ##
+  # Return min & max values of a schedule (compact).
+  #
+  # @param sched [OpenStudio::Model::ScheduleCompact] schedule
+  #
+  # @return [Hash] min: (Float), max: (Float)
+  # @return [Hash] min: nil, max: nil (if invalid input)
+
+  ##
+  # Return min & max values for schedule (fixed interval).
+  #
+  # @param sched [OpenStudio::Model::ScheduleFixedInterval] schedule
+  #
+  # @return [Hash] min: (Float), max: (Float)
+  # @return [Hash] min: nil, max: nil (if invalid input)
+  def scheduleFixedIntervalMinMax(sched)
+    mth      = "scheduleFixedIntervalMinMax"
+    cl       = OpenStudio::Model::ScheduleFixedInterval
+    dbg      = OSut::DEBUG
+    err      = OSut::ERROR
+    vals     = []
+    prev_str = ""
+    res      = { min: nil, max: nil }
+
+    return mismatch(sched, cl, mth, res, dbg) unless sched.is_a?(cl)
+
+    # unless sched && sched.is_a?(cl)
+    #   TBD.log(TBD::DEBUG,
+    #     "Invalid fixed interval MinMax schedule (argument) - skipping")
+    #   return result
+    # end
+
+    min = nil
+    max = nil
+    values = sched.timeSeries.values
+    min = values.min if values.min.is_a?(Numeric)
+    max = values.max if values.max.is_a?(Numeric)
 
     res[:min] = min
     res[:max] = max
-    res
+    result
   end
 
   ##
@@ -258,9 +338,13 @@ module Outilities
     # github.com/NREL/openstudio-standards/blob/
     # 58964222d25783e9da4ae292e375fb0d5c902aa5/lib/openstudio-standards/
     # standards/Standards.ThermalZone.rb#L910
+    mth = "maxHeatScheduledSetpoint"
+    cl  = OpenStudio::Model::ThermalZone
+    err = OSut::ERROR
     res = { setpoint: nil, dual: false }
-    cl = OpenStudio::Model::ThermalZone
-    return res unless zone && zone.is_a?(cl)
+
+    return OSut.mismatch(zone, cl, mth, res) unless zone.is_a?(cl)
+    # return res unless zone && zone.is_a?(cl)
 
     # Zone radiant heating? Get schedule from radiant system.
     zone.equipment.each do |equip|
@@ -351,7 +435,11 @@ module Outilities
     end
 
     return res if res[:setpoint]
-    return res if zone.thermostat.empty?
+
+    if zone.thermostat.empty?
+      return res
+    end
+
     tstat = zone.thermostat.get
 
     unless tstat.to_ThermostatSetpointDualSetpoint.empty? &&
@@ -468,9 +556,22 @@ module Outilities
     # github.com/NREL/openstudio-standards/blob/
     # 99cf713750661fe7d2082739f251269c2dfd9140/lib/openstudio-standards/
     # standards/Standards.ThermalZone.rb#L1058
-    res = { setpoint: nil, dual: false }
-    cl = OpenStudio::Model::ThermalZone
-    return res unless zone && zone.is_a?(cl)
+    mth = "minCoolScheduledSetpoint"
+    cl1 = OpenStudio::Model::ThermalZone
+    err = OSut::ERROR
+    stp = { setpoint: nil, dual: false }
+
+    unless zone
+      OSut.log(err, "Invalid argument (#{mth})")
+      return res
+    end
+
+    id = zone.nameString
+
+    unless zone.is_a?(cl1)
+      OSut.log(err, "'#{id}': #{zone.class}? expecting #{cl1} (#{mth})")
+      return res
+    end
 
     # Zone radiant cooling? Get schedule from radiant system.
     zone.equipment.each do |equip|
@@ -637,6 +738,7 @@ module Outilities
   # @param model [OpenStudio::Model::Model] a model
   #
   # @return [Bool] true if valid cooling temperature setpoints
+  # @return [Bool] false if invalid input
   def coolingTemperatureSetpoints?(model)
     return false unless model && model.is_a?(OpenStudio::Model::Model)
 
@@ -654,6 +756,7 @@ module Outilities
   # @param model [OpenStudio::Model::Model] a model
   #
   # @return [Bool] true if model has one or more HVAC air loops
+  # @return [Bool] false if invalid input
   def airLoopsHVAC?(model)
     answer = false
     return answer unless model && model.is_a?(OpenStudio::Model::Model)
@@ -675,9 +778,10 @@ module Outilities
   # @param loops [Bool] true if model has airLoopHVAC object(s)
   # @param setpoints [Bool] true if model has valid temperature setpoints
   #
-  # @return [Bool] true if should be tagged as plenum.
+  # @return [Bool] true if should be tagged as plenum
+  # @return [Bool] false if invalid input
   def plenum?(space, loops, setpoints)
-    # Largely inspired from NREL's "space_plenum?" procedure.
+    # Largely inspired from NREL's "space_plenum?" procedure:
     #
     # github.com/NREL/openstudio-standards/blob/
     # 58964222d25783e9da4ae292e375fb0d5c902aa5/lib/openstudio-standards/
@@ -687,22 +791,36 @@ module Outilities
     # space tagged as plenum if zone "isPlenum" (case A).
     #
     # In absence of HVAC air loops, 2x other cases trigger a plenum tag:
-    #   case B. space excluded from building's total floor area, yet zone holds
+    #   case B: space excluded from building's total floor area, yet zone holds
     #           an "inactive" thermostat (i.e., can't extract valid setpoints);
     #           ... or
-    #   case C. spacetype is "plenum".
-    cl = OpenStudio::Model::Space
-    return false unless space && space.is_a?(cl)
-    return false unless loops == true || loops == false
-    return false unless setpoints == true || setpoints == false
+    #   case C: spacetype is "plenum".
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::Space
+    stp = { heat: nil, cool: nil }
+
+    return invalid("space", mth, 1, DBG, stp) unless space.respond_to?(NS)
+    id = space.nameString
+    return mismatch(id, space, cl, mth, DBG, res) unless space.is_a?(cl)
+
+    valid = loops == true || loops == false
+    return invalid("loops", mth, 2, DBG, stp) unless valid
+
+    valid = setpoints == true || setpoints == false
+    return invalid("setpoints", mth, 3, DBG, stp) unless valid
 
     unless space.thermalZone.empty?
       zone = space.thermalZone.get
       return zone.isPlenum if loops                                     # case A
 
       if setpoints
-        heating, dual1 = maxHeatScheduledSetpoint(zone)
-        cooling, dual2 = minCoolScheduledSetpoint(zone)
+        stp[:heat] = maxHeatScheduledSetpoint(zone)
+        stp[:cool] = minCoolScheduledSetpoint(zone)
+
+        # CHECK FOR HASH KEYS ...
+
+        # heating, dual1 = maxHeatScheduledSetpoint(zone)
+        # cooling, dual2 = minCoolScheduledSetpoint(zone)
         return false if heating || cooling          # directly conditioned space
 
         unless space.partofTotalFloorArea
@@ -730,14 +848,18 @@ module Outilities
   # Generate an HVAC availability schedule.
   #
   # @param model [OpenStudio::Model::Model] a model
-  # @param avl [String] seasonal availability option (default "ON")
+  # @param avl [String] seasonal availability choice (optional, default "ON")
   #
-  # @return [OpenStudio::Model::Schedule] HVAC avail sched
-  # @return [nil] if in valid input
+  # @return [OpenStudio::Model::Schedule] HVAC availability sched
+  # @return [nil] if invalid input
   def availabilitySchedule(model, avl = "")
-    return nil unless model && model.is_a?(OpenStudio::Model::Model)
+    mth = "OSut::#{__callee__}"
+    cl = OpenStudio::Model::Model
 
-    # First, fetch availability ScheduleTypeLimits object - or create one.
+    return invalid("model", mth, 1) unless model
+    return mismatch("model", model, cl, mth) unless model.is_a?(cl)
+
+    # Either fetch availability ScheduleTypeLimits object, or create one.
     limits = nil
 
     model.getScheduleTypeLimitss.each do |l|
@@ -764,13 +886,12 @@ module Outilities
 
     time = OpenStudio::Time.new(0,24)
     secs = time.totalSeconds
-
-    on = OpenStudio::Model::ScheduleDay.new(model, 1)
-    off = OpenStudio::Model::ScheduleDay.new(model, 0)
+    on   = OpenStudio::Model::ScheduleDay.new(model, 1)
+    off  = OpenStudio::Model::ScheduleDay.new(model, 0)
 
     # Seasonal availability start/end dates.
     year = model.yearDescription
-    return nil if year.empty?
+    return empty("yearDescription", mth, ERR) if year.empty?
     year = year.get
     may01 = year.makeDate(OpenStudio::MonthOfYear.new("May"),  1)
     oct31 = year.makeDate(OpenStudio::MonthOfYear.new("Oct"), 31)
@@ -846,17 +967,39 @@ module Outilities
     end
 
     schedule = OpenStudio::Model::ScheduleRuleset.new(model)
-    return nil unless schedule.setScheduleTypeLimits(limits)
     schedule.setName(nom)
-    return nil unless schedule.defaultDaySchedule.addValue(time, val)
+
+    unless schedule.setScheduleTypeLimits(limits)
+      log(ERR, "'#{nom}': Can't set schedule type limits (#{mth})")
+      return nil
+    end
+
+    unless schedule.defaultDaySchedule.addValue(time, val)
+      log(ERR, "'#{nom}': Can't set default day schedule (#{mth})")
+      return nil
+    end
+
     schedule.defaultDaySchedule.setName(dft)
 
     unless tag.empty?
       rule = OpenStudio::Model::ScheduleRule.new(schedule, sch)
       rule.setName(tag)
-      return nil unless rule.setStartDate(may01)
-      return nil unless rule.setEndDate(oct31)
-      return nil unless rule.setApplyAllDays(true)
+
+      unless rule.setStartDate(may01)
+        log(err, "'#{tag}': Can't set start date (#{mth})")
+        return nil
+      end
+
+      unless rule.setEndDate(oct31)
+        log(err, "'#{tag}': Can't set end date (#{mth})")
+        return nil
+      end
+
+      unless rule.setApplyAllDays(true)
+        log(err, "'#{tag}': Can't apply to all days (#{mth})")
+        return nil
+      end
+
       rule.daySchedule.setName(day)
     end
 
@@ -872,16 +1015,21 @@ module Outilities
   # @return [Hash] t: (OpenStudio::Transformation), r: Float
   # @return [Hash] t: nil, r: nil (if invalid input)
   def transforms(model, group)
+    mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Model::Model
-    cl2 = OpenStudio::Model::Space
-    cl3 = OpenStudio::Model::ShadingSurfaceGroup
+    cl2 = OpenStudio::Model::PlanarSurfaceGroup
+    res = { t: nil, r: nil }
 
-    return nil, nil unless model && model.is_a?(cl1)
-    return nil, nil unless group && group.is_a?(cl2) || group.is_a?(cl3)
+    return invalid("model", mth, 1, DBG, res) unless model
+    return mismatch("model", model, cl1, mth, DBG, res) unless model.is_a?(cl1)
 
-    t = group.siteTransformation
-    r = group.directionofRelativeNorth + model.getBuilding.northAxis
-    return t, r
+    return invalid("group", mth, 2, DBG, res) unless group.respond_to?(NS)
+    id = group.nameString
+    return mismatch(id, group, cl2, mth, DBG, res) unless group.is_a?(cl2)
+
+    res[:t] = group.siteTransformation
+    res[:r] = group.directionofRelativeNorth + model.getBuilding.northAxis
+    res
   end
 
   ##
@@ -889,20 +1037,34 @@ module Outilities
   #
   # @param set [OpenStudio::Model::DefaultConstructionSet] a default set
   # @param base [OpensStudio::Model::ConstructionBase] a construction base
-  # @param type [String] a surface type
   # @param ground [Bool] true if ground-facing surface
   # @param exterior [Bool] true if exterior-facing surface
+  # @param type [String] a surface type
   #
   # @return [Bool] true if default construction set holds construction
+  # @return [Bool] false if invalid input
   def holdsConstruction?(set, base, ground, exterior, type)
-    cl = OpenStudio::Model::DefaultConstructionSet
-    return false unless set && set.is_a?(cl)
-    return false unless base && base.is_a?(OpenStudio::Model::ConstructionBase)
-    return false unless ground == true || ground == false
-    return false unless exterior == true || exterior == false
-    return false unless type
-    typ = type.downcase
-    return false unless typ == "floor" || typ == "wall" || typ == "roofceiling"
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Model::DefaultConstructionSet
+    cl2 = OpenStudio::Model::ConstructionBase
+
+    return invalid("set", mth, 1, DBG, false) unless set.respond_to?(NS)
+    id = set.nameString
+    return mismatch(id, set, cl1, mth, DBG, false) unless set.is_a?(cl1)
+
+    return invalid("base", mth, 2, DBG, false) unless base.respond_to?(NS)
+    id = base.nameString
+    return mismatch(id, base, cl2, mth, DBG, false) unless base.is_a?(cl2)
+
+    valid = ground == true || ground == false
+    return invalid("ground", mth, 3, DBG, false) unless valid
+
+    valid = exterior == true || exterior == false
+    return invalid("exterior", mth, 4, DBG, false) unless valid
+
+    return invalid("type", mth, 5, DBG, false) unless type
+    typ = type.to_s.downcase
+    valid = typ == "floor" || typ == "wall" || typ == "roofceiling"
 
     constructions = nil
 
@@ -952,19 +1114,36 @@ module Outilities
   # @return [OpenStudio::Model::DefaultConstructionSet] default set
   # @return [nil] if invalid input
   def defaultConstructionSet(model, s)
-    return nil unless model && model.is_a?(OpenStudio::Model::Model)
-    return nil unless s && s.is_a?(OpenStudio::Model::Surface)
-    return nil unless s.isConstructionDefaulted
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Model::Model
+    cl2 = OpenStudio::Model::Surface
 
-    ground = false
-    ground = true if s.isGroundSurface
-    exterior = false
-    exterior = true if s.outsideBoundaryCondition.downcase == "outdoors"
-    return nil if s.construction.empty?
+    return invalid("model", mth, 1) unless model
+    return mismatch("model", model, cl1, mth) unless model.is_a?(cl1)
+
+    return invalid("s", mth, 2) unless s.respond_to?(NS)
+    id = s.nameString
+    return mismatch(id, s, cl2, mth) unless s.is_a?(cl2)
+
+    unless s.isConstructionDefaulted
+      log(ERR, "'#{id}' construction not defaulted (#{mth})")
+      return nil
+    end
+
+    return empty(id, mth, ERR) if s.construction.empty?
     base = s.construction.get
-    return nil if s.space.empty?
+    return empty(id, mth, ERR) if s.space.empty?
     space = s.space.get
     type = s.surfaceType
+
+    ground = false
+    exterior = false
+
+    if s.isGroundSurface
+      ground = true
+    elsif s.outsideBoundaryCondition.downcase == "outdoors"
+      exterior = true
+    end
 
     unless space.defaultConstructionSet.empty?
       set = space.defaultConstructionSet.get
@@ -1007,18 +1186,11 @@ module Outilities
   # @return [Bool] true if all layers are valid
   # @return [Bool] false if invalid input
   def standardOpaqueLayers?(lc)
-    cl = OpenStudio::Model::LayeredConstruction
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::LayeredConstruction
 
-    unless lc
-      Outilities.log(Outilities::ERROR,
-        "Invalid argument in Outilities::standardOpaqueLayers?")
-      return false
-    end
-    unless lc.is_a?(cl)
-      Outilities.log(Outilities::ERROR,
-        "#{lc.class}? expecting #{cl} in Outilities::standardOpaqueLayers?")
-      return false
-    end
+    return invalid("lc", mth, 1, DBG, 0) unless lc.respond_to?(NS)
+    return mismatch(lc.nameString, lc, cl, mth, DBG) unless lc.is_a?(cl)
 
     lc.layers.each { |m| return false if m.to_StandardOpaqueMaterial.empty? }
     true
@@ -1032,21 +1204,15 @@ module Outilities
   # @return [Double] total layered construction thickness
   # @return [Double] 0 if invalid input
   def thickness(lc)
-    cl = OpenStudio::Model::LayeredConstruction
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::LayeredConstruction
 
-    unless lc
-      Outilities.log(Outilities::ERROR,
-        "Invalid argument in Outilities::thickness")
-      return 0
-    end
-    unless lc.is_a?(cl)
-      Outilities.log(Outilities::ERROR,
-        "#{lc.class}? expecting #{cl} in Outilities::thickness")
-      return 0
-    end
+    return invalid("lc", mth, 1, DBG, 0) unless lc.respond_to?(NS)
+    id = lc.nameString
+    return mismatch(id, lc, cl, mth, DBG, 0) unless lc.is_a?(cl)
+
     unless standardOpaqueLayers?(lc)
-      Outilities.log(Outilities::ERROR,
-        "#{lc.nameString} holds invalid material(s), Outilities::thickness")
+      log(ERR, "'#{id}' holds non-StandardOpaqueMaterial(s) (#{mth})")
       return 0
     end
 
