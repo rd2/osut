@@ -33,25 +33,23 @@ require "json"
 require "csv"
 
 module OSut
-  extend OSlg
+  extend OSlg # DEBUG for devs (using OSut); WARN/ERROR for users (bad OS input)
 
-  NS  = "nameString"                    # OpenStudio IdfObject nameString method
-  DBG = OSut::DEBUG                                             # OSlg constants
-  INF = OSut::INFO
-  WRN = OSut::WARN
-  ERR = OSut::ERROR
-  FTL = OSut::FATAL
+  NS  = "nameString"     #                OpenStudio IdfObject nameString method
+  DBG = OSut::DEBUG      # mainly to flag invalid arguments to devs (buggy code)
+  INF = OSut::INFO       #                            not currently used in OSut
+  WRN = OSut::WARN       #   WARN users of 'iffy' .osm inputs (yet not critical)
+  ERR = OSut::ERROR      #     flag invalid .osm inputs (then exit via 'return')
+  FTL = OSut::FATAL      #                            not currently used in OSut
 
-  # This next set of utilities helps distinguishing surfaces enclosing spaces
-  # that are directly vs indirectly CONDITIONED, vs SEMI-HEATED. In many
-  # cases, it is desirable to set aside surfaces in UNCONDITIONED or UNENCLOSED
-  # spaces. The solution here relies as much as possible on space conditioning
-  # categories found in standards like ASHRAE 90.1 and energy codes like the
-  # Canadian NECB editions. Both documents share many similarities, regardless
-  # of nomenclature. There are however noticeable differences between approaches
-  # on how a space is tagged as falling into one of the aforementioned
-  # categories. First, an overview of 90.1 requirements (with some minor edits
-  # for brevity + added emphasis):
+  # This first set of utilities (~750 lines) help distinguishing spaces that
+  # are directly vs indirectly CONDITIONED, vs SEMI-HEATED. The solution here
+  # relies as much as possible on space conditioning categories found in
+  # standards like ASHRAE 90.1 and energy codes like the Canadian NECB editions.
+  # Both documents share many similarities, regardless of nomenclature. There
+  # are however noticeable differences between approaches on how a space is
+  # tagged as falling into one of the aforementioned categories. First, an
+  # overview of 90.1 requirements, with some minor edits for brevity/emphasis:
   #
   # www.pnnl.gov/main/publications/external/technical_reports/PNNL-26917.pdf
   #
@@ -106,25 +104,21 @@ module OSut
   # focusing on adjacent surfaces to CONDITIONED (or SEMI-HEATED) spaces as part
   # of the building envelope.
 
-  # In light of the above, the methods here are designed to handle envelope
-  # surfaces without a priori knowledge of explicit system sizing choices or
-  # access to iterative autosizing processes. As discussed in the following,
-  # the methods are developed to rely on zoning info and/or "intended"
-  # temperature setpoints to determine which surfaces to process.
+  # In light of the above, methods here are designed without a priori knowledge
+  # of explicit system sizing choices or access to iterative autosizing
+  # processes. As discussed in greater detail elswhere, methods are developed to
+  # rely on zoning info and/or "intended" temperature setpoints.
   #
   # For an OpenStudio model (OSM) in an incomplete or preliminary state, e.g.
   # holding fully-formed ENCLOSED spaces without thermal zoning information or
-  # setpoint temperatures [early design stage assessments of form, porosity or
-  # envelope]), all OSM spaces will be considered CONDITIONED, presuming
+  # setpoint temperatures (early design stage assessments of form, porosity or
+  # envelope), all OSM spaces will be considered CONDITIONED, presuming
   # setpoints of ~21°C (heating) and ~24°C (cooling).
   #
-  # If any valid space/zone-specific temperature setpoints are found in the OSM,
-  # the following methods will seek to tag outdoor-facing opaque surfaces with
-  # their parent space/zone's explicit heating (max) and/or cooling (min)
-  # setpoints. In such cases, spaces/zones without valid heating or cooling
-  # setpoints are either considered as UNCONDITIONED or UNENCLOSED spaces
-  # (like attics), or INDIRECTLY CONDITIONED spaces (like plenums), see
-  # "plenum?" method.
+  # If ANY valid space/zone-specific temperature setpoints are found in the OSM,
+  # spaces/zones WITHOUT valid heating or cooling setpoints are considered as
+  # UNCONDITIONED or UNENCLOSED spaces (like attics), or INDIRECTLY CONDITIONED
+  # spaces (like plenums), see "plenum?" method.
 
   ##
   # Return min & max values of a schedule (ruleset).
@@ -144,7 +138,7 @@ module OSut
     cl  = OpenStudio::Model::ScheduleRuleset
     res = { min: nil, max: nil }
 
-    return invalid("sched", mth, 1, DBG, res) unless lc.respond_to?(NS)
+    return invalid("sched", mth, 1, DBG, res) unless sched.respond_to?(NS)
     id = sched.nameString
     return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
 
@@ -154,28 +148,21 @@ module OSut
 
     profiles.each do |profile|
       id = profile.nameString
-      profile.values.each do |value|
-        unless value.is_a?(Numeric)
-          log(DBG, "Ignoring non-numeric: profile '#{id}' (#{mth})")
+      profile.values.each do |val|
+        unless val.is_a?(Numeric)
+          log(WRN, "Skipping non-numeric profile values in '#{id}' (#{mth})")
           next
         end
 
-        if res[:min]
-          res[:min] = value if res[:min] > value
-        else
-          res[:min] = value
-        end
-
-        if res[:max]
-          res[:max] = value if res[:max] < value
-        else
-          res[:max] = value
-        end
+        res[:min] = val unless res[:min]
+        res[:min] = val     if res[:min] > val
+        res[:max] = val unless res[:max]
+        res[:max] = val     if res[:max] < val
       end
     end
 
     valid = res[:min] && res[:max]
-    log(ERR, "Can't find valid MIN/MAX in '#{id}' (#{mth})") unless valid
+    log(ERR, "Invalid MIN/MAX in '#{id}' (#{mth})") unless valid
 
     res
   end
@@ -194,30 +181,19 @@ module OSut
     # github.com/NREL/openstudio-standards/blob/
     # 99cf713750661fe7d2082739f251269c2dfd9140/lib/openstudio-standards/
     # standards/Standards.ScheduleConstant.rb#L21
-    mth = "scheduleConstantMinMax"
+    mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::ScheduleConstant
     res = { min: nil, max: nil }
 
-    # unless sched
-    #   OSut.log(err, "Invalid argument (#{mth})")
-    #   return res
-    # end
-    #
-    # id = sched.nameString
+    return invalid("sched", mth, 1, DBG, res) unless sched.respond_to?(NS)
+    id = sched.nameString
+    return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
 
-    # unless sched.is_a?(cl1)
-    #   OSut.log(err, "'#{id}': #{sched.class}? expecting #{cl1} (#{mth})")
-    #   return res
-    # end
-    # return OSut.mismatch(sched, cl1, mth = "", res = nil)
-    return mismatch(sched, cl, mth, res, dbg) unless sched.is_a?(cl)
-
-    if sched.value.is_a?(Numeric)
-      res[:min] = sched.value
-      res[:max] = res[:min]
+    unless sched.value.is_a?(Numeric)
+      return mismatch("'#{id}' value", sched.value, Numeric, mth, ERR, res)
     else
-      id = sched.nameString
-      OSut.log(ERR, "Non-numeric constant value in '#{id}' (#{mth})")
+      res[:min] = sched.value
+      res[:max] = sched.value
     end
 
     res
@@ -237,21 +213,15 @@ module OSut
     # github.com/NREL/openstudio-standards/blob/
     # 99cf713750661fe7d2082739f251269c2dfd9140/lib/openstudio-standards/
     # standards/Standards.ScheduleCompact.rb#L8
-    mth      = "scheduleCompactMinMax"
+    mth      = "OSut::#{__callee__}"
     cl       = OpenStudio::Model::ScheduleCompact
-    dbg      = OSut::DEBUG
-    err      = OSut::ERROR
     vals     = []
     prev_str = ""
     res      = { min: nil, max: nil }
 
-    return mismatch(sched, cl, mth, res, dbg) unless sched.is_a?(cl)
-    log(ERROR, "hello")
-
-    # return res unless sched && sched.is_a?(cl)
-
-    # min = nil
-    # max = nil
+    return invalid("sched", mth, 1, DBG, res) unless sched.respond_to?(NS)
+    id = sched.nameString
+    return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
 
     sched.extensibleGroups.each do |eg|
       if prev_str.include?("until")
@@ -262,29 +232,17 @@ module OSut
       prev_str = str.get.downcase unless str.empty?
     end
 
-    if vals.empty?
-      id = sched.nameString
-      OSut.log(err, "Can't extract setpoints from '#{id}' (#{mth})")
+    return empty("'#{id}' values", mth, ERR, res) if vals.empty?
+
+    if vals.min.is_a?(Numeric) && vals.max.is_a?(Numeric)
+      res[:min] = vals.min
+      res[:max] = vals.max
     else
-      if vals.min.is_a?(Numeric) && vals.max.is_a?(Numeric)
-        res[:min] = vals.min
-        res[:max] = vals.max
-      else
-        id = sched.nameString
-        OSut.log(err, "Non-numeric value in '#{id}' (#{mth})")
-      end
+      log(ERR, "Non-numeric values in '#{id}' (#{mth})")
     end
 
     res
   end
-
-  ##
-  # Return min & max values of a schedule (compact).
-  #
-  # @param sched [OpenStudio::Model::ScheduleCompact] schedule
-  #
-  # @return [Hash] min: (Float), max: (Float)
-  # @return [Hash] min: nil, max: nil (if invalid input)
 
   ##
   # Return min & max values for schedule (fixed interval).
@@ -294,31 +252,25 @@ module OSut
   # @return [Hash] min: (Float), max: (Float)
   # @return [Hash] min: nil, max: nil (if invalid input)
   def scheduleFixedIntervalMinMax(sched)
-    mth      = "scheduleFixedIntervalMinMax"
+    mth      = "OSut::#{__callee__}"
     cl       = OpenStudio::Model::ScheduleFixedInterval
-    dbg      = OSut::DEBUG
-    err      = OSut::ERROR
     vals     = []
     prev_str = ""
     res      = { min: nil, max: nil }
 
-    return mismatch(sched, cl, mth, res, dbg) unless sched.is_a?(cl)
+    return invalid("sched", mth, 1, DBG, res) unless sched.respond_to?(NS)
+    id = sched.nameString
+    return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
 
-    # unless sched && sched.is_a?(cl)
-    #   TBD.log(TBD::DEBUG,
-    #     "Invalid fixed interval MinMax schedule (argument) - skipping")
-    #   return result
-    # end
+    vals = sched.timeSeries.values
+    if vals.min.is_a?(Numeric) && vals.max.is_a?(Numeric)
+      res[:min] = vals.min
+      res[:max] = vals.max
+    else
+      log(ERR, "Non-numeric values in '#{id}' (#{mth})")
+    end
 
-    min = nil
-    max = nil
-    values = sched.timeSeries.values
-    min = values.min if values.min.is_a?(Numeric)
-    max = values.max if values.max.is_a?(Numeric)
-
-    res[:min] = min
-    res[:max] = max
-    result
+    res
   end
 
   ##
@@ -327,8 +279,8 @@ module OSut
   #
   # @param zone [OpenStudio::Model::ThermalZone] a thermal zone
   #
-  # @return [Hash] setpoint: (Float), dual: (Bool)
-  # @return [Hash] setpoint: nil, dual: false (if invalid input)
+  # @return [Hash] spt: (Float), dual: (Bool)
+  # @return [Hash] spt: nil, dual: false (if invalid input)
   def maxHeatScheduledSetpoint(zone)
     # Largely inspired from Parker & Marrec's "thermal_zone_heated?" procedure.
     # The solution here is a tad more relaxed to encompass SEMI-HEATED zones as
@@ -338,13 +290,13 @@ module OSut
     # github.com/NREL/openstudio-standards/blob/
     # 58964222d25783e9da4ae292e375fb0d5c902aa5/lib/openstudio-standards/
     # standards/Standards.ThermalZone.rb#L910
-    mth = "maxHeatScheduledSetpoint"
+    mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::ThermalZone
-    err = OSut::ERROR
-    res = { setpoint: nil, dual: false }
+    res = { spt: nil, dual: false }
 
-    return OSut.mismatch(zone, cl, mth, res) unless zone.is_a?(cl)
-    # return res unless zone && zone.is_a?(cl)
+    return invalid("zone", mth, 1, DBG, res) unless sched.respond_to?(NS)
+    id = zone.nameString
+    return mismatch(id, zone, cl, mth, DBG, res) unless zone.is_a?(cl)
 
     # Zone radiant heating? Get schedule from radiant system.
     zone.equipment.each do |equip|
@@ -399,11 +351,8 @@ module OSut
         max = scheduleRulesetMinMax(sched)[:max]
 
         if max
-          if res[:setpoint]
-            res[:setpoint] = max if max > res[:setpoint]
-          else
-            res[:setpoint] = max
-          end
+          res[:spt] = max unless res[:spt]
+          res[:spt] = max     if res[:spt] < max
         end
       end
 
@@ -412,11 +361,8 @@ module OSut
         max = scheduleConstantMinMax(sched)[:max]
 
         if max
-          if res[:setpoint]
-            res[:setpoint] = max if max > res[:setpoint]
-          else
-            res[:setpoint] = max
-          end
+          res[:spt] = max unless res[:spt]
+          res[:spt] = max     if res[:spt] < max
         end
       end
 
@@ -425,21 +371,14 @@ module OSut
         max = scheduleCompactMinMax(sched)[:max]
 
         if max
-          if res[:setpoint]
-            res[:setpoint] = max if max > res[:setpoint]
-          else
-            res[:setpoint] = max
-          end
+          res[:spt] = max unless res[:spt]
+          res[:spt] = max     if res[:spt] < max
         end
       end
     end
 
-    return res if res[:setpoint]
-
-    if zone.thermostat.empty?
-      return res
-    end
-
+    return res if res[:spt]
+    return res if zone.thermostat.empty?
     tstat = zone.thermostat.get
 
     unless tstat.to_ThermostatSetpointDualSetpoint.empty? &&
@@ -460,21 +399,15 @@ module OSut
           max = scheduleRulesetMinMax(sched)[:max]
 
           if max
-            if res[:setpoint]
-              res[:setpoint] = max if max > res[:setpoint]
-            else
-              res[:setpoint] = max
-            end
+            res[:spt] = max unless res[:spt]
+            res[:spt] = max     if res[:spt] < max
           end
 
           dd = sched.winterDesignDaySchedule
 
           unless dd.values.empty?
-            if res[:setpoint]
-              res[:setpoint] = dd.values.max if dd.values.max > res[:setpoint]
-            else
-              res[:setpoint] = dd.values.max
-            end
+            res[:spt] = dd.values.max unless res[:spt]
+            res[:spt] = dd.values.max     if res[:spt] < dd.values.max
           end
         end
 
@@ -483,11 +416,8 @@ module OSut
           max = scheduleConstantMinMax(sched)[:max]
 
           if max
-            if res[:setpoint]
-              res[:setpoint] = max if max > res[:setpoint]
-            else
-              res[:setpoint] = max
-            end
+            res[:spt] = max unless res[:spt]
+            res[:spt] = max     if res[:spt] < max
           end
         end
 
@@ -496,11 +426,8 @@ module OSut
           max = scheduleCompactMinMax(sched)[:max]
 
           if max
-            if res[:setpoint]
-              res[:setpoint] = max if max > res[:setpoint]
-            else
-              res[:setpoint] = max
-            end
+            res[:spt] = max unless res[:spt]
+            res[:spt] = max     if res[:spt] < max
           end
         end
 
@@ -512,11 +439,8 @@ module OSut
             dd = week.winterDesignDaySchedule.get
             next unless dd.values.empty?
 
-            if res[:setpoint]
-              res[:setpoint] = dd.values.max if dd.values.max > res[:setpoint]
-            else
-              res[:setpoint] = dd.values.max
-            end
+            res[:spt] = dd.values.max unless res[:spt]
+            res[:spt] = dd.values.max     if res[:spt] < dd.values.max
           end
         end
       end
@@ -531,12 +455,16 @@ module OSut
   # @param model [OpenStudio::Model::Model] a model
   #
   # @return [Bool] true if valid heating temperature setpoints
+  # @return [Bool] false if invalid input
   def heatingTemperatureSetpoints?(model)
-    return false unless model && model.is_a?(OpenStudio::Model::Model)
+    mth = "OSut::#{__callee__}"
+    cl = OpenStudio::Model::Model
+
+    return invalid("model", mth, 1, DBG, false) unless model
+    return mismatch("model", model, cl, mth, DBG, false) unless model.is_a?(cl)
 
     model.getThermalZones.each do |zone|
-      max, _ = maxHeatScheduledSetpoint(zone)
-      return true if max
+      return true if maxHeatScheduledSetpoint(zone)[:spt]
     end
 
     false
@@ -548,30 +476,21 @@ module OSut
   #
   # @param zone [OpenStudio::Model::ThermalZone] a thermal zone
   #
-  # @return [Hash] setpoint: (Float), dual: (Bool)
-  # @return [Hash] setpoint: nil, dual: false (if invalid input)
+  # @return [Hash] spt: (Float), dual: (Bool)
+  # @return [Hash] spt: nil, dual: false (if invalid input)
   def minCoolScheduledSetpoint(zone)
     # Largely inspired from Parker & Marrec's "thermal_zone_cooled?" procedure.
     #
     # github.com/NREL/openstudio-standards/blob/
     # 99cf713750661fe7d2082739f251269c2dfd9140/lib/openstudio-standards/
     # standards/Standards.ThermalZone.rb#L1058
-    mth = "minCoolScheduledSetpoint"
-    cl1 = OpenStudio::Model::ThermalZone
-    err = OSut::ERROR
-    stp = { setpoint: nil, dual: false }
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::ThermalZone
+    res = { spt: nil, dual: false }
 
-    unless zone
-      OSut.log(err, "Invalid argument (#{mth})")
-      return res
-    end
-
+    return invalid("zone", mth, 1, DBG, res) unless sched.respond_to?(NS)
     id = zone.nameString
-
-    unless zone.is_a?(cl1)
-      OSut.log(err, "'#{id}': #{zone.class}? expecting #{cl1} (#{mth})")
-      return res
-    end
+    return mismatch(id, zone, cl, mth, DBG, res) unless zone.is_a?(cl)
 
     # Zone radiant cooling? Get schedule from radiant system.
     zone.equipment.each do |equip|
@@ -610,11 +529,8 @@ module OSut
         min = scheduleRulesetMinMax(sched)[:min]
 
         if min
-          if res[:setpoint]
-            res[:setpoint] = min if min < res[:setpoint]
-          else
-            res[:setpoint] = min
-          end
+          res[:spt] = min unless res[:spt]
+          res[:spt] = min     if res[:spt] > min
         end
       end
 
@@ -623,11 +539,8 @@ module OSut
         min = scheduleConstantMinMax(sched)[:min]
 
         if min
-          if res[:setpoint]
-            res[:setpoint] = min if min < res[:setpoint]
-          else
-            res[:setpoint] = min
-          end
+          res[:spt] = min unless res[:spt]
+          res[:spt] = min     if res[:spt] > min
         end
       end
 
@@ -636,22 +549,19 @@ module OSut
         min = scheduleCompactMinMax(sched)[:min]
 
         if min
-          if res[:setpoint]
-            res[:setpoint] = min if min < res[:setpoint]
-          else
-            res[:setpoint] = min
-          end
+          res[:spt] = min unless res[:spt]
+          res[:spt] = min     if res[:spt] > min
         end
       end
     end
 
-    return res if res[:setpoint]
+    return res if res[:spt]
     return res if zone.thermostat.empty?
     tstat = zone.thermostat.get
 
     unless tstat.to_ThermostatSetpointDualSetpoint.empty? &&
            tstat.to_ZoneControlThermostatStagedDualSetpoint.empty?
-      dual = true
+      res[:dual] = true
 
       unless tstat.to_ThermostatSetpointDualSetpoint.empty?
         tstat = tstat.to_ThermostatSetpointDualSetpoint.get
@@ -667,21 +577,15 @@ module OSut
           min = scheduleRulesetMinMax(sched)[:min]
 
           if min
-            if res[:setpoint]
-              res[:setpoint] = min if min < res[:setpoint]
-            else
-              res[:setpoint] = min
-            end
+            res[:spt] = min unless res[:spt]
+            res[:spt] = min     if res[:spt] > min
           end
 
           dd = sched.summerDesignDaySchedule
 
           unless dd.values.empty?
-            if res[:setpoint]
-              res[:setpoint] = dd.values.min if dd.values.min < setpoint
-            else
-              res[:setpoint] = dd.values.min
-            end
+            res[:spt] = dd.values.min unless res[:spt]
+            res[:spt] = dd.values.min     if res[:spt] > dd.values.min
           end
         end
 
@@ -690,11 +594,8 @@ module OSut
           min = scheduleConstantMinMax(sched)[:min]
 
           if min
-            if res[:setpoint]
-              res[:setpoint] = min if min < res[:setpoint]
-            else
-              res[:setpoint] = min
-            end
+            res[:spt] = min unless res[:spt]
+            res[:spt] = min     if res[:spt] > min
           end
         end
 
@@ -703,11 +604,8 @@ module OSut
           min = scheduleCompactMinMax(sched)[:min]
 
           if min
-            if res[:setpoint]
-              res[:setpoint] = min if min < res[:setpoint]
-            else
-              res[:setpoint] = min
-            end
+            res[:spt] = min unless res[:spt]
+            res[:spt] = min     if res[:spt] > min
           end
         end
 
@@ -719,11 +617,8 @@ module OSut
             dd = week.summerDesignDaySchedule.get
             next unless dd.values.empty?
 
-            if res[:setpoint]
-              res[:setpoint] = dd.values.min if dd.values.min < res[:setpoint]
-            else
-              res[:setpoint] = dd.values.min
-            end
+            res[:spt] = dd.values.min unless res[:spt]
+            res[:spt] = dd.values.min     if res[:spt] > dd.values.min
           end
         end
       end
@@ -740,11 +635,14 @@ module OSut
   # @return [Bool] true if valid cooling temperature setpoints
   # @return [Bool] false if invalid input
   def coolingTemperatureSetpoints?(model)
-    return false unless model && model.is_a?(OpenStudio::Model::Model)
+    mth = "OSut::#{__callee__}"
+    cl = OpenStudio::Model::Model
+
+    return invalid("model", mth, 1, DBG, false) unless model
+    return mismatch("model", model, cl, mth, DBG, false) unless model.is_a?(cl)
 
     model.getThermalZones.each do |zone|
-      min, _ = minCoolScheduledSetpoint(zone)
-      return true if min
+      return true if minCoolScheduledSetpoint(zone)[:spt]
     end
 
     false
@@ -758,17 +656,19 @@ module OSut
   # @return [Bool] true if model has one or more HVAC air loops
   # @return [Bool] false if invalid input
   def airLoopsHVAC?(model)
-    answer = false
-    return answer unless model && model.is_a?(OpenStudio::Model::Model)
+    mth = "OSut::#{__callee__}"
+    cl = OpenStudio::Model::Model
+
+    return invalid("model", mth, 1, DBG, false) unless model
+    return mismatch("model", model, cl, mth, DBG, false) unless model.is_a?(cl)
 
     model.getThermalZones.each do |zone|
-      next if answer
       next if zone.canBePlenum
-      answer = true unless zone.airLoopHVACs.empty?
-      answer = true if zone.isPlenum
+      return true unless zone.airLoopHVACs.empty?
+      return true if zone.isPlenum
     end
 
-    answer
+    false
   end
 
   ##
@@ -797,34 +697,29 @@ module OSut
     #   case C: spacetype is "plenum".
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Space
-    stp = { heat: nil, cool: nil }
 
-    return invalid("space", mth, 1, DBG, stp) unless space.respond_to?(NS)
+    return invalid("space", mth, 1, DBG, false) unless space.respond_to?(NS)
     id = space.nameString
-    return mismatch(id, space, cl, mth, DBG, res) unless space.is_a?(cl)
+    return mismatch(id, space, cl, mth, DBG, false) unless space.is_a?(cl)
 
     valid = loops == true || loops == false
-    return invalid("loops", mth, 2, DBG, stp) unless valid
+    return invalid("loops", mth, 2, DBG, false) unless valid
 
     valid = setpoints == true || setpoints == false
-    return invalid("setpoints", mth, 3, DBG, stp) unless valid
+    return invalid("setpoints", mth, 3, DBG, false) unless valid
 
     unless space.thermalZone.empty?
       zone = space.thermalZone.get
       return zone.isPlenum if loops                                     # case A
 
       if setpoints
-        stp[:heat] = maxHeatScheduledSetpoint(zone)
-        stp[:cool] = minCoolScheduledSetpoint(zone)
+        heating = maxHeatScheduledSetpoint(zone)
+        cooling = minCoolScheduledSetpoint(zone)
 
-        # CHECK FOR HASH KEYS ...
-
-        # heating, dual1 = maxHeatScheduledSetpoint(zone)
-        # cooling, dual2 = minCoolScheduledSetpoint(zone)
-        return false if heating || cooling          # directly conditioned space
+        return false if heating[:spt] || cooling[:spt]    # directly conditioned
 
         unless space.partofTotalFloorArea
-          return true if dual1 || dual2                                 # case B
+          return true if heating[:dual] || cooling[:dual]               # case B
         else
           return false
         end
@@ -986,17 +881,17 @@ module OSut
       rule.setName(tag)
 
       unless rule.setStartDate(may01)
-        log(err, "'#{tag}': Can't set start date (#{mth})")
+        log(ERR, "'#{tag}': Can't set start date (#{mth})")
         return nil
       end
 
       unless rule.setEndDate(oct31)
-        log(err, "'#{tag}': Can't set end date (#{mth})")
+        log(ERR, "'#{tag}': Can't set end date (#{mth})")
         return nil
       end
 
       unless rule.setApplyAllDays(true)
-        log(err, "'#{tag}': Can't apply to all days (#{mth})")
+        log(ERR, "'#{tag}': Can't apply to all days (#{mth})")
         return nil
       end
 
@@ -1029,6 +924,7 @@ module OSut
 
     res[:t] = group.siteTransformation
     res[:r] = group.directionofRelativeNorth + model.getBuilding.northAxis
+
     res
   end
 
@@ -1043,7 +939,7 @@ module OSut
   #
   # @return [Bool] true if default construction set holds construction
   # @return [Bool] false if invalid input
-  def holdsConstruction?(set, base, ground, exterior, type)
+  def holdsConstruction?(set, base, ground = false, exterior = false, type = "")
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Model::DefaultConstructionSet
     cl2 = OpenStudio::Model::ConstructionBase
@@ -1062,9 +958,9 @@ module OSut
     valid = exterior == true || exterior == false
     return invalid("exterior", mth, 4, DBG, false) unless valid
 
-    return invalid("type", mth, 5, DBG, false) unless type
     typ = type.to_s.downcase
     valid = typ == "floor" || typ == "wall" || typ == "roofceiling"
+    return invalid("surface type", mth, 5, DBG, false) unless valid
 
     constructions = nil
 
@@ -1130,9 +1026,9 @@ module OSut
       return nil
     end
 
-    return empty(id, mth, ERR) if s.construction.empty?
+    return empty("'#{id}' construction", mth, ERR) if s.construction.empty?
     base = s.construction.get
-    return empty(id, mth, ERR) if s.space.empty?
+    return empty("'#{id}' space", mth, ERR) if s.space.empty?
     space = s.space.get
     type = s.surfaceType
 
@@ -1189,8 +1085,8 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::LayeredConstruction
 
-    return invalid("lc", mth, 1, DBG, 0) unless lc.respond_to?(NS)
-    return mismatch(lc.nameString, lc, cl, mth, DBG) unless lc.is_a?(cl)
+    return invalid("lc", mth, 1, DBG, false) unless lc.respond_to?(NS)
+    return mismatch(lc.nameString, lc, cl, mth, DBG, false) unless lc.is_a?(cl)
 
     lc.layers.each { |m| return false if m.to_StandardOpaqueMaterial.empty? }
     true
