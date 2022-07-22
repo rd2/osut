@@ -13,7 +13,7 @@ RSpec.describe OSut do
   let(:mod1) { Module.new { extend OSut } }
   let(:mod2) { Module.new { extend OSut } }
 
-  it "can check scheduleCompactMinMax (from within class instances)" do
+  it "can check scheduleRulesetMinMax (from within class instances)" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
@@ -26,33 +26,35 @@ RSpec.describe OSut do
     expect(cls1.level).to eq(DBG)
     expect(cls1.clean!).to eq(DBG)
 
-    spt = 22
-    str = "Building HVAC Operation"
-    cl1 = OpenStudio::Model::Schedule
-    cl2 = OpenStudio::Model::ScheduleCompact
-    m1 = "Invalid 'sched' arg #1 (OSut::scheduleCompactMinMax)"
-    m2 = "'#{str}' #{cl1}? expecting #{cl2} (OSut::scheduleCompactMinMax)"
+    sc1 = "Space Thermostat Cooling Setpoint"
+    sc2 = "Schedule Constant 1"
+    cl1 = OpenStudio::Model::ScheduleRuleset
+    cl2 = OpenStudio::Model::ScheduleConstant
+    m1  = "Invalid 'sched' arg #1 (OSut::scheduleRulesetMinMax)"
+    m2  = "'#{sc2}' #{cl2}? expecting #{cl1} (OSut::scheduleRulesetMinMax)"
 
-    sched = OpenStudio::Model::ScheduleCompact.new(model, spt)
-    expect(sched.is_a?(OpenStudio::Model::ScheduleCompact)).to be(true)
-    sched.setName("compact schedule")
+    sched = model.getScheduleRulesetByName(sc1)
+    expect(sched.empty?).to be(false)
+    sched = sched.get
+    expect(sched.is_a?(cl1)).to be(true)
 
-    sch = model.getScheduleByName(str)
+    sch = model.getScheduleConstantByName(sc2)
     expect(sch.empty?).to be(false)
     sch = sch.get
+    expect(sch.is_a?(cl2)).to be(true)
 
     # Valid case.
-    minmax = cls1.scheduleCompactMinMax(sched)
+    minmax = cls1.scheduleRulesetMinMax(sched)
     expect(minmax.is_a?(Hash)).to be(true)
     expect(minmax.key?(:min)).to be(true)
     expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min]).to be_within(TOL).of(spt)
-    expect(minmax[:min]).to be_within(TOL).of(spt)
+    expect(minmax[:min]).to be_within(TOL).of(23.89)
+    expect(minmax[:min]).to be_within(TOL).of(23.89)
     expect(cls1.status.zero?).to be(true)
     expect(cls1.logs.empty?).to be(true)
 
     # Invalid parameter.
-    minmax = cls1.scheduleCompactMinMax(nil)
+    minmax = cls1.scheduleRulesetMinMax(nil)
     expect(minmax.is_a?(Hash)).to be(true)
     expect(minmax.key?(:min)).to be(true)
     expect(minmax.key?(:max)).to be(true)
@@ -65,7 +67,7 @@ RSpec.describe OSut do
     expect(cls1.clean!).to eq(DBG)
 
     # Invalid parameter.
-    minmax = cls1.scheduleCompactMinMax(model)
+    minmax = cls1.scheduleRulesetMinMax(model)
     expect(minmax.is_a?(Hash)).to be(true)
     expect(minmax.key?(:min)).to be(true)
     expect(minmax.key?(:max)).to be(true)
@@ -78,7 +80,7 @@ RSpec.describe OSut do
     expect(cls1.clean!).to eq(DBG)
 
     # Invalid parameter (wrong schedule type)
-    minmax = cls1.scheduleCompactMinMax(sch)
+    minmax = cls1.scheduleRulesetMinMax(sch)
     expect(minmax.is_a?(Hash)).to be(true)
     expect(minmax.key?(:min)).to be(true)
     expect(minmax.key?(:max)).to be(true)
@@ -87,9 +89,155 @@ RSpec.describe OSut do
     expect(cls1.debug?).to be(true)
     expect(cls1.logs.size).to eq(1)
     expect(cls1.logs.first[:message]).to eq(m2)
+  end
+
+  it "can check scheduleConstantMinMax (from within class instances)" do
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    file = File.join(__dir__, "files/osms/in/seb.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
 
     expect(cls1.clean!).to eq(DBG)
 
+    sc1 = "Schedule Constant 1"
+    sc2 = "Space Thermostat Cooling Setpoint"
+    cl1 = OpenStudio::Model::ScheduleConstant
+    cl2 = OpenStudio::Model::ScheduleRuleset
+    m1  = "Invalid 'sched' arg #1 (OSut::scheduleConstantMinMax)"
+    m2  = "'#{sc2}' #{cl2}? expecting #{cl1} (OSut::scheduleConstantMinMax)"
+
+    sched = model.getScheduleConstantByName(sc1)
+    expect(sched.empty?).to be(false)
+    sched = sched.get
+    expect(sched.is_a?(cl1)).to be(true)
+
+    sch = model.getScheduleRulesetByName(sc2)
+    expect(sch.empty?).to be(false)
+    sch = sch.get
+    expect(sch.is_a?(cl2)).to be(true)
+
+    # Valid case.
+    minmax = cls1.scheduleConstantMinMax(sched)
+    expect(minmax.is_a?(Hash)).to be(true)
+    expect(minmax.key?(:min)).to be(true)
+    expect(minmax.key?(:max)).to be(true)
+    expect(minmax[:min]).to be_within(TOL).of(139.88)
+    expect(minmax[:min]).to be_within(TOL).of(139.88)
+    expect(cls1.status.zero?).to be(true)
+    expect(cls1.logs.empty?).to be(true)
+
+    # Invalid parameter.
+    minmax = cls1.scheduleConstantMinMax(nil)
+    expect(minmax.is_a?(Hash)).to be(true)
+    expect(minmax.key?(:min)).to be(true)
+    expect(minmax.key?(:max)).to be(true)
+    expect(minmax[:min].nil?).to be(true)
+    expect(minmax[:max].nil?).to be(true)
+    expect(cls1.debug?).to be(true)
+    expect(cls1.logs.size).to eq(1)
+    expect(cls1.logs.first[:message]).to eq(m1)
+
+    expect(cls1.clean!).to eq(DBG)
+
+    # Invalid parameter.
+    minmax = cls1.scheduleConstantMinMax(model)
+    expect(minmax.is_a?(Hash)).to be(true)
+    expect(minmax.key?(:min)).to be(true)
+    expect(minmax.key?(:max)).to be(true)
+    expect(minmax[:min].nil?).to be(true)
+    expect(minmax[:max].nil?).to be(true)
+    expect(cls1.debug?).to be(true)
+    expect(cls1.logs.size).to eq(1)
+    expect(cls1.logs.first[:message]).to eq(m1)
+
+    expect(cls1.clean!).to eq(DBG)
+
+    # Invalid parameter (wrong schedule type)
+    minmax = cls1.scheduleConstantMinMax(sch)
+    expect(minmax.is_a?(Hash)).to be(true)
+    expect(minmax.key?(:min)).to be(true)
+    expect(minmax.key?(:max)).to be(true)
+    expect(minmax[:min].nil?).to be(true)
+    expect(minmax[:max].nil?).to be(true)
+    expect(cls1.debug?).to be(true)
+    expect(cls1.logs.size).to eq(1)
+    expect(cls1.logs.first[:message]).to eq(m2)
+  end
+
+  it "can check scheduleCompactMinMax (from within module instances)" do
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    file = File.join(__dir__, "files/osms/in/seb.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    expect(mod1.clean!).to eq(DBG)
+
+    spt = 22
+    sc2 = "Building HVAC Operation"
+    cl1 = OpenStudio::Model::ScheduleCompact
+    cl2 = OpenStudio::Model::Schedule
+
+    m1 = "Invalid 'sched' arg #1 (OSut::scheduleCompactMinMax)"
+    m2 = "'#{sc2}' #{cl2}? expecting #{cl1} (OSut::scheduleCompactMinMax)"
+
+    sched = OpenStudio::Model::ScheduleCompact.new(model, spt)
+    expect(sched.is_a?(OpenStudio::Model::ScheduleCompact)).to be(true)
+    sched.setName("compact schedule")
+
+    sch = model.getScheduleByName(sc2)
+    expect(sch.empty?).to be(false)
+    sch = sch.get
+
+    # Valid case.
+    minmax = mod1.scheduleCompactMinMax(sched)
+    expect(minmax.is_a?(Hash)).to be(true)
+    expect(minmax.key?(:min)).to be(true)
+    expect(minmax.key?(:max)).to be(true)
+    expect(minmax[:min]).to be_within(TOL).of(spt)
+    expect(minmax[:min]).to be_within(TOL).of(spt)
+    expect(mod1.status.zero?).to be(true)
+    expect(mod1.logs.empty?).to be(true)
+
+    # Invalid parameter.
+    minmax = mod1.scheduleCompactMinMax(nil)
+    expect(minmax.is_a?(Hash)).to be(true)
+    expect(minmax.key?(:min)).to be(true)
+    expect(minmax.key?(:max)).to be(true)
+    expect(minmax[:min].nil?).to be(true)
+    expect(minmax[:max].nil?).to be(true)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m1)
+
+    expect(mod1.clean!).to eq(DBG)
+
+    # Invalid parameter.
+    minmax = mod1.scheduleCompactMinMax(model)
+    expect(minmax.is_a?(Hash)).to be(true)
+    expect(minmax.key?(:min)).to be(true)
+    expect(minmax.key?(:max)).to be(true)
+    expect(minmax[:min].nil?).to be(true)
+    expect(minmax[:max].nil?).to be(true)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m1)
+
+    expect(mod1.clean!).to eq(DBG)
+
+    # Invalid parameter (wrong schedule type)
+    minmax = mod1.scheduleCompactMinMax(sch)
+    expect(minmax.is_a?(Hash)).to be(true)
+    expect(minmax.key?(:min)).to be(true)
+    expect(minmax.key?(:max)).to be(true)
+    expect(minmax[:min].nil?).to be(true)
+    expect(minmax[:max].nil?).to be(true)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m2)
   end
 
   it "can check construction thickness" do
@@ -151,55 +299,6 @@ RSpec.describe OSut do
     expect(cls2.logs.empty?).to be(true)
     expect(cls1.status.zero?).to eq(true)
     expect(cls1.logs.empty?).to be(true)
-  end
-
-  it "can check construction thickness (from within module instances)" do
-    # Repeating the same exercice as above, yet with module instances.
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    expect(cls1.clean!).to eq(DBG)
-
-    model.getConstructions.each do |c|
-      next if c.to_LayeredConstruction.empty?
-      c = c.to_LayeredConstruction.get
-      id = c.nameString
-      th = mod1.thickness(c)
-      expect(th).to be_within(TOL).of(0) if id.include?("Air Wall")
-      expect(th).to be_within(TOL).of(0) if id.include?("Double pane")
-      next if id.include?("Air Wall")
-      next if id.include?("Double pane")
-      expect(th > 0).to be(true)
-    end
-
-    expect(mod1.status).to eq(ERR)
-    expect(mod1.logs.size).to eq(2)
-    msg = "holds non-StandardOpaqueMaterial(s) (OSut::thickness)"
-    mod1.logs.each { |l| expect(l[:message].include?(msg)).to be(true) }
-
-    expect(mod2.status).to eq(ERR)
-    mod2.clean!
-    expect(mod1.status.zero?).to eq(true)
-    expect(mod1.logs.empty?).to be(true)
-
-    model.getConstructions.each do |c|
-      next if c.to_LayeredConstruction.empty?
-      c = c.to_LayeredConstruction.get
-      id = c.nameString
-      next if id.include?("Air Wall")
-      next if id.include?("Double pane")
-      th = mod2.thickness(c)
-      expect(th > 0).to be(true)
-    end
-
-    expect(mod2.status.zero?).to be(true)
-    expect(mod2.logs.empty?).to be(true)
-    expect(mod1.status.zero?).to eq(true)
-    expect(mod1.logs.empty?).to be(true)
   end
 
   it "can check if a set holds a construction" do
