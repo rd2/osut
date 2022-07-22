@@ -245,15 +245,15 @@ module OSut
   end
 
   ##
-  # Return min & max values for schedule (fixed interval).
+  # Return min & max values for schedule (interval).
   #
-  # @param sched [OpenStudio::Model::ScheduleFixedInterval] schedule
+  # @param sched [OpenStudio::Model::ScheduleInterval] schedule
   #
   # @return [Hash] min: (Float), max: (Float)
   # @return [Hash] min: nil, max: nil (if invalid input)
-  def scheduleFixedIntervalMinMax(sched)
+  def scheduleIntervalMinMax(sched)
     mth      = "OSut::#{__callee__}"
-    cl       = OpenStudio::Model::ScheduleFixedInterval
+    cl       = OpenStudio::Model::ScheduleInterval
     vals     = []
     prev_str = ""
     res      = { min: nil, max: nil }
@@ -294,7 +294,7 @@ module OSut
     cl  = OpenStudio::Model::ThermalZone
     res = { spt: nil, dual: false }
 
-    return invalid("zone", mth, 1, DBG, res) unless sched.respond_to?(NS)
+    return invalid("zone", mth, 1, DBG, res) unless zone.respond_to?(NS)
     id = zone.nameString
     return mismatch(id, zone, cl, mth, DBG, res) unless zone.is_a?(cl)
 
@@ -488,7 +488,7 @@ module OSut
     cl  = OpenStudio::Model::ThermalZone
     res = { spt: nil, dual: false }
 
-    return invalid("zone", mth, 1, DBG, res) unless sched.respond_to?(NS)
+    return invalid("zone", mth, 1, DBG, res) unless zone.respond_to?(NS)
     id = zone.nameString
     return mismatch(id, zone, cl, mth, DBG, res) unless zone.is_a?(cl)
 
@@ -687,14 +687,20 @@ module OSut
     # 58964222d25783e9da4ae292e375fb0d5c902aa5/lib/openstudio-standards/
     # standards/Standards.Space.rb#L1384
 
-    # For a fully-developed OpenStudio model (complete with HVAC air loops),
-    # space tagged as plenum if zone "isPlenum" (case A).
+    # A space may be tagged as a plenum if:
     #
-    # In absence of HVAC air loops, 2x other cases trigger a plenum tag:
-    #   case B: space excluded from building's total floor area, yet zone holds
-    #           an "inactive" thermostat (i.e., can't extract valid setpoints);
-    #           ... or
-    #   case C: spacetype is "plenum".
+    # CASE A: its zone's "isPlenum" == true (SDK method) for a fully-developed
+    #         OpenStudio model (complete with HVAC air loops);
+    #
+    # CASE B: it's excluded from building's total floor area yet linked to a
+    #         zone holding an "inactive" thermostat (i.e., can't extract
+    #         valid setpoints);
+    #
+    # CASE C: it has a spacetype whose name holds "plenum", or a spacetype with
+    #         a 'standards spacetype' holding "plenum" (case insensitive); OR
+    #
+    # CASE D: its name string holds "plenum" (also case insensitive).
+
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Space
 
@@ -710,7 +716,7 @@ module OSut
 
     unless space.thermalZone.empty?
       zone = space.thermalZone.get
-      return zone.isPlenum if loops                                     # case A
+      return true if zone.isPlenum && loops                             # CASE A
 
       if setpoints
         heating = maxHeatScheduledSetpoint(zone)
@@ -719,22 +725,22 @@ module OSut
         return false if heating[:spt] || cooling[:spt]    # directly conditioned
 
         unless space.partofTotalFloorArea
-          return true if heating[:dual] || cooling[:dual]               # case B
-        else
-          return false
+          return true if heating[:dual] || cooling[:dual]               # CASE B
         end
       end
     end
 
-    unless space.spaceType.empty?                                       # case C
+    unless space.spaceType.empty?
       type = space.spaceType.get
-      return true if type.nameString.downcase == "plenum"
+      return true if type.nameString.downcase.include?("plenum")        # CASE C
 
       unless type.standardsSpaceType.empty?
         type = type.standardsSpaceType.get
-        return true if type.downcase == "plenum"
+        return true if type.downcase.include?("plenum")                 # CASE C
       end
     end
+
+    return true if space.nameString.downcase.include?("plenum")
 
     false
   end
