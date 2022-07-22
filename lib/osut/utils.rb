@@ -908,33 +908,6 @@ module OSut
   end
 
   ##
-  # Return OpenStudio site/space transformation & rotation angle [0,2PI) rads.
-  #
-  # @param model [OpenStudio::Model::Model] a model
-  # @param group [OpenStudio::Model::PlanarSurfaceGroup] a group
-  #
-  # @return [Hash] t: (OpenStudio::Transformation), r: Float
-  # @return [Hash] t: nil, r: nil (if invalid input)
-  def transforms(model, group)
-    mth = "OSut::#{__callee__}"
-    cl1 = OpenStudio::Model::Model
-    cl2 = OpenStudio::Model::PlanarSurfaceGroup
-    res = { t: nil, r: nil }
-
-    return invalid("model", mth, 1, DBG, res) unless model
-    return mismatch("model", model, cl1, mth, DBG, res) unless model.is_a?(cl1)
-
-    return invalid("group", mth, 2, DBG, res) unless group.respond_to?(NS)
-    id = group.nameString
-    return mismatch(id, group, cl2, mth, DBG, res) unless group.is_a?(cl2)
-
-    res[:t] = group.siteTransformation
-    res[:r] = group.directionofRelativeNorth + model.getBuilding.northAxis
-
-    res
-  end
-
-  ##
   # Validate if default construction set holds a base ground construction.
   #
   # @param set [OpenStudio::Model::DefaultConstructionSet] a default set
@@ -1121,5 +1094,32 @@ module OSut
     thickness = 0.0
     lc.layers.each { |m| thickness += m.thickness }
     thickness
+  end
+
+  ##
+  # Return OpenStudio site/space transformation & rotation angle [0,2PI) rads.
+  #
+  # @param model [OpenStudio::Model::Model] a model
+  # @param group [OpenStudio::Model::PlanarSurfaceGroup] a group
+  #
+  # @return [Hash] t: (OpenStudio::Transformation), r: Float
+  # @return [Hash] t: nil, r: nil (if invalid input)
+  def transforms(model, group)
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Model::Model
+    cl2 = OpenStudio::Model::PlanarSurfaceGroup
+    res = { t: nil, r: nil }
+
+    return invalid("model", mth, 1, DBG, res) unless model
+    return mismatch("model", model, cl1, mth, DBG, res) unless model.is_a?(cl1)
+
+    return invalid("group", mth, 2, DBG, res) unless group.respond_to?(NS)
+    id = group.nameString
+    return mismatch(id, group, cl2, mth, DBG, res) unless group.is_a?(cl2)
+
+    res[:t] = group.siteTransformation
+    res[:r] = group.directionofRelativeNorth + model.getBuilding.northAxis
+
+    res
   end
 end

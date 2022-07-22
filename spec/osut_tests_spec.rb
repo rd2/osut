@@ -634,57 +634,6 @@ RSpec.describe OSut do
     end
   end
 
-  it "checks model transformation" do
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    m = "OSut::transforms"
-    expect(mod1.clean!).to eq(DBG)
-
-    model.getSpaces.each do |space|
-      tr = mod1.transforms(model, space)
-      expect(tr.is_a?(Hash)).to be(true)
-      expect(tr.key?(:t)).to be(true)
-      expect(tr.key?(:r)).to be(true)
-      expect(tr[:t].is_a?(OpenStudio::Transformation)).to be(true)
-      expect(tr[:r]).to within(TOL).of(0)
-    end
-
-    expect(mod1.status.zero?).to be(true)
-
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    model.getSpaces.each do |space|
-      tr = mod1.transforms(model, space)
-      expect(tr.is_a?(Hash)).to be(true)
-      expect(tr.key?(:t)).to be(true)
-      expect(tr.key?(:r)).to be(true)
-      expect(tr[:t].is_a?(OpenStudio::Transformation)).to be(true)
-      expect(tr[:r]).to within(TOL).of(0)
-    end
-
-    expect(mod1.status.zero?).to be(true)
-
-    tr = mod1.transforms(model, nil)
-    expect(tr.is_a?(Hash)).to be(true)
-    expect(tr.key?(:t)).to be(true)
-    expect(tr.key?(:r)).to be(true)
-    expect(tr[:t].nil?).to be(true)
-    expect(tr[:r].nil?).to be(true)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'group' arg #2 (#{m})")
-  end
-
   it "checks construction thickness" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
@@ -844,5 +793,56 @@ RSpec.describe OSut do
       msg = "construction not defaulted (defaultConstructionSet)"
       mod1.logs.each {|l| expect(l[:message].include?(msg)) }
     end
+  end
+
+  it "checks model transformation" do
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    file = File.join(__dir__, "files/osms/in/seb.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    m = "OSut::transforms"
+    expect(mod1.clean!).to eq(DBG)
+
+    model.getSpaces.each do |space|
+      tr = mod1.transforms(model, space)
+      expect(tr.is_a?(Hash)).to be(true)
+      expect(tr.key?(:t)).to be(true)
+      expect(tr.key?(:r)).to be(true)
+      expect(tr[:t].is_a?(OpenStudio::Transformation)).to be(true)
+      expect(tr[:r]).to within(TOL).of(0)
+    end
+
+    expect(mod1.status.zero?).to be(true)
+
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    model.getSpaces.each do |space|
+      tr = mod1.transforms(model, space)
+      expect(tr.is_a?(Hash)).to be(true)
+      expect(tr.key?(:t)).to be(true)
+      expect(tr.key?(:r)).to be(true)
+      expect(tr[:t].is_a?(OpenStudio::Transformation)).to be(true)
+      expect(tr[:r]).to within(TOL).of(0)
+    end
+
+    expect(mod1.status.zero?).to be(true)
+
+    tr = mod1.transforms(model, nil)
+    expect(tr.is_a?(Hash)).to be(true)
+    expect(tr.key?(:t)).to be(true)
+    expect(tr.key?(:r)).to be(true)
+    expect(tr[:t].nil?).to be(true)
+    expect(tr[:r].nil?).to be(true)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq("Invalid 'group' arg #2 (#{m})")
   end
 end
