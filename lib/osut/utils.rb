@@ -1097,6 +1097,171 @@ module OSut
   end
 
   ##
+  # Return total air film resistance for fenestration.
+  #
+  # @param usi [Float] a fenestrated construction's U-factor (W/m2•K)
+  #
+  # @return [Float] total air film resistance in m2•K/W (0.1216 if errors)
+  def glazingAirFilmRSi(usi = 5.85)
+    # The sum of thermal resistances of calculated exterior and interior film
+    # coefficients under standard winter conditions are taken from:
+    #
+    #   https://bigladdersoftware.com/epx/docs/9-6/engineering-reference/
+    #   window-calculation-module.html#simple-window-model
+    #
+    # These remain acceptable approximations for flat windows, yet likely
+    # unsuitable for subsurfaces with curved or projecting shapes like domed
+    # skylights. The solution here is considered an adequate fix for reporting,
+    # awaiting eventual OpenStudio (and EnergyPlus) upgrades to report NFRC 100
+    # (or ISO) air film resistances under standard winter conditions.
+    #
+    # For U-factors above 8.0 W/m2•K (or invalid input), the function returns
+    # 0.1216 m2•K/W, which corresponds to a construction with a single glass
+    # layer thickness of 2mm & k = ~0.6 W/m.K.
+    #
+    # The EnergyPlus Engineering calculations were designed for vertical windows
+    # - not horizontal, slanted or domed surfaces - use with caution.
+    mth = "OSut::#{__callee__}"
+    cl = Numeric
+
+    return invalid("usi", mth, 1, DBG, 0.1216) unless usi
+    return mismatch("usi", usi, cl, mth, DBG, 0.1216) unless usi.is_a?(cl)
+    return invalid("usi", mth, 1, WRN, 0.1216) if usi > 8.0
+
+    rsi = 1 / (0.025342 * usi + 29.163853)   # exterior film, next interior film
+
+    return rsi + 1 / (0.359073 * Math.log(usi) + 6.949915) if usi < 5.85
+    return rsi + 1 / (1.788041 * usi - 2.886625)
+  end
+
+  ##
+  # Return a construction's 'standard calc' thermal resistance (with air films).
+  #
+  # @param lc [OpenStudio::Model::LayeredConstruction] a layered construction
+  # @param film [Float] thermal resistance of surface air films (m2•K/W)
+  # @param t [Float] gas temperature (°C) (optional)
+  #
+  # @return [Float] calculated RSi at standard conditions (0 if error)
+  def rsi(lc, film, t = 0.0)
+    # This is adapted from BTAP's Material Module's "get_conductance" (P. Lopez)
+    #
+    #   https://github.com/NREL/OpenStudio-Prototype-Buildings/blob/
+    #   c3d5021d8b7aef43e560544699fb5c559e6b721d/lib/btap/measures/
+    #   btap_equest_converter/envelope.rb#L122
+
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Model::LayeredConstruction
+    cl2 = Numeric
+
+    return invalid("lc", mth, 1, DBG, 0) unless lc.respond_to?(NS)
+    id = lc.nameString
+    return mismatch(id, lc, cl1, mth, DBG, 0) unless lc.is_a?(cl1)
+
+    return invalid("film", mth, 2, DBG, 0) unless film
+    return invalid("temperature", mth, 3, DBG, 0) unless t
+
+    return mismatch("film", film, cl2, mth, DBG, 0) unless film.is_a?(cl2)
+    return mismatch("temperature", t, cl2, mth, DBG, 0) unless t.is_a?(cl2)
+
+    tt  = t + 273.0                                                    # °C to K
+    return zero("temperature", mth, DBG, 0) if tt < 0
+    return zero("film", mth, DBG, 0) if film < 0
+
+    rsi = film
+
+    lc.layers.each do |m|
+      # Fenestration materials first (ignoring shades, screens, etc.)
+      unless m.to_SimpleGlazing.empty?
+        return 1 / m.to_SimpleGlazing.get.uFactor              # no need to loop
+      end
+      unless m.to_StandardGlazing.empty?
+        rsi += m.to_StandardGlazing.get.thermalResistance
+      end
+      unless m.to_RefractionExtinctionGlazing.empty?
+        rsi += m.to_RefractionExtinctionGlazing.get.thermalResistance
+      end
+      unless m.to_Gas.empty?
+        rsi += m.to_Gas.get.getThermalResistance(tt)
+      end
+      unless m.to_GasMixture.empty?
+        rsi += m.to_GasMixture.get.getThermalResistance(tt)
+      end
+
+      # Opaque materials next.
+      unless m.to_StandardOpaqueMaterial.empty?
+        rsi += m.to_StandardOpaqueMaterial.get.thermalResistance
+      end
+      unless m.to_MasslessOpaqueMaterial.empty?
+        rsi += m.to_MasslessOpaqueMaterial.get.thermalResistance
+      end
+      unless m.to_RoofVegetation.empty?
+        rsi += m.to_RoofVegetation.get.thermalResistance
+      end
+      unless m.to_AirGap.empty?
+        rsi += m.to_AirGap.get.thermalResistance
+      end
+    end
+
+    rsi
+  end
+
+  ##
+  # Identify a layered construction's (opaque) insulating layer. The method
+  # returns a 3-keyed hash ... :index (insulating layer index within layered
+  # construction), :type (standard: or massless: material type), and
+  # :r (material thermal resistance in m2•K/W).
+  #
+  # @param lc [OpenStudio::Model::LayeredConstruction] a layered construction
+  #
+  # @return [Hash] index: (Integer), type: (:standard or :massless), r: (Float)
+  # @return [Hash] index: nil, type: nil, r: 0 (if invalid input)
+  def insulatingLayer(lc)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::LayeredConstruction
+    res = { index: nil, type: nil, r: 0.0 }
+    i   = 0                                                           # iterator
+
+    return invalid("lc", mth, 1, DBG, res) unless lc.respond_to?(NS)
+    id = lc.nameString
+    return mismatch(id, lc, cl1, mth, DBG, res) unless lc.is_a?(cl)
+
+    lc.layers.each do |m|
+
+      unless m.to_MasslessOpaqueMaterial.empty?
+        m             = m.to_MasslessOpaqueMaterial.get
+
+        if m.thermalResistance < 0.001 || m.thermalResistance < res[:r]
+          i += 1
+          next
+        else
+          res[:r]     = m.thermalResistance
+          res[:index] = i
+          res[:type]  = :massless
+        end
+      end
+
+      unless m.to_StandardOpaqueMaterial.empty?
+        m             = m.to_StandardOpaqueMaterial.get
+        k             = m.thermalConductivity
+        d             = m.thickness
+
+        if d < 0.003 || k > 3.0 || d / k < res[:r]
+          i += 1
+          next
+        else
+          res[:r]     = d / k
+          res[:index] = i
+          res[:type]  = :standard
+        end
+      end
+
+      i += 1
+    end
+
+    res
+  end
+
+  ##
   # Return OpenStudio site/space transformation & rotation angle [0,2PI) rads.
   #
   # @param model [OpenStudio::Model::Model] a model

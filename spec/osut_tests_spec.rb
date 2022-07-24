@@ -795,6 +795,215 @@ RSpec.describe OSut do
     end
   end
 
+  it "checks glazing airfilms" do
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    file = File.join(__dir__, "files/osms/in/seb.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    m = "OSut::glazingAirFilmRSi"
+    expect(mod1.clean!).to eq(DBG)
+
+    model.getConstructions.each do |c|
+      next unless c.isFenestration
+      expect(c.uFactor.empty?).to be(false)
+      expect(c.uFactor.get.is_a?(Numeric)).to be(true)
+      expect(mod1.glazingAirFilmRSi(c.uFactor.get)).to be_within(TOL).of(0.17)
+      expect(mod1.status.zero?).to be(true)
+    end
+
+    expect(mod1.glazingAirFilmRSi(9.0)).to be_within(TOL).of(0.1216)
+    expect(mod1.warn?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq("Invalid 'usi' arg #1 (#{m})")
+
+    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.glazingAirFilmRSi("")).to be_within(TOL).of(0.1216)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    message = "'usi' String? expecting Numeric (#{m})"
+    expect(mod1.logs.first[:message]).to eq(message)
+
+    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.glazingAirFilmRSi(nil)).to be_within(TOL).of(0.1216)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq("Invalid 'usi' arg #1 (#{m})")
+  end
+
+  it "checks rsi calculations" do
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    file = File.join(__dir__, "files/osms/in/seb.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    m = "OSut::rsi"
+    expect(mod1.clean!).to eq(DBG)
+
+    model.getSurfaces.each do |s|
+      next unless s.isPartOfEnvelope
+      lc = s.construction
+      expect(lc.empty?).to be(false)
+      lc = lc.get.to_LayeredConstruction
+      expect(lc.empty?).to be(false)
+      lc = lc.get
+
+      if s.isGroundSurface                      # 4x slabs on grade in SEB model
+        expect(s.filmResistance).to be_within(TOL).of(0.160)
+        expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.448)
+        expect(mod1.status.zero?).to be(true)
+      else
+        if s.surfaceType == "Wall"
+          expect(s.filmResistance).to be_within(TOL).of(0.150)
+          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(2.616)
+          expect(mod1.status.zero?).to be(true)
+        else                                                       # RoofCeiling
+          expect(s.filmResistance).to be_within(TOL).of(0.136)
+          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(5.631)
+          expect(mod1.status.zero?).to be(true)
+        end
+      end
+    end
+
+    expect(mod1.rsi("", 0.150)).to be_within(TOL).of(0)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq("Invalid 'lc' arg #1 (#{m})")
+
+    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.rsi(nil, 0.150)).to be_within(TOL).of(0)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq("Invalid 'lc' arg #1 (#{m})")
+
+    lc = model.getLayeredConstructionByName("SLAB-ON-GRADE-FLOOR")
+    expect(lc.empty?).to be(false)
+    lc = lc.get
+
+    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.rsi(lc, -1)).to be_within(TOL).of(0)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq("'film' ~zero (#{m})")
+
+    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.rsi(lc, nil)).to be_within(TOL).of(0)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq("Invalid 'film' arg #2 (#{m})")
+
+    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.rsi(lc, 0.150, -300)).to be_within(TOL).of(0)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq("'temperature' ~zero (#{m})")
+
+    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.rsi(lc, 0.150, nil)).to be_within(TOL).of(0)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    message = "Invalid 'temperature' arg #3 (#{m})"
+    expect(mod1.logs.first[:message]).to eq(message)
+  end
+
+  it "identifies an (opaque) insulating layer within a layered construction" do
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    file = File.join(__dir__, "files/osms/in/seb.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    m = "OSut::insulatingLayer"
+    expect(mod1.clean!).to eq(DBG)
+
+    model.getLayeredConstructions.each do |lc|
+      # puts "#{lc.nameString} #{lc.numLayers}"
+      # 3'0" x 3'0" Double pane  Alum Construction 1
+      # EXTERIOR-ROOF 4
+      # EXTERIOR-WALL 4
+      # Default interior ceiling 1
+      # INTERIOR-WALL 3
+      # SLAB-ON-GRADE-FLOOR 1
+      # Air Wall 1
+
+      lyr = mod1.insulatingLayer(lc)
+      expect(lyr.is_a?(Hash)).to be(true)
+      expect(lyr.key?(:index)).to be(true)
+      expect(lyr.key?(:type)).to be(true)
+      expect(lyr.key?(:r)).to be(true)
+
+      if lc.isFenestration
+        expect(mod1.status.zero?).to be(true)
+        expect(lyr[:index].nil?).to be(true)
+        expect(lyr[:type].nil?).to be(true)
+        expect(lyr[:r].zero?).to be(true)
+        next
+      end
+
+      unless lyr[:type] == :standard || lyr[:type] == :massless   # air wall mat
+        expect(mod1.status.zero?).to be(true)
+        expect(lyr[:index].nil?).to be(true)
+        expect(lyr[:type].nil?).to be(true)
+        expect(lyr[:r].zero?).to be(true)
+        next
+      end
+
+      expect(lyr[:index] < lc.numLayers).to be(true)
+
+      case lc.nameString
+      when "EXTERIOR-ROOF"
+        expect(lyr[:index]).to eq(2)
+        expect(lyr[:r]).to be_within(TOL).of(5.08)
+      when "EXTERIOR-WALL"
+        expect(lyr[:index]).to eq(2)
+        expect(lyr[:r]).to be_within(TOL).of(1.47)
+      when "Default interior ceiling"
+        expect(lyr[:index]).to eq(0)
+        expect(lyr[:r]).to be_within(TOL).of(0.12)
+      when "INTERIOR-WALL"
+        expect(lyr[:index]).to eq(1)
+        expect(lyr[:r]).to be_within(TOL).of(0.24)
+      else
+        expect(lyr[:index]).to eq(0)
+        expect(lyr[:r]).to be_within(TOL).of(0.29)
+      end
+    end
+
+    lyr = mod1.insulatingLayer(nil)
+    expect(mod1.debug?).to be(true)
+    expect(lyr[:index].nil?).to be(true)
+    expect(lyr[:type].nil?).to be(true)
+    expect(lyr[:r].zero?).to be(true)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq("Invalid 'lc' arg #1 (#{m})")
+
+    expect(mod1.clean!).to eq(DBG)
+    lyr = mod1.insulatingLayer("")
+    expect(mod1.debug?).to be(true)
+    expect(lyr[:index].nil?).to be(true)
+    expect(lyr[:type].nil?).to be(true)
+    expect(lyr[:r].zero?).to be(true)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq("Invalid 'lc' arg #1 (#{m})")
+
+    expect(mod1.clean!).to eq(DBG)
+    lyr = mod1.insulatingLayer(model)
+    expect(mod1.debug?).to be(true)
+    expect(lyr[:index].nil?).to be(true)
+    expect(lyr[:type].nil?).to be(true)
+    expect(lyr[:r].zero?).to be(true)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq("Invalid 'lc' arg #1 (#{m})")
+  end
+
   it "checks model transformation" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
