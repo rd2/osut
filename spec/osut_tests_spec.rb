@@ -1,12 +1,13 @@
 require "osut"
 
 RSpec.describe OSut do
-  TOL = 0.01
-  DBG = OSut::DEBUG
-  INF = OSut::INFO
-  WRN = OSut::WARN
-  ERR = OSut::ERR
-  FTL = OSut::FATAL
+  TOL  = OSut::TOL
+  TOL2 = OSut::TOL2
+  DBG  = OSut::DEBUG
+  INF  = OSut::INFO
+  WRN  = OSut::WARN
+  ERR  = OSut::ERR
+  FTL  = OSut::FATAL
 
   let(:cls1) { Class.new  { extend OSut } }
   let(:cls2) { Class.new  { extend OSut } }
@@ -1053,5 +1054,159 @@ RSpec.describe OSut do
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq("Invalid 'group' arg #2 (#{m})")
+  end
+
+  it "checks flattened 3D points" do
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    file = File.join(__dir__, "files/osms/in/seb.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    m   = "OSut::flatZ"
+    cl1 = OpenStudio::Model::Model
+    cl2 = OpenStudio::Point3dVector
+    cl3 = OpenStudio::Point3d
+
+    expect(mod1.clean!).to eq(DBG)
+
+    model.getSurfaces.each do |s|
+      next unless s.isPartOfEnvelope
+      next unless s.surfaceType == "RoofCeiling"
+      flat = mod1.flatZ(s.vertices)
+      expect(flat.is_a?(cl2)).to be(true)
+
+      flat.each do |fv|
+        expect(fv.is_a?(cl3)).to be(true)
+        expect(fv.z).to be_within(TOL).of(0)
+      end
+
+      expect(s.vertices.first.x).to be_within(TOL).of(flat.first.x)
+      expect(s.vertices.first.y).to be_within(TOL).of(flat.first.y)
+    end
+
+    expect(mod1.status.zero?).to be(true)
+    flat = mod1.flatZ(nil)
+    expect(flat.is_a?(cl2)).to be(true)
+    expect(flat.empty?).to be(true)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to be(1)
+    expect(mod1.logs.first[:message]).to eq("Invalid 'points' arg #1 (#{m})")
+
+    expect(mod1.clean!).to eq(DBG)
+    flat = mod1.flatZ(model)
+    expect(flat.is_a?(cl2)).to be(true)
+    expect(flat.empty?).to be(true)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to be(1)
+    message = "'points' #{cl1}? expecting #{cl2} (#{m})"
+    expect(mod1.logs.first[:message]).to eq(message)
+  end
+
+  it "checks surface fits?' & overlaps?" do
+    model = OpenStudio::Model::Model.new
+    expect(mod1.clean!).to eq(DBG)
+
+    # 10m x 10m parent vertical (wall) surface.
+    vec = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  0,  0, 10)
+    vec << OpenStudio::Point3d.new(  0,  0,  0)
+    vec << OpenStudio::Point3d.new( 10,  0,  0)
+    vec << OpenStudio::Point3d.new( 10,  0, 10)
+    wall = OpenStudio::Model::Surface.new(vec, model)
+    ft = OpenStudio::Transformation::alignFace(wall.vertices).inverse
+    ft_wall  = mod1.flatZ( (ft * wall.vertices).reverse )
+
+    # 1m x 2m corner door (with 2x edges along wall edges)
+    vec = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  0,  0,  2)
+    vec << OpenStudio::Point3d.new(  0,  0,  0)
+    vec << OpenStudio::Point3d.new(  1,  0,  0)
+    vec << OpenStudio::Point3d.new(  1,  0,  2)
+    door1 = OpenStudio::Model::SubSurface.new(vec, model)
+    ft_door1 = mod1.flatZ( (ft * door1.vertices).reverse )
+
+    union = OpenStudio::join(ft_wall, ft_door1, TOL2)
+    expect(union.empty?).to be(false)
+    union = union.get
+    area = OpenStudio::getArea(union)
+    expect(area.empty?).to be(false)
+    area = area.get
+    expect(area).to be_within(0.01).of(wall.grossArea)
+
+    # Door1 fits?, overlaps?
+    expect(mod1.status.zero?).to be(true)
+    expect(mod1.fits?(door1.vertices, wall.vertices)).to be(true)
+    expect(mod1.overlaps?(door1.vertices, wall.vertices)).to be(true)
+    expect(mod1.status.zero?).to be(true)
+
+    # Order of arguments matter.
+    expect(mod1.fits?(wall.vertices, door1.vertices)).to be(false)
+    expect(mod1.overlaps?(wall.vertices, door1.vertices)).to be(true)
+    expect(mod1.status.zero?).to be(true)
+
+    # Another 1m x 2m corner door, yet entirely beyond the wall surface.
+    vec = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( 16,  0,  2)
+    vec << OpenStudio::Point3d.new( 16,  0,  0)
+    vec << OpenStudio::Point3d.new( 17,  0,  0)
+    vec << OpenStudio::Point3d.new( 17,  0,  2)
+    door2 = OpenStudio::Model::SubSurface.new(vec, model)
+    ft_door2 = mod1.flatZ( (ft * door2.vertices).reverse )
+    union = OpenStudio::join(ft_wall, ft_door2, TOL2)
+    expect(union.empty?).to be(true)
+
+    # Door2 fits?, overlaps?
+    expect(mod1.fits?(door2.vertices, wall.vertices)).to be(false)
+    expect(mod1.overlaps?(door2.vertices, wall.vertices)).to be(false)
+    expect(mod1.status.zero?).to be(true)
+
+    # # Order of arguments doesn't matter.
+    expect(mod1.fits?(wall.vertices, door2.vertices)).to be(false)
+    expect(mod1.overlaps?(wall.vertices, door2.vertices)).to be(false)
+    expect(mod1.status.zero?).to be(true)
+
+    # Top-right corner 2m x 2m window, overlapping top-right corner of wall.
+    vec = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  9,  0, 11)
+    vec << OpenStudio::Point3d.new(  9,  0,  9)
+    vec << OpenStudio::Point3d.new( 11,  0,  9)
+    vec << OpenStudio::Point3d.new( 11,  0, 11)
+    window = OpenStudio::Model::SubSurface.new(vec, model)
+    ft_window = mod1.flatZ( (ft * window.vertices).reverse )
+    union = OpenStudio::join(ft_wall, ft_window, TOL2)
+    expect(union.empty?).to be(false)
+    union = union.get
+    area = OpenStudio::getArea(union)
+    expect(area.empty?).to be(false)
+    area = area.get
+    expect(area).to be_within(0.01).of(103)
+
+    # Window fits?, overlaps?
+    expect(mod1.fits?(window.vertices, wall.vertices)).to be(false)
+    expect(mod1.overlaps?(window.vertices, wall.vertices)).to be(true)
+    expect(mod1.status.zero?).to be(true)
+
+    expect(mod1.fits?(wall.vertices, window.vertices)).to be(false)
+    expect(mod1.overlaps?(wall.vertices, window.vertices)).to be(true)
+    expect(mod1.status.zero?).to be(true)
+
+    # A glazed surface, entirely encompassing the wall.
+    vec = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  0,  0, 10)
+    vec << OpenStudio::Point3d.new(  0,  0,  0)
+    vec << OpenStudio::Point3d.new( 10,  0,  0)
+    vec << OpenStudio::Point3d.new( 10,  0, 10)
+    glazing = OpenStudio::Model::SubSurface.new(vec, model)
+
+    # Glazing fits?, overlaps?
+    expect(mod1.fits?(glazing.vertices, wall.vertices)).to be(true)
+    expect(mod1.overlaps?(glazing.vertices, wall.vertices)).to be(true)
+    expect(mod1.status.zero?).to be(true)
+
+    expect(mod1.fits?(wall.vertices, glazing.vertices)).to be(true)
+    expect(mod1.overlaps?(wall.vertices, glazing.vertices)).to be(true)
+    expect(mod1.status.zero?).to be(true)
   end
 end
