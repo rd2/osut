@@ -1166,8 +1166,8 @@ module OSut
     return mismatch("temperature", t, cl2, mth, DBG, 0) unless t.is_a?(cl2)
 
     tt  = t + 273.0                                                    # °C to K
-    return zero("temperature", mth, DBG, 0) if tt < 0
-    return zero("film", mth, DBG, 0) if film < 0
+    return negative("temp K", mth, DBG, 0) if tt < 0
+    return negative("film", mth, DBG, 0) if film < 0
 
     rsi = film
 
