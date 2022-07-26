@@ -671,8 +671,7 @@ RSpec.describe OSut do
 
     # OSut, and by extension OSlg, are intended to be accessed "globally"
     # once instantiated within a class or module. Here, class instance cls2
-    # accesses the same OSut module methods as cls1.
-
+    # accesses the same OSut module methods/attributes as cls1.
     expect(cls2.status).to eq(ERR)
     cls2.clean!
     expect(cls1.status.zero?).to eq(true)
@@ -923,15 +922,6 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
 
     model.getLayeredConstructions.each do |lc|
-      # puts "#{lc.nameString} #{lc.numLayers}"
-      # 3'0" x 3'0" Double pane  Alum Construction 1
-      # EXTERIOR-ROOF 4
-      # EXTERIOR-WALL 4
-      # Default interior ceiling 1
-      # INTERIOR-WALL 3
-      # SLAB-ON-GRADE-FLOOR 1
-      # Air Wall 1
-
       lyr = mod1.insulatingLayer(lc)
       expect(lyr.is_a?(Hash)).to be(true)
       expect(lyr.key?(:index)).to be(true)
