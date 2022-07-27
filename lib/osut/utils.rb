@@ -29,18 +29,18 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 require "openstudio"
-require "json"
-require "csv"
 
 module OSut
-  extend OSlg # DEBUG for devs (using OSut); WARN/ERROR for users (bad OS input)
+  extend OSlg            #   DEBUG for devs; WARN/ERROR for users (bad OS input)
 
-  NS  = "nameString"     #                OpenStudio IdfObject nameString method
-  DBG = OSut::DEBUG      # mainly to flag invalid arguments to devs (buggy code)
-  INF = OSut::INFO       #                            not currently used in OSut
-  WRN = OSut::WARN       #   WARN users of 'iffy' .osm inputs (yet not critical)
-  ERR = OSut::ERROR      #     flag invalid .osm inputs (then exit via 'return')
-  FTL = OSut::FATAL      #                            not currently used in OSut
+  TOL  = 0.01
+  TOL2 = TOL * TOL
+  NS   = "nameString"    #                OpenStudio IdfObject nameString method
+  DBG  = OSut::DEBUG     # mainly to flag invalid arguments to devs (buggy code)
+  INF  = OSut::INFO      #                            not currently used in OSut
+  WRN  = OSut::WARN      #   WARN users of 'iffy' .osm inputs (yet not critical)
+  ERR  = OSut::ERROR     #     flag invalid .osm inputs (then exit via 'return')
+  FTL  = OSut::FATAL     #                            not currently used in OSut
 
   # This first set of utilities (~750 lines) help distinguishing spaces that
   # are directly vs indirectly CONDITIONED, vs SEMI-HEATED. The solution here
@@ -1097,6 +1097,171 @@ module OSut
   end
 
   ##
+  # Return total air film resistance for fenestration.
+  #
+  # @param usi [Float] a fenestrated construction's U-factor (W/m2•K)
+  #
+  # @return [Float] total air film resistance in m2•K/W (0.1216 if errors)
+  def glazingAirFilmRSi(usi = 5.85)
+    # The sum of thermal resistances of calculated exterior and interior film
+    # coefficients under standard winter conditions are taken from:
+    #
+    #   https://bigladdersoftware.com/epx/docs/9-6/engineering-reference/
+    #   window-calculation-module.html#simple-window-model
+    #
+    # These remain acceptable approximations for flat windows, yet likely
+    # unsuitable for subsurfaces with curved or projecting shapes like domed
+    # skylights. The solution here is considered an adequate fix for reporting,
+    # awaiting eventual OpenStudio (and EnergyPlus) upgrades to report NFRC 100
+    # (or ISO) air film resistances under standard winter conditions.
+    #
+    # For U-factors above 8.0 W/m2•K (or invalid input), the function returns
+    # 0.1216 m2•K/W, which corresponds to a construction with a single glass
+    # layer thickness of 2mm & k = ~0.6 W/m.K.
+    #
+    # The EnergyPlus Engineering calculations were designed for vertical windows
+    # - not horizontal, slanted or domed surfaces - use with caution.
+    mth = "OSut::#{__callee__}"
+    cl = Numeric
+
+    return invalid("usi", mth, 1, DBG, 0.1216) unless usi
+    return mismatch("usi", usi, cl, mth, DBG, 0.1216) unless usi.is_a?(cl)
+    return invalid("usi", mth, 1, WRN, 0.1216) if usi > 8.0
+
+    rsi = 1 / (0.025342 * usi + 29.163853)   # exterior film, next interior film
+
+    return rsi + 1 / (0.359073 * Math.log(usi) + 6.949915) if usi < 5.85
+    return rsi + 1 / (1.788041 * usi - 2.886625)
+  end
+
+  ##
+  # Return a construction's 'standard calc' thermal resistance (with air films).
+  #
+  # @param lc [OpenStudio::Model::LayeredConstruction] a layered construction
+  # @param film [Float] thermal resistance of surface air films (m2•K/W)
+  # @param t [Float] gas temperature (°C) (optional)
+  #
+  # @return [Float] calculated RSi at standard conditions (0 if error)
+  def rsi(lc, film, t = 0.0)
+    # This is adapted from BTAP's Material Module's "get_conductance" (P. Lopez)
+    #
+    #   https://github.com/NREL/OpenStudio-Prototype-Buildings/blob/
+    #   c3d5021d8b7aef43e560544699fb5c559e6b721d/lib/btap/measures/
+    #   btap_equest_converter/envelope.rb#L122
+
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Model::LayeredConstruction
+    cl2 = Numeric
+
+    return invalid("lc", mth, 1, DBG, 0) unless lc.respond_to?(NS)
+    id = lc.nameString
+    return mismatch(id, lc, cl1, mth, DBG, 0) unless lc.is_a?(cl1)
+
+    return invalid("film", mth, 2, DBG, 0) unless film
+    return invalid("temperature", mth, 3, DBG, 0) unless t
+
+    return mismatch("film", film, cl2, mth, DBG, 0) unless film.is_a?(cl2)
+    return mismatch("temperature", t, cl2, mth, DBG, 0) unless t.is_a?(cl2)
+
+    tt  = t + 273.0                                                    # °C to K
+    return negative("temp K", mth, DBG, 0) if tt < 0
+    return negative("film", mth, DBG, 0) if film < 0
+
+    rsi = film
+
+    lc.layers.each do |m|
+      # Fenestration materials first (ignoring shades, screens, etc.)
+      unless m.to_SimpleGlazing.empty?
+        return 1 / m.to_SimpleGlazing.get.uFactor              # no need to loop
+      end
+      unless m.to_StandardGlazing.empty?
+        rsi += m.to_StandardGlazing.get.thermalResistance
+      end
+      unless m.to_RefractionExtinctionGlazing.empty?
+        rsi += m.to_RefractionExtinctionGlazing.get.thermalResistance
+      end
+      unless m.to_Gas.empty?
+        rsi += m.to_Gas.get.getThermalResistance(tt)
+      end
+      unless m.to_GasMixture.empty?
+        rsi += m.to_GasMixture.get.getThermalResistance(tt)
+      end
+
+      # Opaque materials next.
+      unless m.to_StandardOpaqueMaterial.empty?
+        rsi += m.to_StandardOpaqueMaterial.get.thermalResistance
+      end
+      unless m.to_MasslessOpaqueMaterial.empty?
+        rsi += m.to_MasslessOpaqueMaterial.get.thermalResistance
+      end
+      unless m.to_RoofVegetation.empty?
+        rsi += m.to_RoofVegetation.get.thermalResistance
+      end
+      unless m.to_AirGap.empty?
+        rsi += m.to_AirGap.get.thermalResistance
+      end
+    end
+
+    rsi
+  end
+
+  ##
+  # Identify a layered construction's (opaque) insulating layer. The method
+  # returns a 3-keyed hash ... :index (insulating layer index within layered
+  # construction), :type (standard: or massless: material type), and
+  # :r (material thermal resistance in m2•K/W).
+  #
+  # @param lc [OpenStudio::Model::LayeredConstruction] a layered construction
+  #
+  # @return [Hash] index: (Integer), type: (:standard or :massless), r: (Float)
+  # @return [Hash] index: nil, type: nil, r: 0 (if invalid input)
+  def insulatingLayer(lc)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::LayeredConstruction
+    res = { index: nil, type: nil, r: 0.0 }
+    i   = 0                                                           # iterator
+
+    return invalid("lc", mth, 1, DBG, res) unless lc.respond_to?(NS)
+    id = lc.nameString
+    return mismatch(id, lc, cl1, mth, DBG, res) unless lc.is_a?(cl)
+
+    lc.layers.each do |m|
+
+      unless m.to_MasslessOpaqueMaterial.empty?
+        m             = m.to_MasslessOpaqueMaterial.get
+
+        if m.thermalResistance < 0.001 || m.thermalResistance < res[:r]
+          i += 1
+          next
+        else
+          res[:r]     = m.thermalResistance
+          res[:index] = i
+          res[:type]  = :massless
+        end
+      end
+
+      unless m.to_StandardOpaqueMaterial.empty?
+        m             = m.to_StandardOpaqueMaterial.get
+        k             = m.thermalConductivity
+        d             = m.thickness
+
+        if d < 0.003 || k > 3.0 || d / k < res[:r]
+          i += 1
+          next
+        else
+          res[:r]     = d / k
+          res[:index] = i
+          res[:type]  = :standard
+        end
+      end
+
+      i += 1
+    end
+
+    res
+  end
+
+  ##
   # Return OpenStudio site/space transformation & rotation angle [0,2PI) rads.
   #
   # @param model [OpenStudio::Model::Model] a model
@@ -1121,5 +1286,145 @@ module OSut
     res[:r] = group.directionofRelativeNorth + model.getBuilding.northAxis
 
     res
+  end
+
+  ##
+  # Flatten OpenStudio 3D points vs Z-axis (Z=0).
+  #
+  # @param pts [Array] an OpenStudio Point3D array/vector
+  #
+  # @return [Array] flattened OpenStudio 3D points
+  def flatZ(pts)
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Point3dVector
+    cl2 = OpenStudio::Point3d
+    v = OpenStudio::Point3dVector.new
+
+    return invalid("points", mth, 1, DBG, v) unless pts
+    valid = pts.is_a?(cl1) || pts.is_a?(Array)
+    return mismatch("points", pts, cl1, mth, DBG, v) unless valid
+
+    pts.each { |pt| mismatch("pt", pt, cl2, mth, ERR, v) unless pt.is_a?(cl2) }
+    pts.each { |pt| v << OpenStudio::Point3d.new(pt.x, pt.y, 0) }
+
+    v
+  end
+
+  ##
+  # Validate whether 1st OpenStudio convex polygon fits in 2nd convex polygon.
+  #
+  # @param p1 [OpenStudio::Point3dVector] or Point3D array of polygon #1
+  # @param p2 [OpenStudio::Point3dVector] or Point3D array of polygon #2
+  # @param id1 [String] polygon #1 identifier (optional)
+  # @param id2 [String] polygon #2 identifier (optional)
+  #
+  # @return [Bool] true if 1st polygon fits entirely within the 2nd polygon
+  # @return [Bool] false if invalid input
+  def fits?(p1, p2, id1 = "", id2 = "")
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Point3dVector
+    cl2 = OpenStudio::Point3d
+    a   = false
+    i1  = id1.to_s
+    i2  = id2.to_s
+    i1  = "poly1" if i1.empty?
+    i2  = "poly2" if i2.empty?
+
+    return invalid(i1, mth, 1, DBG, a) unless p1
+    valid = p1.is_a?(cl1) || p1.is_a?(Array)
+    return mismatch(i1, p1, cl1, mth, DBG, a) unless valid
+    return empty(i1, mth, ERR, a) if p1.empty?
+
+    return invalid(i2, mth, 2, DBG, a) unless p2
+    valid = p2.is_a?(cl1) || p2.is_a?(Array)
+    return mismatch(i2, p2, cl1, mth, DBG, a) unless valid
+    return empty(i2, mth, ERR, a) if p2.empty?
+
+    p1.each { |v| return mismatch(i1, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
+    p2.each { |v| return mismatch(i2, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
+
+    ft = OpenStudio::Transformation::alignFace(p1).inverse
+
+    ft_p1 = flatZ( (ft * p1).reverse )
+    return false if ft_p1.empty?
+    area1 = OpenStudio::getArea(ft_p1)
+    return empty(i1, mth, ERR, a) if area1.empty?
+    area1 = area1.get
+
+    ft_p2 = flatZ( (ft * p2).reverse )
+    return false if ft_p2.empty?
+    area2 = OpenStudio::getArea(ft_p2)
+    return empty(i2, mth, ERR, a) if area2.empty?
+    area2 = area2.get
+
+    union = OpenStudio::join(ft_p1, ft_p2, TOL2)
+    return false if union.empty?
+    union = union.get
+    area = OpenStudio::getArea(union)
+    return empty("union", mth, ERR, a) if area.empty?
+    area = area.get
+
+    return false if area < TOL
+    return true if (area - area2).abs < TOL
+    return false if (area - area2).abs > TOL
+    true
+  end
+
+  ##
+  # Validate whether an OpenStudio polygon overlaps another.
+  #
+  # @param p1 [OpenStudio::Point3dVector] or Point3D array of polygon #1
+  # @param p2 [OpenStudio::Point3dVector] or Point3D array of polygon #2
+  # @param id1 [String] polygon #1 identifier (optional)
+  # @param id2 [String] polygon #2 identifier (optional)
+  #
+  # @return Returns true if polygons overlaps (or either fits into the other)
+  # @return [Bool] false if invalid input
+  def overlaps?(p1, p2, id1 = "", id2 = "")
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Point3dVector
+    cl2 = OpenStudio::Point3d
+    a   = false
+    i1  = id1.to_s
+    i2  = id2.to_s
+    i1  = "poly1" if i1.empty?
+    i2  = "poly2" if i2.empty?
+
+    return invalid(i1, mth, 1, DBG, a) unless p1
+    valid = p1.is_a?(cl1) || p1.is_a?(Array)
+    return mismatch(i1, p1, cl1, mth, DBG, a) unless valid
+    return empty(i1, mth, ERR, a) if p1.empty?
+
+    return invalid(i2, mth, 2, DBG, a) unless p2
+    valid = p2.is_a?(cl1) || p2.is_a?(Array)
+    return mismatch(i2, p2, cl1, mth, DBG, a) unless valid
+    return empty(i2, mth, ERR, a) if p2.empty?
+
+    p1.each { |v| return mismatch(i1, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
+    p2.each { |v| return mismatch(i2, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
+
+    ft = OpenStudio::Transformation::alignFace(p1).inverse
+
+    ft_p1 = flatZ( (ft * p1).reverse )
+    return false if ft_p1.empty?
+    area1 = OpenStudio::getArea(ft_p1)
+    return empty(i1, mth, ERR, a) if area1.empty?
+    area1 = area1.get
+
+    ft_p2 = flatZ( (ft * p2).reverse )
+    return false if ft_p2.empty?
+    area2 = OpenStudio::getArea(ft_p2)
+    return empty(i2, mth, ERR, a) if area2.empty?
+    area2 = area2.get
+
+    union = OpenStudio::join(ft_p1, ft_p2, TOL2)
+    return false if union.empty?
+    union = union.get
+    area = OpenStudio::getArea(union)
+    return empty("union", mth, ERR, a) if area.empty?
+    area = area.get
+
+    return false if area < TOL
+    true
   end
 end
