@@ -29,11 +29,9 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 require "openstudio"
-require "json"
-require "csv"
 
 module OSut
-  extend OSlg # DEBUG for devs (using OSut); WARN/ERROR for users (bad OS input)
+  extend OSlg            #   DEBUG for devs; WARN/ERROR for users (bad OS input)
 
   TOL  = 0.01
   TOL2 = TOL * TOL

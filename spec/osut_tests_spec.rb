@@ -92,7 +92,7 @@ RSpec.describe OSut do
     expect(cls1.logs.first[:message]).to eq(m2)
   end
 
-  it "checks scheduleConstantMinMax (from within class instances)" do
+  it "checks scheduleConstantMinMax" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
