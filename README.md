@@ -1,6 +1,6 @@
 # osut
 
-General purpose Ruby utilities for [OpenStudio](https://openstudio-sdk-documentation.s3.amazonaws.com/index.html) [Measures](https://nrel.github.io/OpenStudio-user-documentation/reference/measure_writing_guide/) or other OpenStudio [SDK](https://openstudio-sdk-documentation.s3.amazonaws.com/index.html) applications. Compatible with SDK v3.0.0 (or newer) and OpenStudio Application [releases](https://github.com/openstudiocoalition/OpenStudioApplication/releases?page=2) distributed by the [OpenStudio Coalition](https://openstudiocoalition.org).
+General purpose Ruby utilities for [OpenStudio](https://openstudio.net) [Measures](https://nrel.github.io/OpenStudio-user-documentation/reference/measure_writing_guide/) or other OpenStudio [SDK](https://openstudio-sdk-documentation.s3.amazonaws.com/index.html) applications. Compatible with SDK v3.0.0 (or newer) and OpenStudio Application [releases](https://github.com/openstudiocoalition/OpenStudioApplication/releases?page=2) distributed by the [OpenStudio Coalition](https://openstudiocoalition.org).
 
 Add:
 
