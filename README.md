@@ -13,6 +13,7 @@ gem "osut", git: "https://github.com/rd2/osut", branch: "main"
 ```
 bundle install (or 'bundle update')
 ```
+
 ### Recommended use
 
 As a Ruby module, one can access __osut__ by extending a _Measure_ module or class:
@@ -25,7 +26,7 @@ module M
   ...
 end
 ```
-The logger module [oslg](https://github.com/rd2/oslg) is an __osut__ dependency. _Measure_ developers can (optionally) choose to log debug, informative, warning or error messages from within an __osut__-extended module or class, e.g.:
+The logger module [oslg](https://github.com/rd2/oslg) is an __osut__ dependency: DEBUG, WARN and/or ERROR messages may be logged by __osut__, usually as a result of invalid method calls or bad OpenStudio input. _Measure_ developers can (optionally) choose to continue logging messages from within an __osut__-extended module or class, e.g.:
 
 ```
 M.log(OSut::WARN, "Calculated material thickness > 1m")
