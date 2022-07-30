@@ -12,7 +12,6 @@ RSpec.describe OSut do
   let(:cls1) { Class.new  { extend OSut } }
   let(:cls2) { Class.new  { extend OSut } }
   let(:mod1) { Module.new { extend OSut } }
-  let(:mod2) { Module.new { extend OSut } }
 
   it "checks scheduleRulesetMinMax (from within class instances)" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
@@ -241,7 +240,13 @@ RSpec.describe OSut do
     expect(mod1.logs.first[:message]).to eq(m2)
   end
 
-  it "checks min/max heat/cool scheduled setpoints" do
+  it "checks min/max heat/cool scheduled setpoints (as a module method)" do
+    module M
+      extend OSut
+    end
+
+    puts M.public_methods(false)
+
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
@@ -249,7 +254,7 @@ RSpec.describe OSut do
     expect(model.empty?).to be(false)
     model = model.get
 
-    expect(mod1.clean!).to eq(DBG)
+    expect(M.clean!).to eq(DBG)
 
     m1 = "OSut::maxHeatScheduledSetpoint"
     m2 = "OSut::minCoolScheduledSetpoint"
@@ -257,7 +262,7 @@ RSpec.describe OSut do
     z2 = "Single zone"
 
     model.getThermalZones.each do |z|
-      res = mod1.maxHeatScheduledSetpoint(z)
+      res = M.maxHeatScheduledSetpoint(z)
       expect(res.is_a?(Hash)).to be(true)
       expect(res.key?(:spt)).to be(true)
       expect(res.key?(:dual)).to be(true)
@@ -265,9 +270,9 @@ RSpec.describe OSut do
       expect(res[:spt]).to be_within(TOL).of(22.11) if z.nameString == z2
       expect(res[:dual]).to eq(false)               if z.nameString == z1
       expect(res[:dual]).to eq(true)                if z.nameString == z2
-      expect(mod1.status.zero?).to be(true)
+      expect(M.status.zero?).to be(true)
 
-      res = mod1.minCoolScheduledSetpoint(z)
+      res = M.minCoolScheduledSetpoint(z)
       expect(res.is_a?(Hash)).to be(true)
       expect(res.key?(:spt)).to be(true)
       expect(res.key?(:dual)).to be(true)
@@ -275,52 +280,52 @@ RSpec.describe OSut do
       expect(res[:spt]).to be_within(TOL).of(22.78) if z.nameString == z2
       expect(res[:dual]).to eq(false)               if z.nameString == z1
       expect(res[:dual]).to eq(true)                if z.nameString == z2
-      expect(mod1.status.zero?).to be(true)
+      expect(M.status.zero?).to be(true)
     end
 
-    res = mod1.maxHeatScheduledSetpoint(nil)                      # bad argument
+    res = M.maxHeatScheduledSetpoint(nil)                      # bad argument
     expect(res.is_a?(Hash)).to be(true)
     expect(res.key?(:spt)).to be(true)
     expect(res.key?(:dual)).to be(true)
     expect(res[:spt].nil?).to be(true)
     expect(res[:dual]).to eq(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
-    expect(mod1.clean!).to eq(DBG)
+    expect(M.debug?).to be(true)
+    expect(M.logs.size).to eq(1)
+    expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
+    expect(M.clean!).to eq(DBG)
 
-    res = mod1.minCoolScheduledSetpoint(nil)                      # bad argument
+    res = M.minCoolScheduledSetpoint(nil)                      # bad argument
     expect(res.is_a?(Hash)).to be(true)
     expect(res.key?(:spt)).to be(true)
     expect(res.key?(:dual)).to be(true)
     expect(res[:spt].nil?).to be(true)
     expect(res[:dual]).to eq(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
-    expect(mod1.clean!).to eq(DBG)
+    expect(M.debug?).to be(true)
+    expect(M.logs.size).to eq(1)
+    expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
+    expect(M.clean!).to eq(DBG)
 
-    res = mod1.maxHeatScheduledSetpoint(model)                    # bad argument
+    res = M.maxHeatScheduledSetpoint(model)                    # bad argument
     expect(res.is_a?(Hash)).to be(true)
     expect(res.key?(:spt)).to be(true)
     expect(res.key?(:dual)).to be(true)
     expect(res[:spt].nil?).to be(true)
     expect(res[:dual]).to eq(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
-    expect(mod1.clean!).to eq(DBG)
+    expect(M.debug?).to be(true)
+    expect(M.logs.size).to eq(1)
+    expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
+    expect(M.clean!).to eq(DBG)
 
-    res = mod1.minCoolScheduledSetpoint(model)                    # bad argument
+    res = M.minCoolScheduledSetpoint(model)                    # bad argument
     expect(res.is_a?(Hash)).to be(true)
     expect(res.key?(:spt)).to be(true)
     expect(res.key?(:dual)).to be(true)
     expect(res[:spt].nil?).to be(true)
     expect(res[:dual]).to eq(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
-    expect(mod1.clean!).to eq(DBG)
+    expect(M.debug?).to be(true)
+    expect(M.logs.size).to eq(1)
+    expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
+    expect(M.clean!).to eq(DBG)
   end
 
   it "checks if zones have heating/cooling temperature setpoints" do

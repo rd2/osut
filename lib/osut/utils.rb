@@ -1427,4 +1427,12 @@ module OSut
     return false if area < TOL
     true
   end
+
+  ##
+  # Callback when other modules extend OSlg
+  #
+  # @param base [Object] instance or class object
+  # def self.extended(base)
+  #   base.send(:include, self)
+  # end
 end
