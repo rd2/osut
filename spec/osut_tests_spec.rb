@@ -245,8 +245,6 @@ RSpec.describe OSut do
       extend OSut
     end
 
-    puts M.public_methods(false)
-
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
