@@ -891,7 +891,7 @@ RSpec.describe OSut do
     expect(mod1.rsi(lc, -1)).to be_within(TOL).of(0)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("'film' negative (#{m})")
+    expect(mod1.logs.first[:message]).to eq("Negative 'film' (#{m})")
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.rsi(lc, nil)).to be_within(TOL).of(0)
@@ -903,7 +903,7 @@ RSpec.describe OSut do
     expect(mod1.rsi(lc, 0.150, -300)).to be_within(TOL).of(0)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("'temp K' negative (#{m})")
+    expect(mod1.logs.first[:message]).to eq("Negative 'temp K' (#{m})")
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.rsi(lc, 0.150, nil)).to be_within(TOL).of(0)
