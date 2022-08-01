@@ -749,13 +749,14 @@ module OSut
   # @param avl [String] seasonal availability choice (optional, default "ON")
   #
   # @return [OpenStudio::Model::Schedule] HVAC availability sched
-  # @return [nil] if invalid input
+  # @return [NilClass] if invalid input
   def availabilitySchedule(model = nil, avl = "")
     mth    = "OSut::#{__callee__}"
     cl     = OpenStudio::Model::Model
     limits = nil
 
     return mismatch("model", model, cl, mth) unless model.is_a?(cl)
+    return invalid("availability", avl, 2, mth) unless avl.respond_to?(:to_s)
 
     # Either fetch availability ScheduleTypeLimits object, or create one.
     model.getScheduleTypeLimitss.each do |l|
@@ -792,7 +793,7 @@ module OSut
     may01 = year.makeDate(OpenStudio::MonthOfYear.new("May"),  1)
     oct31 = year.makeDate(OpenStudio::MonthOfYear.new("Oct"), 31)
 
-    case avl.downcase
+    case avl.to_s.downcase
     when "winter"             # available from November 1 to April 30 (6 months)
       val = 1
       sch = off
@@ -984,7 +985,7 @@ module OSut
   # @param s [OpenStudio::Model::Surface] a surface
   #
   # @return [OpenStudio::Model::DefaultConstructionSet] default set
-  # @return [nil] if invalid input
+  # @return [NilClass] if invalid input
   def defaultConstructionSet(model = nil, s = nil)
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Model::Model
@@ -1064,6 +1065,7 @@ module OSut
     return mismatch(lc.nameString, lc, cl, mth, DBG, false) unless lc.is_a?(cl)
 
     lc.layers.each { |m| return false if m.to_StandardOpaqueMaterial.empty? }
+
     true
   end
 
@@ -1089,6 +1091,7 @@ module OSut
 
     thickness = 0.0
     lc.layers.each { |m| thickness += m.thickness }
+
     thickness
   end
 
@@ -1118,10 +1121,12 @@ module OSut
     # The EnergyPlus Engineering calculations were designed for vertical windows
     # - not horizontal, slanted or domed surfaces - use with caution.
     mth = "OSut::#{__callee__}"
-    cl = Numeric
+    cl  = Numeric
 
     return mismatch("usi", usi, cl, mth, DBG, 0.1216) unless usi.is_a?(cl)
     return invalid("usi", mth, 1, WRN, 0.1216) if usi > 8.0
+    return negative("usi", mth, WRN, 0.1216) if usi < 0
+    return zero("usi", mth, WRN, 0.1216) if usi.abs < TOL
 
     rsi = 1 / (0.025342 * usi + 29.163853)   # exterior film, next interior film
 
@@ -1322,8 +1327,8 @@ module OSut
     cl2 = OpenStudio::Point3d
     a   = false
 
-    return invalid(id1, mth, 3, DBG, a) unless id1.respond_to?(:to_s)
-    return invalid(id2, mth, 4, DBG, a) unless id2.respond_to?(:to_s)
+    return invalid("id1", mth, 3, DBG, a) unless id1.respond_to?(:to_s)
+    return invalid("id2", mth, 4, DBG, a) unless id2.respond_to?(:to_s)
     i1  = id1.to_s
     i2  = id2.to_s
     i1  = "poly1" if i1.empty?
@@ -1363,6 +1368,7 @@ module OSut
     return false if area < TOL
     return true if (area - area2).abs < TOL
     return false if (area - area2).abs > TOL
+
     true
   end
 
@@ -1382,8 +1388,8 @@ module OSut
     cl2 = OpenStudio::Point3d
     a   = false
 
-    return invalid(id1, mth, 3, DBG, a) unless id1.respond_to?(:to_s)
-    return invalid(id2, mth, 4, DBG, a) unless id2.respond_to?(:to_s)
+    return invalid("id1", mth, 3, DBG, a) unless id1.respond_to?(:to_s)
+    return invalid("id2", mth, 4, DBG, a) unless id2.respond_to?(:to_s)
     i1 = id1.to_s
     i2 = id2.to_s
     i1 = "poly1" if i1.empty?
@@ -1421,6 +1427,7 @@ module OSut
     area = area.get
 
     return false if area < TOL
+
     true
   end
 
