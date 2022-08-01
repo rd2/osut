@@ -35,12 +35,12 @@ module OSut
 
   TOL  = 0.01
   TOL2 = TOL * TOL
-  NS   = "nameString"    #                OpenStudio IdfObject nameString method
   DBG  = OSut::DEBUG     # mainly to flag invalid arguments to devs (buggy code)
   INF  = OSut::INFO      #                            not currently used in OSut
   WRN  = OSut::WARN      #   WARN users of 'iffy' .osm inputs (yet not critical)
   ERR  = OSut::ERROR     #     flag invalid .osm inputs (then exit via 'return')
   FTL  = OSut::FATAL     #                            not currently used in OSut
+  NS   = "nameString"    #                OpenStudio IdfObject nameString method
 
   # This first set of utilities (~750 lines) help distinguishing spaces that
   # are directly vs indirectly CONDITIONED, vs SEMI-HEATED. The solution here
@@ -456,11 +456,9 @@ module OSut
   #
   # @return [Bool] true if valid heating temperature setpoints
   # @return [Bool] false if invalid input
-  def heatingTemperatureSetpoints?(model)
+  def heatingTemperatureSetpoints?(model = nil)
     mth = "OSut::#{__callee__}"
     cl = OpenStudio::Model::Model
-
-    return invalid("model", mth, 1, DBG, false) unless model
     return mismatch("model", model, cl, mth, DBG, false) unless model.is_a?(cl)
 
     model.getThermalZones.each do |zone|
