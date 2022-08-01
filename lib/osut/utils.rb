@@ -127,7 +127,7 @@ module OSut
   #
   # @return [Hash] min: (Float), max: (Float)
   # @return [Hash] min: nil, max: nil (if invalid input)
-  def scheduleRulesetMinMax(sched)
+  def scheduleRulesetMinMax(sched = nil)
     # Largely inspired from David Goldwasser's
     # "schedule_ruleset_annual_min_max_value":
     #
@@ -174,7 +174,7 @@ module OSut
   #
   # @return [Hash] min: (Float), max: (Float)
   # @return [Hash] min: nil, max: nil (if invalid input)
-  def scheduleConstantMinMax(sched)
+  def scheduleConstantMinMax(sched = nil)
     # Largely inspired from David Goldwasser's
     # "schedule_constant_annual_min_max_value":
     #
@@ -206,7 +206,7 @@ module OSut
   #
   # @return [Hash] min: (Float), max: (Float)
   # @return [Hash] min: nil, max: nil (if invalid input)
-  def scheduleCompactMinMax(sched)
+  def scheduleCompactMinMax(sched = nil)
     # Largely inspired from Andrew Parker's
     # "schedule_compact_annual_min_max_value":
     #
@@ -251,7 +251,7 @@ module OSut
   #
   # @return [Hash] min: (Float), max: (Float)
   # @return [Hash] min: nil, max: nil (if invalid input)
-  def scheduleIntervalMinMax(sched)
+  def scheduleIntervalMinMax(sched = nil)
     mth      = "OSut::#{__callee__}"
     cl       = OpenStudio::Model::ScheduleInterval
     vals     = []
@@ -263,6 +263,7 @@ module OSut
     return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
 
     vals = sched.timeSeries.values
+
     if vals.min.is_a?(Numeric) && vals.max.is_a?(Numeric)
       res[:min] = vals.min
       res[:max] = vals.max
@@ -281,7 +282,7 @@ module OSut
   #
   # @return [Hash] spt: (Float), dual: (Bool)
   # @return [Hash] spt: nil, dual: false (if invalid input)
-  def maxHeatScheduledSetpoint(zone)
+  def maxHeatScheduledSetpoint(zone = nil)
     # Largely inspired from Parker & Marrec's "thermal_zone_heated?" procedure.
     # The solution here is a tad more relaxed to encompass SEMI-HEATED zones as
     # per Canadian NECB criteria (basically any space with at least 10 W/m2 of
@@ -458,7 +459,8 @@ module OSut
   # @return [Bool] false if invalid input
   def heatingTemperatureSetpoints?(model = nil)
     mth = "OSut::#{__callee__}"
-    cl = OpenStudio::Model::Model
+    cl  = OpenStudio::Model::Model
+
     return mismatch("model", model, cl, mth, DBG, false) unless model.is_a?(cl)
 
     model.getThermalZones.each do |zone|
@@ -476,7 +478,7 @@ module OSut
   #
   # @return [Hash] spt: (Float), dual: (Bool)
   # @return [Hash] spt: nil, dual: false (if invalid input)
-  def minCoolScheduledSetpoint(zone)
+  def minCoolScheduledSetpoint(zone = nil)
     # Largely inspired from Parker & Marrec's "thermal_zone_cooled?" procedure.
     #
     # github.com/NREL/openstudio-standards/blob/
@@ -632,11 +634,10 @@ module OSut
   #
   # @return [Bool] true if valid cooling temperature setpoints
   # @return [Bool] false if invalid input
-  def coolingTemperatureSetpoints?(model)
+  def coolingTemperatureSetpoints?(model = nil)
     mth = "OSut::#{__callee__}"
-    cl = OpenStudio::Model::Model
+    cl  = OpenStudio::Model::Model
 
-    return invalid("model", mth, 1, DBG, false) unless model
     return mismatch("model", model, cl, mth, DBG, false) unless model.is_a?(cl)
 
     model.getThermalZones.each do |zone|
@@ -653,11 +654,10 @@ module OSut
   #
   # @return [Bool] true if model has one or more HVAC air loops
   # @return [Bool] false if invalid input
-  def airLoopsHVAC?(model)
+  def airLoopsHVAC?(model = nil)
     mth = "OSut::#{__callee__}"
-    cl = OpenStudio::Model::Model
+    cl  = OpenStudio::Model::Model
 
-    return invalid("model", mth, 1, DBG, false) unless model
     return mismatch("model", model, cl, mth, DBG, false) unless model.is_a?(cl)
 
     model.getThermalZones.each do |zone|
@@ -678,7 +678,7 @@ module OSut
   #
   # @return [Bool] true if should be tagged as plenum
   # @return [Bool] false if invalid input
-  def plenum?(space, loops, setpoints)
+  def plenum?(space = nil, loops = nil, setpoints = nil)
     # Largely inspired from NREL's "space_plenum?" procedure:
     #
     # github.com/NREL/openstudio-standards/blob/
@@ -698,7 +698,6 @@ module OSut
     #         a 'standards spacetype' holding "plenum" (case insensitive); OR
     #
     # CASE D: its name string holds "plenum" (also case insensitive).
-
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Space
 
@@ -751,16 +750,14 @@ module OSut
   #
   # @return [OpenStudio::Model::Schedule] HVAC availability sched
   # @return [nil] if invalid input
-  def availabilitySchedule(model, avl = "")
-    mth = "OSut::#{__callee__}"
-    cl = OpenStudio::Model::Model
+  def availabilitySchedule(model = nil, avl = "")
+    mth    = "OSut::#{__callee__}"
+    cl     = OpenStudio::Model::Model
+    limits = nil
 
-    return invalid("model", mth, 1) unless model
     return mismatch("model", model, cl, mth) unless model.is_a?(cl)
 
     # Either fetch availability ScheduleTypeLimits object, or create one.
-    limits = nil
-
     model.getScheduleTypeLimitss.each do |l|
       break if limits
       next if l.lowerLimitValue.empty?
@@ -909,14 +906,14 @@ module OSut
   # Validate if default construction set holds a base ground construction.
   #
   # @param set [OpenStudio::Model::DefaultConstructionSet] a default set
-  # @param base [OpensStudio::Model::ConstructionBase] a construction base
-  # @param ground [Bool] true if ground-facing surface
-  # @param exterior [Bool] true if exterior-facing surface
-  # @param type [String] a surface type
+  # @param bse [OpensStudio::Model::ConstructionBase] a construction base
+  # @param gr [Bool] true if ground-facing surface
+  # @param ex [Bool] true if exterior-facing surface
+  # @param typ [String] a surface type
   #
   # @return [Bool] true if default construction set holds construction
   # @return [Bool] false if invalid input
-  def holdsConstruction?(set, base, ground = false, exterior = false, type = "")
+  def holdsConstruction?(set = nil, bse = nil, gr = false, ex = false, typ = "")
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Model::DefaultConstructionSet
     cl2 = OpenStudio::Model::ConstructionBase
@@ -925,27 +922,29 @@ module OSut
     id = set.nameString
     return mismatch(id, set, cl1, mth, DBG, false) unless set.is_a?(cl1)
 
-    return invalid("base", mth, 2, DBG, false) unless base.respond_to?(NS)
-    id = base.nameString
-    return mismatch(id, base, cl2, mth, DBG, false) unless base.is_a?(cl2)
+    return invalid("base", mth, 2, DBG, false) unless bse.respond_to?(NS)
+    id = bse.nameString
+    return mismatch(id, bse, cl2, mth, DBG, false) unless bse.is_a?(cl2)
 
-    valid = ground == true || ground == false
+    valid = gr == true || gr == false
     return invalid("ground", mth, 3, DBG, false) unless valid
 
-    valid = exterior == true || exterior == false
+    valid = ex == true || ex == false
     return invalid("exterior", mth, 4, DBG, false) unless valid
 
-    typ = type.to_s.downcase
-    valid = typ == "floor" || typ == "wall" || typ == "roofceiling"
+    valid = typ.respond_to?(:to_s)
+    return invalid("surface typ", mth, 4, DBG, false) unless valid
+    type = typ.to_s.downcase
+    valid = type == "floor" || type == "wall" || type == "roofceiling"
     return invalid("surface type", mth, 5, DBG, false) unless valid
 
     constructions = nil
 
-    if ground
+    if gr
       unless set.defaultGroundContactSurfaceConstructions.empty?
         constructions = set.defaultGroundContactSurfaceConstructions.get
       end
-    elsif exterior
+    elsif ex
       unless set.defaultExteriorSurfaceConstructions.empty?
         constructions = set.defaultExteriorSurfaceConstructions.get
       end
@@ -957,21 +956,21 @@ module OSut
 
     return false unless constructions
 
-    case typ
+    case type
     when "roofceiling"
       unless constructions.roofCeilingConstruction.empty?
         construction = constructions.roofCeilingConstruction.get
-        return true if construction == base
+        return true if construction == bse
       end
     when "floor"
       unless constructions.floorConstruction.empty?
         construction = constructions.floorConstruction.get
-        return true if construction == base
+        return true if construction == bse
       end
     else
       unless constructions.wallConstruction.empty?
         construction = constructions.wallConstruction.get
-        return true if construction == base
+        return true if construction == bse
       end
     end
 
@@ -986,12 +985,11 @@ module OSut
   #
   # @return [OpenStudio::Model::DefaultConstructionSet] default set
   # @return [nil] if invalid input
-  def defaultConstructionSet(model, s)
+  def defaultConstructionSet(model = nil, s = nil)
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Model::Model
     cl2 = OpenStudio::Model::Surface
 
-    return invalid("model", mth, 1) unless model
     return mismatch("model", model, cl1, mth) unless model.is_a?(cl1)
 
     return invalid("s", mth, 2) unless s.respond_to?(NS)
@@ -1058,7 +1056,7 @@ module OSut
   #
   # @return [Bool] true if all layers are valid
   # @return [Bool] false if invalid input
-  def standardOpaqueLayers?(lc)
+  def standardOpaqueLayers?(lc = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::LayeredConstruction
 
@@ -1076,7 +1074,7 @@ module OSut
   #
   # @return [Double] total layered construction thickness
   # @return [Double] 0 if invalid input
-  def thickness(lc)
+  def thickness(lc = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::LayeredConstruction
 
@@ -1122,7 +1120,6 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl = Numeric
 
-    return invalid("usi", mth, 1, DBG, 0.1216) unless usi
     return mismatch("usi", usi, cl, mth, DBG, 0.1216) unless usi.is_a?(cl)
     return invalid("usi", mth, 1, WRN, 0.1216) if usi > 8.0
 
@@ -1140,13 +1137,12 @@ module OSut
   # @param t [Float] gas temperature (°C) (optional)
   #
   # @return [Float] calculated RSi at standard conditions (0 if error)
-  def rsi(lc, film, t = 0.0)
+  def rsi(lc = nil, film = nil, t = 0.0)
     # This is adapted from BTAP's Material Module's "get_conductance" (P. Lopez)
     #
     #   https://github.com/NREL/OpenStudio-Prototype-Buildings/blob/
     #   c3d5021d8b7aef43e560544699fb5c559e6b721d/lib/btap/measures/
     #   btap_equest_converter/envelope.rb#L122
-
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Model::LayeredConstruction
     cl2 = Numeric
@@ -1154,9 +1150,6 @@ module OSut
     return invalid("lc", mth, 1, DBG, 0) unless lc.respond_to?(NS)
     id = lc.nameString
     return mismatch(id, lc, cl1, mth, DBG, 0) unless lc.is_a?(cl1)
-
-    return invalid("film", mth, 2, DBG, 0) unless film
-    return invalid("temperature", mth, 3, DBG, 0) unless t
 
     return mismatch("film", film, cl2, mth, DBG, 0) unless film.is_a?(cl2)
     return mismatch("temperature", t, cl2, mth, DBG, 0) unless t.is_a?(cl2)
@@ -1172,15 +1165,19 @@ module OSut
       unless m.to_SimpleGlazing.empty?
         return 1 / m.to_SimpleGlazing.get.uFactor              # no need to loop
       end
+
       unless m.to_StandardGlazing.empty?
         rsi += m.to_StandardGlazing.get.thermalResistance
       end
+
       unless m.to_RefractionExtinctionGlazing.empty?
         rsi += m.to_RefractionExtinctionGlazing.get.thermalResistance
       end
+
       unless m.to_Gas.empty?
         rsi += m.to_Gas.get.getThermalResistance(tt)
       end
+
       unless m.to_GasMixture.empty?
         rsi += m.to_GasMixture.get.getThermalResistance(tt)
       end
@@ -1189,12 +1186,15 @@ module OSut
       unless m.to_StandardOpaqueMaterial.empty?
         rsi += m.to_StandardOpaqueMaterial.get.thermalResistance
       end
+
       unless m.to_MasslessOpaqueMaterial.empty?
         rsi += m.to_MasslessOpaqueMaterial.get.thermalResistance
       end
+
       unless m.to_RoofVegetation.empty?
         rsi += m.to_RoofVegetation.get.thermalResistance
       end
+
       unless m.to_AirGap.empty?
         rsi += m.to_AirGap.get.thermalResistance
       end
@@ -1213,7 +1213,7 @@ module OSut
   #
   # @return [Hash] index: (Integer), type: (:standard or :massless), r: (Float)
   # @return [Hash] index: nil, type: nil, r: 0 (if invalid input)
-  def insulatingLayer(lc)
+  def insulatingLayer(lc = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::LayeredConstruction
     res = { index: nil, type: nil, r: 0.0 }
@@ -1267,13 +1267,12 @@ module OSut
   #
   # @return [Hash] t: (OpenStudio::Transformation), r: Float
   # @return [Hash] t: nil, r: nil (if invalid input)
-  def transforms(model, group)
+  def transforms(model = nil, group = nil)
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Model::Model
     cl2 = OpenStudio::Model::PlanarSurfaceGroup
     res = { t: nil, r: nil }
 
-    return invalid("model", mth, 1, DBG, res) unless model
     return mismatch("model", model, cl1, mth, DBG, res) unless model.is_a?(cl1)
 
     return invalid("group", mth, 2, DBG, res) unless group.respond_to?(NS)
@@ -1292,13 +1291,12 @@ module OSut
   # @param pts [Array] an OpenStudio Point3D array/vector
   #
   # @return [Array] flattened OpenStudio 3D points
-  def flatZ(pts)
+  def flatZ(pts = nil)
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Point3dVector
     cl2 = OpenStudio::Point3d
-    v = OpenStudio::Point3dVector.new
+    v   = OpenStudio::Point3dVector.new
 
-    return invalid("points", mth, 1, DBG, v) unless pts
     valid = pts.is_a?(cl1) || pts.is_a?(Array)
     return mismatch("points", pts, cl1, mth, DBG, v) unless valid
 
@@ -1318,24 +1316,24 @@ module OSut
   #
   # @return [Bool] true if 1st polygon fits entirely within the 2nd polygon
   # @return [Bool] false if invalid input
-  def fits?(p1, p2, id1 = "", id2 = "")
+  def fits?(p1 = nil, p2 = nil, id1 = "", id2 = "")
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Point3dVector
     cl2 = OpenStudio::Point3d
     a   = false
+
+    return invalid(id1, mth, 3, DBG, a) unless id1.respond_to?(:to_s)
+    return invalid(id2, mth, 4, DBG, a) unless id2.respond_to?(:to_s)
     i1  = id1.to_s
     i2  = id2.to_s
     i1  = "poly1" if i1.empty?
     i2  = "poly2" if i2.empty?
 
-    return invalid(i1, mth, 1, DBG, a) unless p1
-    valid = p1.is_a?(cl1) || p1.is_a?(Array)
-    return mismatch(i1, p1, cl1, mth, DBG, a) unless valid
+    valid1 = p1.is_a?(cl1) || p1.is_a?(Array)
+    valid2 = p2.is_a?(cl1) || p2.is_a?(Array)
+    return mismatch(i1, p1, cl1, mth, DBG, a) unless valid1
+    return mismatch(i2, p2, cl1, mth, DBG, a) unless valid2
     return empty(i1, mth, ERR, a) if p1.empty?
-
-    return invalid(i2, mth, 2, DBG, a) unless p2
-    valid = p2.is_a?(cl1) || p2.is_a?(Array)
-    return mismatch(i2, p2, cl1, mth, DBG, a) unless valid
     return empty(i2, mth, ERR, a) if p2.empty?
 
     p1.each { |v| return mismatch(i1, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
@@ -1346,20 +1344,20 @@ module OSut
     ft_p1 = flatZ( (ft * p1).reverse )
     return false if ft_p1.empty?
     area1 = OpenStudio::getArea(ft_p1)
-    return empty(i1, mth, ERR, a) if area1.empty?
+    return empty("#{i1} area", mth, ERR, a) if area1.empty?
     area1 = area1.get
 
     ft_p2 = flatZ( (ft * p2).reverse )
     return false if ft_p2.empty?
     area2 = OpenStudio::getArea(ft_p2)
-    return empty(i2, mth, ERR, a) if area2.empty?
+    return empty("#{i2} area", mth, ERR, a) if area2.empty?
     area2 = area2.get
 
     union = OpenStudio::join(ft_p1, ft_p2, TOL2)
     return false if union.empty?
     union = union.get
     area = OpenStudio::getArea(union)
-    return empty("union", mth, ERR, a) if area.empty?
+    return empty("#{i1}:#{i2} union area", mth, ERR, a) if area.empty?
     area = area.get
 
     return false if area < TOL
@@ -1378,24 +1376,24 @@ module OSut
   #
   # @return Returns true if polygons overlaps (or either fits into the other)
   # @return [Bool] false if invalid input
-  def overlaps?(p1, p2, id1 = "", id2 = "")
+  def overlaps?(p1 = nil, p2 = nil, id1 = "", id2 = "")
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Point3dVector
     cl2 = OpenStudio::Point3d
     a   = false
-    i1  = id1.to_s
-    i2  = id2.to_s
-    i1  = "poly1" if i1.empty?
-    i2  = "poly2" if i2.empty?
 
-    return invalid(i1, mth, 1, DBG, a) unless p1
-    valid = p1.is_a?(cl1) || p1.is_a?(Array)
-    return mismatch(i1, p1, cl1, mth, DBG, a) unless valid
+    return invalid(id1, mth, 3, DBG, a) unless id1.respond_to?(:to_s)
+    return invalid(id2, mth, 4, DBG, a) unless id2.respond_to?(:to_s)
+    i1 = id1.to_s
+    i2 = id2.to_s
+    i1 = "poly1" if i1.empty?
+    i2 = "poly2" if i2.empty?
+
+    valid1 = p1.is_a?(cl1) || p1.is_a?(Array)
+    valid2 = p2.is_a?(cl1) || p2.is_a?(Array)
+    return mismatch(i1, p1, cl1, mth, DBG, a) unless valid1
+    return mismatch(i2, p2, cl1, mth, DBG, a) unless valid2
     return empty(i1, mth, ERR, a) if p1.empty?
-
-    return invalid(i2, mth, 2, DBG, a) unless p2
-    valid = p2.is_a?(cl1) || p2.is_a?(Array)
-    return mismatch(i2, p2, cl1, mth, DBG, a) unless valid
     return empty(i2, mth, ERR, a) if p2.empty?
 
     p1.each { |v| return mismatch(i1, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
@@ -1406,20 +1404,20 @@ module OSut
     ft_p1 = flatZ( (ft * p1).reverse )
     return false if ft_p1.empty?
     area1 = OpenStudio::getArea(ft_p1)
-    return empty(i1, mth, ERR, a) if area1.empty?
+    return empty("#{i1} area", mth, ERR, a) if area1.empty?
     area1 = area1.get
 
     ft_p2 = flatZ( (ft * p2).reverse )
     return false if ft_p2.empty?
     area2 = OpenStudio::getArea(ft_p2)
-    return empty(i2, mth, ERR, a) if area2.empty?
+    return empty("#{i2} area", mth, ERR, a) if area2.empty?
     area2 = area2.get
 
     union = OpenStudio::join(ft_p1, ft_p2, TOL2)
     return false if union.empty?
     union = union.get
     area = OpenStudio::getArea(union)
-    return empty("union", mth, ERR, a) if area.empty?
+    return empty("#{i1}:#{i2} union area", mth, ERR, a) if area.empty?
     area = area.get
 
     return false if area < TOL
