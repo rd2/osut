@@ -148,11 +148,11 @@ module OSut
 
     profiles.each do |profile|
       id = profile.nameString
+
       profile.values.each do |val|
-        unless val.is_a?(Numeric)
-          log(WRN, "Skipping non-numeric profile values in '#{id}' (#{mth})")
-          next
-        end
+        ok = val.is_a?(Numeric)
+        log(WRN, "Skipping non-numeric value in '#{id}' (#{mth})") unless ok
+        next unless ok
 
         res[:min] = val unless res[:min]
         res[:min] = val     if res[:min] > val
@@ -189,12 +189,10 @@ module OSut
     id = sched.nameString
     return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
 
-    unless sched.value.is_a?(Numeric)
-      return mismatch("'#{id}' value", sched.value, Numeric, mth, ERR, res)
-    else
-      res[:min] = sched.value
-      res[:max] = sched.value
-    end
+    valid = sched.value.is_a?(Numeric)
+    mismatch("'#{id}' value", sched.value, Numeric, mth, ERR, res) unless valid
+    res[:min] = sched.value
+    res[:max] = sched.value
 
     res
   end
@@ -233,13 +231,11 @@ module OSut
     end
 
     return empty("'#{id}' values", mth, ERR, res) if vals.empty?
-
-    if vals.min.is_a?(Numeric) && vals.max.is_a?(Numeric)
-      res[:min] = vals.min
-      res[:max] = vals.max
-    else
-      log(ERR, "Non-numeric values in '#{id}' (#{mth})")
-    end
+    ok = vals.min.is_a?(Numeric) && vals.max.is_a?(Numeric)
+    log(ERR, "Non-numeric values in '#{id}' (#{mth})") unless ok
+    return res unless ok
+    res[:min] = vals.min
+    res[:max] = vals.max
 
     res
   end
@@ -261,15 +257,12 @@ module OSut
     return invalid("sched", mth, 1, DBG, res) unless sched.respond_to?(NS)
     id = sched.nameString
     return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
-
     vals = sched.timeSeries.values
-
-    if vals.min.is_a?(Numeric) && vals.max.is_a?(Numeric)
-      res[:min] = vals.min
-      res[:max] = vals.max
-    else
-      log(ERR, "Non-numeric values in '#{id}' (#{mth})")
-    end
+    ok = vals.min.is_a?(Numeric) && vals.max.is_a?(Numeric)
+    log(ERR, "Non-numeric values in '#{id}' (#{mth})") unless ok
+    return res unless ok
+    res[:min] = vals.min
+    res[:max] = vals.max
 
     res
   end
@@ -684,7 +677,7 @@ module OSut
     # github.com/NREL/openstudio-standards/blob/
     # 58964222d25783e9da4ae292e375fb0d5c902aa5/lib/openstudio-standards/
     # standards/Standards.Space.rb#L1384
-
+    #
     # A space may be tagged as a plenum if:
     #
     # CASE A: its zone's "isPlenum" == true (SDK method) for a fully-developed
@@ -704,10 +697,8 @@ module OSut
     return invalid("space", mth, 1, DBG, false) unless space.respond_to?(NS)
     id = space.nameString
     return mismatch(id, space, cl, mth, DBG, false) unless space.is_a?(cl)
-
     valid = loops == true || loops == false
     return invalid("loops", mth, 2, DBG, false) unless valid
-
     valid = setpoints == true || setpoints == false
     return invalid("setpoints", mth, 3, DBG, false) unless valid
 
@@ -865,38 +856,26 @@ module OSut
 
     schedule = OpenStudio::Model::ScheduleRuleset.new(model)
     schedule.setName(nom)
-
-    unless schedule.setScheduleTypeLimits(limits)
-      log(ERR, "'#{nom}': Can't set schedule type limits (#{mth})")
-      return nil
-    end
-
-    unless schedule.defaultDaySchedule.addValue(time, val)
-      log(ERR, "'#{nom}': Can't set default day schedule (#{mth})")
-      return nil
-    end
-
+    ok = schedule.setScheduleTypeLimits(limits)
+    log(ERR, "'#{nom}': Can't set schedule type limits (#{mth})") unless ok
+    return nil unless ok
+    ok = schedule.defaultDaySchedule.addValue(time, val)
+    log(ERR, "'#{nom}': Can't set default day schedule (#{mth})") unless ok
+    return nil unless ok
     schedule.defaultDaySchedule.setName(dft)
 
     unless tag.empty?
       rule = OpenStudio::Model::ScheduleRule.new(schedule, sch)
       rule.setName(tag)
-
-      unless rule.setStartDate(may01)
-        log(ERR, "'#{tag}': Can't set start date (#{mth})")
-        return nil
-      end
-
-      unless rule.setEndDate(oct31)
-        log(ERR, "'#{tag}': Can't set end date (#{mth})")
-        return nil
-      end
-
-      unless rule.setApplyAllDays(true)
-        log(ERR, "'#{tag}': Can't apply to all days (#{mth})")
-        return nil
-      end
-
+      ok = rule.setStartDate(may01)
+      log(ERR, "'#{tag}': Can't set start date (#{mth})") unless ok
+      return nil unless ok
+      ok = rule.setEndDate(oct31)
+      log(ERR, "'#{tag}': Can't set end date (#{mth})") unless ok
+      return nil unless ok
+      ok = rule.setApplyAllDays(true)
+      log(ERR, "'#{tag}': Can't apply to all days (#{mth})") unless ok
+      return nil unless ok
       rule.daySchedule.setName(day)
     end
 
@@ -922,17 +901,13 @@ module OSut
     return invalid("set", mth, 1, DBG, false) unless set.respond_to?(NS)
     id = set.nameString
     return mismatch(id, set, cl1, mth, DBG, false) unless set.is_a?(cl1)
-
     return invalid("base", mth, 2, DBG, false) unless bse.respond_to?(NS)
     id = bse.nameString
     return mismatch(id, bse, cl2, mth, DBG, false) unless bse.is_a?(cl2)
-
     valid = gr == true || gr == false
     return invalid("ground", mth, 3, DBG, false) unless valid
-
     valid = ex == true || ex == false
     return invalid("exterior", mth, 4, DBG, false) unless valid
-
     valid = typ.respond_to?(:to_s)
     return invalid("surface typ", mth, 4, DBG, false) unless valid
     type = typ.to_s.downcase
@@ -992,22 +967,18 @@ module OSut
     cl2 = OpenStudio::Model::Surface
 
     return mismatch("model", model, cl1, mth) unless model.is_a?(cl1)
-
     return invalid("s", mth, 2) unless s.respond_to?(NS)
     id = s.nameString
     return mismatch(id, s, cl2, mth) unless s.is_a?(cl2)
 
-    unless s.isConstructionDefaulted
-      log(ERR, "'#{id}' construction not defaulted (#{mth})")
-      return nil
-    end
-
+    ok = s.isConstructionDefaulted
+    log(ERR, "'#{id}' construction not defaulted (#{mth})") unless ok
+    return nil unless ok
     return empty("'#{id}' construction", mth, ERR) if s.construction.empty?
     base = s.construction.get
     return empty("'#{id}' space", mth, ERR) if s.space.empty?
     space = s.space.get
     type = s.surfaceType
-
     ground = false
     exterior = false
 
@@ -1080,15 +1051,13 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::LayeredConstruction
 
-    return invalid("lc", mth, 1, DBG, 0) unless lc.respond_to?(NS)
+    return invalid("lc", mth, 1, DBG, 0.0) unless lc.respond_to?(NS)
     id = lc.nameString
-    return mismatch(id, lc, cl, mth, DBG, 0) unless lc.is_a?(cl)
+    return mismatch(id, lc, cl, mth, DBG, 0.0) unless lc.is_a?(cl)
 
-    unless standardOpaqueLayers?(lc)
-      log(ERR, "'#{id}' holds non-StandardOpaqueMaterial(s) (#{mth})")
-      return 0
-    end
-
+    ok = standardOpaqueLayers?(lc)
+    log(ERR, "'#{id}' holds non-StandardOpaqueMaterial(s) (#{mth})") unless ok
+    return 0.0 unless ok
     thickness = 0.0
     lc.layers.each { |m| thickness += m.thickness }
 
@@ -1142,7 +1111,7 @@ module OSut
   # @param t [Float] gas temperature (°C) (optional)
   #
   # @return [Float] calculated RSi at standard conditions (0 if error)
-  def rsi(lc = nil, film = nil, t = 0.0)
+  def rsi(lc = nil, film = 0.0, t = 0.0)
     # This is adapted from BTAP's Material Module's "get_conductance" (P. Lopez)
     #
     #   https://github.com/NREL/OpenStudio-Prototype-Buildings/blob/
@@ -1152,57 +1121,39 @@ module OSut
     cl1 = OpenStudio::Model::LayeredConstruction
     cl2 = Numeric
 
-    return invalid("lc", mth, 1, DBG, 0) unless lc.respond_to?(NS)
+    return invalid("lc", mth, 1, DBG, 0.0) unless lc.respond_to?(NS)
     id = lc.nameString
-    return mismatch(id, lc, cl1, mth, DBG, 0) unless lc.is_a?(cl1)
-
-    return mismatch("film", film, cl2, mth, DBG, 0) unless film.is_a?(cl2)
-    return mismatch("temperature", t, cl2, mth, DBG, 0) unless t.is_a?(cl2)
-
+    return mismatch(id, lc, cl1, mth, DBG, 0.0) unless lc.is_a?(cl1)
+    return mismatch("film", film, cl2, mth, DBG, 0.0) unless film.is_a?(cl2)
+    return mismatch("temperature", t, cl2, mth, DBG, 0.0) unless t.is_a?(cl2)
     tt  = t + 273.0                                                    # °C to K
-    return negative("temp K", mth, DBG, 0) if tt < 0
-    return negative("film", mth, DBG, 0) if film < 0
+    return negative("temp K", mth, DBG, 0.0) if tt < 0
+    return negative("film", mth, DBG, 0.0) if film < 0
 
     rsi = film
 
     lc.layers.each do |m|
       # Fenestration materials first (ignoring shades, screens, etc.)
-      unless m.to_SimpleGlazing.empty?
-        return 1 / m.to_SimpleGlazing.get.uFactor              # no need to loop
-      end
-
-      unless m.to_StandardGlazing.empty?
-        rsi += m.to_StandardGlazing.get.thermalResistance
-      end
-
-      unless m.to_RefractionExtinctionGlazing.empty?
-        rsi += m.to_RefractionExtinctionGlazing.get.thermalResistance
-      end
-
-      unless m.to_Gas.empty?
-        rsi += m.to_Gas.get.getThermalResistance(tt)
-      end
-
-      unless m.to_GasMixture.empty?
-        rsi += m.to_GasMixture.get.getThermalResistance(tt)
-      end
+      empty = m.to_SimpleGlazing.empty?
+      return 1 / m.to_SimpleGlazing.get.uFactor unless empty   # no need to loop
+      empty = m.to_StandardGlazing.empty?
+      rsi += m.to_StandardGlazing.get.thermalResistance unless empty
+      empty = m.to_RefractionExtinctionGlazing.empty?
+      rsi += m.to_RefractionExtinctionGlazing.get.thermalResistance unless empty
+      empty = m.to_Gas.empty?
+      rsi += m.to_Gas.get.getThermalResistance(tt) unless empty
+      empty = m.to_GasMixture.empty?
+      rsi += m.to_GasMixture.get.getThermalResistance(tt) unless empty
 
       # Opaque materials next.
-      unless m.to_StandardOpaqueMaterial.empty?
-        rsi += m.to_StandardOpaqueMaterial.get.thermalResistance
-      end
-
-      unless m.to_MasslessOpaqueMaterial.empty?
-        rsi += m.to_MasslessOpaqueMaterial.get.thermalResistance
-      end
-
-      unless m.to_RoofVegetation.empty?
-        rsi += m.to_RoofVegetation.get.thermalResistance
-      end
-
-      unless m.to_AirGap.empty?
-        rsi += m.to_AirGap.get.thermalResistance
-      end
+      empty = m.to_StandardOpaqueMaterial.empty?
+      rsi += m.to_StandardOpaqueMaterial.get.thermalResistance unless empty
+      empty = m.to_MasslessOpaqueMaterial.empty?
+      rsi += m.to_MasslessOpaqueMaterial.get.thermalResistance unless empty
+      empty = m.to_RoofVegetation.empty?
+      rsi += m.to_RoofVegetation.get.thermalResistance unless empty
+      empty = m.to_AirGap.empty?
+      rsi += m.to_AirGap.get.thermalResistance unless empty
     end
 
     rsi
@@ -1229,7 +1180,6 @@ module OSut
     return mismatch(id, lc, cl1, mth, DBG, res) unless lc.is_a?(cl)
 
     lc.layers.each do |m|
-
       unless m.to_MasslessOpaqueMaterial.empty?
         m             = m.to_MasslessOpaqueMaterial.get
 
@@ -1279,7 +1229,6 @@ module OSut
     res = { t: nil, r: nil }
 
     return mismatch("model", model, cl1, mth, DBG, res) unless model.is_a?(cl1)
-
     return invalid("group", mth, 2, DBG, res) unless group.respond_to?(NS)
     id = group.nameString
     return mismatch(id, group, cl2, mth, DBG, res) unless group.is_a?(cl2)
@@ -1304,7 +1253,6 @@ module OSut
 
     valid = pts.is_a?(cl1) || pts.is_a?(Array)
     return mismatch("points", pts, cl1, mth, DBG, v) unless valid
-
     pts.each { |pt| mismatch("pt", pt, cl2, mth, ERR, v) unless pt.is_a?(cl2) }
     pts.each { |pt| v << OpenStudio::Point3d.new(pt.x, pt.y, 0) }
 
@@ -1333,31 +1281,26 @@ module OSut
     i2  = id2.to_s
     i1  = "poly1" if i1.empty?
     i2  = "poly2" if i2.empty?
-
     valid1 = p1.is_a?(cl1) || p1.is_a?(Array)
     valid2 = p2.is_a?(cl1) || p2.is_a?(Array)
     return mismatch(i1, p1, cl1, mth, DBG, a) unless valid1
     return mismatch(i2, p2, cl1, mth, DBG, a) unless valid2
     return empty(i1, mth, ERR, a) if p1.empty?
     return empty(i2, mth, ERR, a) if p2.empty?
-
     p1.each { |v| return mismatch(i1, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
     p2.each { |v| return mismatch(i2, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
 
     ft = OpenStudio::Transformation::alignFace(p1).inverse
-
     ft_p1 = flatZ( (ft * p1).reverse )
     return false if ft_p1.empty?
     area1 = OpenStudio::getArea(ft_p1)
     return empty("#{i1} area", mth, ERR, a) if area1.empty?
     area1 = area1.get
-
     ft_p2 = flatZ( (ft * p2).reverse )
     return false if ft_p2.empty?
     area2 = OpenStudio::getArea(ft_p2)
     return empty("#{i2} area", mth, ERR, a) if area2.empty?
     area2 = area2.get
-
     union = OpenStudio::join(ft_p1, ft_p2, TOL2)
     return false if union.empty?
     union = union.get
@@ -1394,31 +1337,26 @@ module OSut
     i2 = id2.to_s
     i1 = "poly1" if i1.empty?
     i2 = "poly2" if i2.empty?
-
     valid1 = p1.is_a?(cl1) || p1.is_a?(Array)
     valid2 = p2.is_a?(cl1) || p2.is_a?(Array)
     return mismatch(i1, p1, cl1, mth, DBG, a) unless valid1
     return mismatch(i2, p2, cl1, mth, DBG, a) unless valid2
     return empty(i1, mth, ERR, a) if p1.empty?
     return empty(i2, mth, ERR, a) if p2.empty?
-
     p1.each { |v| return mismatch(i1, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
     p2.each { |v| return mismatch(i2, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
 
     ft = OpenStudio::Transformation::alignFace(p1).inverse
-
     ft_p1 = flatZ( (ft * p1).reverse )
     return false if ft_p1.empty?
     area1 = OpenStudio::getArea(ft_p1)
     return empty("#{i1} area", mth, ERR, a) if area1.empty?
     area1 = area1.get
-
     ft_p2 = flatZ( (ft * p2).reverse )
     return false if ft_p2.empty?
     area2 = OpenStudio::getArea(ft_p2)
     return empty("#{i2} area", mth, ERR, a) if area2.empty?
     area2 = area2.get
-
     union = OpenStudio::join(ft_p1, ft_p2, TOL2)
     return false if union.empty?
     union = union.get
