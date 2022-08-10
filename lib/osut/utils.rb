@@ -151,8 +151,8 @@ module OSut
 
       profile.values.each do |val|
         ok = val.is_a?(Numeric)
-        log(WRN, "Skipping non-numeric value in '#{id}' (#{mth})") unless ok
-        next unless ok
+        log(WRN, "Skipping non-numeric value in '#{id}' (#{mth})")     unless ok
+        next                                                           unless ok
 
         res[:min] = val unless res[:min]
         res[:min] = val     if res[:min] > val
@@ -232,8 +232,8 @@ module OSut
 
     return empty("'#{id}' values", mth, ERR, res) if vals.empty?
     ok = vals.min.is_a?(Numeric) && vals.max.is_a?(Numeric)
-    log(ERR, "Non-numeric values in '#{id}' (#{mth})") unless ok
-    return res unless ok
+    log(ERR, "Non-numeric values in '#{id}' (#{mth})")                 unless ok
+    return res                                                         unless ok
     res[:min] = vals.min
     res[:max] = vals.max
 
@@ -259,8 +259,8 @@ module OSut
     return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
     vals = sched.timeSeries.values
     ok = vals.min.is_a?(Numeric) && vals.max.is_a?(Numeric)
-    log(ERR, "Non-numeric values in '#{id}' (#{mth})") unless ok
-    return res unless ok
+    log(ERR, "Non-numeric values in '#{id}' (#{mth})")                 unless ok
+    return res                                                         unless ok
     res[:min] = vals.min
     res[:max] = vals.max
 
@@ -857,25 +857,25 @@ module OSut
     schedule = OpenStudio::Model::ScheduleRuleset.new(model)
     schedule.setName(nom)
     ok = schedule.setScheduleTypeLimits(limits)
-    log(ERR, "'#{nom}': Can't set schedule type limits (#{mth})") unless ok
-    return nil unless ok
+    log(ERR, "'#{nom}': Can't set schedule type limits (#{mth})")      unless ok
+    return nil                                                         unless ok
     ok = schedule.defaultDaySchedule.addValue(time, val)
-    log(ERR, "'#{nom}': Can't set default day schedule (#{mth})") unless ok
-    return nil unless ok
+    log(ERR, "'#{nom}': Can't set default day schedule (#{mth})")      unless ok
+    return nil                                                         unless ok
     schedule.defaultDaySchedule.setName(dft)
 
     unless tag.empty?
       rule = OpenStudio::Model::ScheduleRule.new(schedule, sch)
       rule.setName(tag)
       ok = rule.setStartDate(may01)
-      log(ERR, "'#{tag}': Can't set start date (#{mth})") unless ok
-      return nil unless ok
+      log(ERR, "'#{tag}': Can't set start date (#{mth})")              unless ok
+      return nil                                                       unless ok
       ok = rule.setEndDate(oct31)
-      log(ERR, "'#{tag}': Can't set end date (#{mth})") unless ok
-      return nil unless ok
+      log(ERR, "'#{tag}': Can't set end date (#{mth})")                unless ok
+      return nil                                                       unless ok
       ok = rule.setApplyAllDays(true)
-      log(ERR, "'#{tag}': Can't apply to all days (#{mth})") unless ok
-      return nil unless ok
+      log(ERR, "'#{tag}': Can't apply to all days (#{mth})")           unless ok
+      return nil                                                       unless ok
       rule.daySchedule.setName(day)
     end
 
@@ -972,8 +972,8 @@ module OSut
     return mismatch(id, s, cl2, mth) unless s.is_a?(cl2)
 
     ok = s.isConstructionDefaulted
-    log(ERR, "'#{id}' construction not defaulted (#{mth})") unless ok
-    return nil unless ok
+    log(ERR, "'#{id}' construction not defaulted (#{mth})")            unless ok
+    return nil                                                         unless ok
     return empty("'#{id}' construction", mth, ERR) if s.construction.empty?
     base = s.construction.get
     return empty("'#{id}' space", mth, ERR) if s.space.empty?
@@ -1056,8 +1056,8 @@ module OSut
     return mismatch(id, lc, cl, mth, DBG, 0.0) unless lc.is_a?(cl)
 
     ok = standardOpaqueLayers?(lc)
-    log(ERR, "'#{id}' holds non-StandardOpaqueMaterial(s) (#{mth})") unless ok
-    return 0.0 unless ok
+    log(ERR, "'#{id}' holds non-StandardOpaqueMaterial(s) (#{mth})")   unless ok
+    return 0.0                                                         unless ok
     thickness = 0.0
     lc.layers.each { |m| thickness += m.thickness }
 
@@ -1135,25 +1135,25 @@ module OSut
     lc.layers.each do |m|
       # Fenestration materials first (ignoring shades, screens, etc.)
       empty = m.to_SimpleGlazing.empty?
-      return 1 / m.to_SimpleGlazing.get.uFactor unless empty   # no need to loop
+      return 1 / m.to_SimpleGlazing.get.uFactor                     unless empty
       empty = m.to_StandardGlazing.empty?
-      rsi += m.to_StandardGlazing.get.thermalResistance unless empty
+      rsi += m.to_StandardGlazing.get.thermalResistance             unless empty
       empty = m.to_RefractionExtinctionGlazing.empty?
       rsi += m.to_RefractionExtinctionGlazing.get.thermalResistance unless empty
       empty = m.to_Gas.empty?
-      rsi += m.to_Gas.get.getThermalResistance(tt) unless empty
+      rsi += m.to_Gas.get.getThermalResistance(tt)                  unless empty
       empty = m.to_GasMixture.empty?
-      rsi += m.to_GasMixture.get.getThermalResistance(tt) unless empty
+      rsi += m.to_GasMixture.get.getThermalResistance(tt)           unless empty
 
       # Opaque materials next.
       empty = m.to_StandardOpaqueMaterial.empty?
-      rsi += m.to_StandardOpaqueMaterial.get.thermalResistance unless empty
+      rsi += m.to_StandardOpaqueMaterial.get.thermalResistance      unless empty
       empty = m.to_MasslessOpaqueMaterial.empty?
-      rsi += m.to_MasslessOpaqueMaterial.get.thermalResistance unless empty
+      rsi += m.to_MasslessOpaqueMaterial.get.thermalResistance      unless empty
       empty = m.to_RoofVegetation.empty?
-      rsi += m.to_RoofVegetation.get.thermalResistance unless empty
+      rsi += m.to_RoofVegetation.get.thermalResistance              unless empty
       empty = m.to_AirGap.empty?
-      rsi += m.to_AirGap.get.thermalResistance unless empty
+      rsi += m.to_AirGap.get.thermalResistance                      unless empty
     end
 
     rsi
