@@ -138,7 +138,7 @@ module OSut
     cl  = OpenStudio::Model::ScheduleRuleset
     res = { min: nil, max: nil }
 
-    return invalid("sched", mth, 1, DBG, res) unless sched.respond_to?(NS)
+    return invalid("sched", mth, 1, DBG, res)     unless sched.respond_to?(NS)
     id = sched.nameString
     return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
 
@@ -185,7 +185,7 @@ module OSut
     cl  = OpenStudio::Model::ScheduleConstant
     res = { min: nil, max: nil }
 
-    return invalid("sched", mth, 1, DBG, res) unless sched.respond_to?(NS)
+    return invalid("sched", mth, 1, DBG, res)     unless sched.respond_to?(NS)
     id = sched.nameString
     return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
 
@@ -217,7 +217,7 @@ module OSut
     prev_str = ""
     res      = { min: nil, max: nil }
 
-    return invalid("sched", mth, 1, DBG, res) unless sched.respond_to?(NS)
+    return invalid("sched", mth, 1, DBG, res)     unless sched.respond_to?(NS)
     id = sched.nameString
     return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
 
@@ -254,7 +254,7 @@ module OSut
     prev_str = ""
     res      = { min: nil, max: nil }
 
-    return invalid("sched", mth, 1, DBG, res) unless sched.respond_to?(NS)
+    return invalid("sched", mth, 1, DBG, res)     unless sched.respond_to?(NS)
     id = sched.nameString
     return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
     vals = sched.timeSeries.values
@@ -288,7 +288,7 @@ module OSut
     cl  = OpenStudio::Model::ThermalZone
     res = { spt: nil, dual: false }
 
-    return invalid("zone", mth, 1, DBG, res) unless zone.respond_to?(NS)
+    return invalid("zone", mth, 1, DBG, res)     unless zone.respond_to?(NS)
     id = zone.nameString
     return mismatch(id, zone, cl, mth, DBG, res) unless zone.is_a?(cl)
 
@@ -481,7 +481,7 @@ module OSut
     cl  = OpenStudio::Model::ThermalZone
     res = { spt: nil, dual: false }
 
-    return invalid("zone", mth, 1, DBG, res) unless zone.respond_to?(NS)
+    return invalid("zone", mth, 1, DBG, res)     unless zone.respond_to?(NS)
     id = zone.nameString
     return mismatch(id, zone, cl, mth, DBG, res) unless zone.is_a?(cl)
 
@@ -694,11 +694,11 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Space
 
-    return invalid("space", mth, 1, DBG, false) unless space.respond_to?(NS)
+    return invalid("space", mth, 1, DBG, false)     unless space.respond_to?(NS)
     id = space.nameString
     return mismatch(id, space, cl, mth, DBG, false) unless space.is_a?(cl)
     valid = loops == true || loops == false
-    return invalid("loops", mth, 2, DBG, false) unless valid
+    return invalid("loops", mth, 2, DBG, false)     unless valid
     valid = setpoints == true || setpoints == false
     return invalid("setpoints", mth, 3, DBG, false) unless valid
 
@@ -746,7 +746,7 @@ module OSut
     cl     = OpenStudio::Model::Model
     limits = nil
 
-    return mismatch("model", model, cl, mth) unless model.is_a?(cl)
+    return mismatch("model", model, cl, mth)    unless model.is_a?(cl)
     return invalid("availability", avl, 2, mth) unless avl.respond_to?(:to_s)
 
     # Either fetch availability ScheduleTypeLimits object, or create one.
@@ -825,29 +825,29 @@ module OSut
       unless schedule.empty?
         schedule = schedule.get
         default = schedule.defaultDaySchedule
-        ok = ok && default.nameString == dft
-        ok = ok && default.times.size == 1
-        ok = ok && default.values.size == 1
-        ok = ok && default.times.first == time
-        ok = ok && default.values.first == val
+        ok = ok && default.nameString           == dft
+        ok = ok && default.times.size           == 1
+        ok = ok && default.values.size          == 1
+        ok = ok && default.times.first          == time
+        ok = ok && default.values.first         == val
         rules = schedule.scheduleRules
         ok = ok && (rules.size == 0 || rules.size == 1)
 
         if rules.size == 1
           rule = rules.first
-          ok = ok && rule.nameString == tag
+          ok = ok && rule.nameString            == tag
           ok = ok && !rule.startDate.empty?
           ok = ok && !rule.endDate.empty?
-          ok = ok && rule.startDate.get == may01
-          ok = ok && rule.endDate.get == oct31
+          ok = ok && rule.startDate.get         == may01
+          ok = ok && rule.endDate.get           == oct31
           ok = ok && rule.applyAllDays
 
           d = rule.daySchedule
-          ok = ok && d.nameString == day
-          ok = ok && d.times.size == 1
-          ok = ok && d.values.size == 1
+          ok = ok && d.nameString               == day
+          ok = ok && d.times.size               == 1
+          ok = ok && d.values.size              == 1
           ok = ok && d.times.first.totalSeconds == secs
-          ok = ok && d.values.first.to_i != val
+          ok = ok && d.values.first.to_i        != val
         end
 
         return schedule if ok
@@ -898,16 +898,16 @@ module OSut
     cl1 = OpenStudio::Model::DefaultConstructionSet
     cl2 = OpenStudio::Model::ConstructionBase
 
-    return invalid("set", mth, 1, DBG, false) unless set.respond_to?(NS)
+    return invalid("set", mth, 1, DBG, false)         unless set.respond_to?(NS)
     id = set.nameString
-    return mismatch(id, set, cl1, mth, DBG, false) unless set.is_a?(cl1)
-    return invalid("base", mth, 2, DBG, false) unless bse.respond_to?(NS)
+    return mismatch(id, set, cl1, mth, DBG, false)    unless set.is_a?(cl1)
+    return invalid("base", mth, 2, DBG, false)        unless bse.respond_to?(NS)
     id = bse.nameString
-    return mismatch(id, bse, cl2, mth, DBG, false) unless bse.is_a?(cl2)
+    return mismatch(id, bse, cl2, mth, DBG, false)    unless bse.is_a?(cl2)
     valid = gr == true || gr == false
-    return invalid("ground", mth, 3, DBG, false) unless valid
+    return invalid("ground", mth, 3, DBG, false)      unless valid
     valid = ex == true || ex == false
-    return invalid("exterior", mth, 4, DBG, false) unless valid
+    return invalid("exterior", mth, 4, DBG, false)    unless valid
     valid = typ.respond_to?(:to_s)
     return invalid("surface typ", mth, 4, DBG, false) unless valid
     type = typ.to_s.downcase
@@ -967,9 +967,9 @@ module OSut
     cl2 = OpenStudio::Model::Surface
 
     return mismatch("model", model, cl1, mth) unless model.is_a?(cl1)
-    return invalid("s", mth, 2) unless s.respond_to?(NS)
+    return invalid("s", mth, 2)               unless s.respond_to?(NS)
     id = s.nameString
-    return mismatch(id, s, cl2, mth) unless s.is_a?(cl2)
+    return mismatch(id, s, cl2, mth)          unless s.is_a?(cl2)
 
     ok = s.isConstructionDefaulted
     log(ERR, "'#{id}' construction not defaulted (#{mth})")            unless ok
@@ -1051,7 +1051,7 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::LayeredConstruction
 
-    return invalid("lc", mth, 1, DBG, 0.0) unless lc.respond_to?(NS)
+    return invalid("lc", mth, 1, DBG, 0.0)     unless lc.respond_to?(NS)
     id = lc.nameString
     return mismatch(id, lc, cl, mth, DBG, 0.0) unless lc.is_a?(cl)
 
@@ -1092,10 +1092,10 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl  = Numeric
 
-    return mismatch("usi", usi, cl, mth, DBG, 0.1216) unless usi.is_a?(cl)
-    return invalid("usi", mth, 1, WRN, 0.1216) if usi > 8.0
-    return negative("usi", mth, WRN, 0.1216) if usi < 0
-    return zero("usi", mth, WRN, 0.1216) if usi.abs < TOL
+    return mismatch("usi", usi, cl, mth, DBG, 0.1216)  unless usi.is_a?(cl)
+    return invalid("usi", mth, 1, WRN, 0.1216)             if usi > 8.0
+    return negative("usi", mth, WRN, 0.1216)               if usi < 0
+    return zero("usi", mth, WRN, 0.1216)                   if usi.abs < TOL
 
     rsi = 1 / (0.025342 * usi + 29.163853)   # exterior film, next interior film
 
@@ -1121,14 +1121,14 @@ module OSut
     cl1 = OpenStudio::Model::LayeredConstruction
     cl2 = Numeric
 
-    return invalid("lc", mth, 1, DBG, 0.0) unless lc.respond_to?(NS)
+    return invalid("lc", mth, 1, DBG, 0.0)             unless lc.respond_to?(NS)
     id = lc.nameString
-    return mismatch(id, lc, cl1, mth, DBG, 0.0) unless lc.is_a?(cl1)
-    return mismatch("film", film, cl2, mth, DBG, 0.0) unless film.is_a?(cl2)
-    return mismatch("temperature", t, cl2, mth, DBG, 0.0) unless t.is_a?(cl2)
-    tt  = t + 273.0                                                    # °C to K
-    return negative("temp K", mth, DBG, 0.0) if tt < 0
-    return negative("film", mth, DBG, 0.0) if film < 0
+    return mismatch(id, lc, cl1, mth, DBG, 0.0)        unless lc.is_a?(cl1)
+    return mismatch("film", film, cl2, mth, DBG, 0.0)  unless film.is_a?(cl2)
+    return mismatch("temp K", t, cl2, mth, DBG, 0.0)   unless t.is_a?(cl2)
+    t += 273.0                                                         # °C to K
+    return negative("temp K", mth, DBG, 0.0)               if t < 0
+    return negative("film", mth, DBG, 0.0)                 if film < 0
 
     rsi = film
 
@@ -1141,9 +1141,9 @@ module OSut
       empty = m.to_RefractionExtinctionGlazing.empty?
       rsi += m.to_RefractionExtinctionGlazing.get.thermalResistance unless empty
       empty = m.to_Gas.empty?
-      rsi += m.to_Gas.get.getThermalResistance(tt)                  unless empty
+      rsi += m.to_Gas.get.getThermalResistance(t)                   unless empty
       empty = m.to_GasMixture.empty?
-      rsi += m.to_GasMixture.get.getThermalResistance(tt)           unless empty
+      rsi += m.to_GasMixture.get.getThermalResistance(t)            unless empty
 
       # Opaque materials next.
       empty = m.to_StandardOpaqueMaterial.empty?
@@ -1175,7 +1175,7 @@ module OSut
     res = { index: nil, type: nil, r: 0.0 }
     i   = 0                                                           # iterator
 
-    return invalid("lc", mth, 1, DBG, res) unless lc.respond_to?(NS)
+    return invalid("lc", mth, 1, DBG, res)      unless lc.respond_to?(NS)
     id = lc.nameString
     return mismatch(id, lc, cl1, mth, DBG, res) unless lc.is_a?(cl)
 
@@ -1252,7 +1252,7 @@ module OSut
     v   = OpenStudio::Point3dVector.new
 
     valid = pts.is_a?(cl1) || pts.is_a?(Array)
-    return mismatch("points", pts, cl1, mth, DBG, v) unless valid
+    return mismatch("points", pts, cl1, mth, DBG, v)     unless valid
     pts.each { |pt| mismatch("pt", pt, cl2, mth, ERR, v) unless pt.is_a?(cl2) }
     pts.each { |pt| v << OpenStudio::Point3d.new(pt.x, pt.y, 0) }
 

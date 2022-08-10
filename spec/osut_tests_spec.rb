@@ -866,7 +866,7 @@ RSpec.describe OSut do
     m2 = "Negative 'film' (#{m})"
     m3 = "'film' NilClass? expecting Numeric (#{m})"
     m4 = "Negative 'temp K' (#{m})"
-    m5 = "'temperature' NilClass? expecting Numeric (#{m})"
+    m5 = "'temp K' NilClass? expecting Numeric (#{m})"
     expect(mod1.clean!).to eq(DBG)
 
     model.getSurfaces.each do |s|
