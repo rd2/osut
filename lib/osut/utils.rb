@@ -688,9 +688,7 @@ module OSut
     #         valid setpoints);
     #
     # CASE C: it has a spacetype whose name holds "plenum", or a spacetype with
-    #         a 'standards spacetype' holding "plenum" (case insensitive); OR
-    #
-    # CASE D: its name string holds "plenum" (also case insensitive).
+    #         a 'standards spacetype' holding "plenum" (case insensitive)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Space
 
@@ -726,8 +724,6 @@ module OSut
         return true if type.downcase.include?("plenum")                 # CASE C
       end
     end
-
-    return true if space.nameString.downcase.include?("plenum")         # case D
 
     false
   end
