@@ -683,12 +683,13 @@ module OSut
     # CASE A: its zone's "isPlenum" == true (SDK method) for a fully-developed
     #         OpenStudio model (complete with HVAC air loops);
     #
-    # CASE B: it's excluded from building's total floor area yet linked to a
-    #         zone holding an "inactive" thermostat (i.e., can't extract
-    #         valid setpoints);
+    # CASE B: (IN ABSENCE OF HVAC AIRLOOPS) if it's excluded from a building's
+    #         total floor area yet linked to a zone holding an 'inactive'
+    #         thermostat, i.e. can't extract valid setpoints; OR
     #
-    # CASE C: it has a spacetype whose name holds "plenum", or a spacetype with
-    #         a 'standards spacetype' holding "plenum" (case insensitive)
+    # CASE C: (IN ABSENCE OF HVAC AIRLOOPS & VALID SETPOINTS) it has "plenum"
+    #         (case insensitive) as a spacetype (or as a spacetype's
+    #         'standards spacetype').
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Space
 
@@ -702,26 +703,24 @@ module OSut
 
     unless space.thermalZone.empty?
       zone = space.thermalZone.get
-      return true if zone.isPlenum && loops                             # CASE A
+      return zone.isPlenum if loops                                          # A
 
       if setpoints
         heat = maxHeatScheduledSetpoint(zone)
         cool = minCoolScheduledSetpoint(zone)
         return false if heat[:spt] || cool[:spt]          # directly conditioned
-
-        unless space.partofTotalFloorArea
-          return true if heat[:dual] || cool[:dual]                     # CASE B
-        end
+        return heat[:dual] || cool[:dual] unless space.partofTotalFloorArea  # B
+        return false
       end
     end
 
     unless space.spaceType.empty?
       type = space.spaceType.get
-      return true if type.nameString.downcase.include?("plenum")        # CASE C
+      return type.nameString.downcase == "plenum"                            # C
 
       unless type.standardsSpaceType.empty?
         type = type.standardsSpaceType.get
-        return true if type.downcase.include?("plenum")                 # CASE C
+        return type.downcase == "plenum"                                     # C
       end
     end
 

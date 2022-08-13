@@ -417,7 +417,7 @@ RSpec.describe OSut do
 
     model.getSpaces.each do |space|
       id = space.nameString
-      expect(mod1.plenum?(space, loops, setpoints)).to be(true)      if id == sp
+      expect(mod1.plenum?(space, loops, setpoints)).to be(false)     if id == sp
       expect(mod1.plenum?(space, loops, setpoints)).to be(false) unless id == sp
     end
 
