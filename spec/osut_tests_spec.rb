@@ -408,46 +408,80 @@ RSpec.describe OSut do
     sp = "Level 0 Ceiling Plenum"
 
     expect(mod1.clean!).to eq(DBG)
-
     loops = mod1.airLoopsHVAC?(model)
     expect(loops).to be(true)
     expect(mod1.status.zero?).to be(true)
-
     setpoints = mod1.heatingTemperatureSetpoints?(model)
     expect(setpoints).to be(true)
     expect(mod1.status.zero?).to be(true)
 
     model.getSpaces.each do |space|
       id = space.nameString
-      expect(mod1.plenum?(space, loops, setpoints)).to be(true) if id == sp
+      expect(mod1.plenum?(space, loops, setpoints)).to be(true)      if id == sp
       expect(mod1.plenum?(space, loops, setpoints)).to be(false) unless id == sp
     end
 
     expect(mod1.status.zero?).to be(true)
-
     expect(mod1.plenum?(nil, loops, setpoints)).to be(false)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m1)
 
-    translator = OpenStudio::OSVersion::VersionTranslator.new
+
     file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+    expect(mod1.clean!).to eq(DBG)
+    loops = mod1.airLoopsHVAC?(model)
+    expect(loops).to be(false)
+    expect(mod1.status.zero?).to be(true)
+    setpoints = mod1.heatingTemperatureSetpoints?(model)
+    expect(setpoints).to be(true)
+    expect(mod1.status.zero?).to be(true)
+
+    model.getSpaces.each do |space|
+      expect(mod1.plenum?(space, loops, setpoints)).to be(false)
+    end
+
+    expect(mod1.status.zero?).to be(true)
+
+
+    file = File.join(__dir__, "files/osms/in/smalloffice.osm")
     path = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model.empty?).to be(false)
     model = model.get
 
     expect(mod1.clean!).to eq(DBG)
-
     loops = mod1.airLoopsHVAC?(model)
-    expect(loops).to be(false)
+    expect(loops).to be(true)
     expect(mod1.status.zero?).to be(true)
-
     setpoints = mod1.heatingTemperatureSetpoints?(model)
     expect(setpoints).to be(true)
     expect(mod1.status.zero?).to be(true)
 
     model.getSpaces.each do |space|
+      id = space.nameString
+      expect(space.thermalZone.empty?).to be(false)
+      zone = space.thermalZone.get
+
+      heat_spt = mod1.maxHeatScheduledSetpoint(zone)
+      cool_spt = mod1.minCoolScheduledSetpoint(zone)
+      expect(heat_spt.is_a?(Hash)).to be(true)
+      expect(cool_spt.is_a?(Hash)).to be(true)
+      expect(heat_spt.key?(:spt)).to be(true)
+      expect(cool_spt.key?(:spt)).to be(true)
+      expect(heat_spt.key?(:dual)).to be(true)
+      expect(cool_spt.key?(:dual)).to be(true)
+      expect(heat_spt[:spt].nil?).to be(true)                   if id == "Attic"
+      expect(cool_spt[:spt].nil?).to be(true)                   if id == "Attic"
+      expect(heat_spt[:dual]).to be(false)                      if id == "Attic"
+      expect(cool_spt[:dual]).to be(false)                      if id == "Attic"
+      expect(zone.thermostat.empty?)                            if id == "Attic"
+      expect(space.partofTotalFloorArea).to be(true)        unless id == "Attic"
+      expect(space.partofTotalFloorArea).to be(false)           if id == "Attic"
       expect(mod1.plenum?(space, loops, setpoints)).to be(false)
     end
 

@@ -371,13 +371,12 @@ module OSut
       end
     end
 
-    return res if res[:spt]
     return res if zone.thermostat.empty?
-    tstat = zone.thermostat.get
+    tstat       = zone.thermostat.get
+    res[:spt]   = nil
 
     unless tstat.to_ThermostatSetpointDualSetpoint.empty? &&
            tstat.to_ZoneControlThermostatStagedDualSetpoint.empty?
-      res[:dual] = true
 
       unless tstat.to_ThermostatSetpointDualSetpoint.empty?
         tstat = tstat.to_ThermostatSetpointDualSetpoint.get
@@ -386,7 +385,8 @@ module OSut
       end
 
       unless tstat.heatingSetpointTemperatureSchedule.empty?
-        sched = tstat.heatingSetpointTemperatureSchedule.get
+        res[:dual] = true
+        sched      = tstat.heatingSetpointTemperatureSchedule.get
 
         unless sched.to_ScheduleRuleset.empty?
           sched = sched.to_ScheduleRuleset.get
@@ -548,13 +548,12 @@ module OSut
       end
     end
 
-    return res if res[:spt]
     return res if zone.thermostat.empty?
-    tstat = zone.thermostat.get
+    tstat       = zone.thermostat.get
+    res[:spt]   = nil
 
     unless tstat.to_ThermostatSetpointDualSetpoint.empty? &&
            tstat.to_ZoneControlThermostatStagedDualSetpoint.empty?
-      res[:dual] = true
 
       unless tstat.to_ThermostatSetpointDualSetpoint.empty?
         tstat = tstat.to_ThermostatSetpointDualSetpoint.get
@@ -563,7 +562,8 @@ module OSut
       end
 
       unless tstat.coolingSetpointTemperatureSchedule.empty?
-        sched = tstat.coolingSetpointTemperatureSchedule.get
+        res[:dual] = true
+        sched      = tstat.coolingSetpointTemperatureSchedule.get
 
         unless sched.to_ScheduleRuleset.empty?
           sched = sched.to_ScheduleRuleset.get
@@ -707,13 +707,12 @@ module OSut
       return true if zone.isPlenum && loops                             # CASE A
 
       if setpoints
-        heating = maxHeatScheduledSetpoint(zone)
-        cooling = minCoolScheduledSetpoint(zone)
-
-        return false if heating[:spt] || cooling[:spt]    # directly conditioned
+        heat = maxHeatScheduledSetpoint(zone)
+        cool = minCoolScheduledSetpoint(zone)
+        return false if heat[:spt] || cool[:spt]          # directly conditioned
 
         unless space.partofTotalFloorArea
-          return true if heating[:dual] || cooling[:dual]               # CASE B
+          return true if heat[:dual] || cool[:dual]                     # CASE B
         end
       end
     end
@@ -728,7 +727,7 @@ module OSut
       end
     end
 
-    return true if space.nameString.downcase.include?("plenum")
+    return true if space.nameString.downcase.include?("plenum")         # case D
 
     false
   end
