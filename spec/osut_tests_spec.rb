@@ -12,7 +12,6 @@ RSpec.describe OSut do
   let(:cls1) { Class.new  { extend OSut } }
   let(:cls2) { Class.new  { extend OSut } }
   let(:mod1) { Module.new { extend OSut } }
-  let(:mod2) { Module.new { extend OSut } }
 
   it "checks scheduleRulesetMinMax (from within class instances)" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
@@ -241,7 +240,11 @@ RSpec.describe OSut do
     expect(mod1.logs.first[:message]).to eq(m2)
   end
 
-  it "checks min/max heat/cool scheduled setpoints" do
+  it "checks min/max heat/cool scheduled setpoints (as a module method)" do
+    module M
+      extend OSut
+    end
+
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
@@ -249,7 +252,7 @@ RSpec.describe OSut do
     expect(model.empty?).to be(false)
     model = model.get
 
-    expect(mod1.clean!).to eq(DBG)
+    expect(M.clean!).to eq(DBG)
 
     m1 = "OSut::maxHeatScheduledSetpoint"
     m2 = "OSut::minCoolScheduledSetpoint"
@@ -257,7 +260,7 @@ RSpec.describe OSut do
     z2 = "Single zone"
 
     model.getThermalZones.each do |z|
-      res = mod1.maxHeatScheduledSetpoint(z)
+      res = M.maxHeatScheduledSetpoint(z)
       expect(res.is_a?(Hash)).to be(true)
       expect(res.key?(:spt)).to be(true)
       expect(res.key?(:dual)).to be(true)
@@ -265,9 +268,9 @@ RSpec.describe OSut do
       expect(res[:spt]).to be_within(TOL).of(22.11) if z.nameString == z2
       expect(res[:dual]).to eq(false)               if z.nameString == z1
       expect(res[:dual]).to eq(true)                if z.nameString == z2
-      expect(mod1.status.zero?).to be(true)
+      expect(M.status.zero?).to be(true)
 
-      res = mod1.minCoolScheduledSetpoint(z)
+      res = M.minCoolScheduledSetpoint(z)
       expect(res.is_a?(Hash)).to be(true)
       expect(res.key?(:spt)).to be(true)
       expect(res.key?(:dual)).to be(true)
@@ -275,52 +278,52 @@ RSpec.describe OSut do
       expect(res[:spt]).to be_within(TOL).of(22.78) if z.nameString == z2
       expect(res[:dual]).to eq(false)               if z.nameString == z1
       expect(res[:dual]).to eq(true)                if z.nameString == z2
-      expect(mod1.status.zero?).to be(true)
+      expect(M.status.zero?).to be(true)
     end
 
-    res = mod1.maxHeatScheduledSetpoint(nil)                      # bad argument
+    res = M.maxHeatScheduledSetpoint(nil)                      # bad argument
     expect(res.is_a?(Hash)).to be(true)
     expect(res.key?(:spt)).to be(true)
     expect(res.key?(:dual)).to be(true)
     expect(res[:spt].nil?).to be(true)
     expect(res[:dual]).to eq(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
-    expect(mod1.clean!).to eq(DBG)
+    expect(M.debug?).to be(true)
+    expect(M.logs.size).to eq(1)
+    expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
+    expect(M.clean!).to eq(DBG)
 
-    res = mod1.minCoolScheduledSetpoint(nil)                      # bad argument
+    res = M.minCoolScheduledSetpoint(nil)                      # bad argument
     expect(res.is_a?(Hash)).to be(true)
     expect(res.key?(:spt)).to be(true)
     expect(res.key?(:dual)).to be(true)
     expect(res[:spt].nil?).to be(true)
     expect(res[:dual]).to eq(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
-    expect(mod1.clean!).to eq(DBG)
+    expect(M.debug?).to be(true)
+    expect(M.logs.size).to eq(1)
+    expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
+    expect(M.clean!).to eq(DBG)
 
-    res = mod1.maxHeatScheduledSetpoint(model)                    # bad argument
+    res = M.maxHeatScheduledSetpoint(model)                    # bad argument
     expect(res.is_a?(Hash)).to be(true)
     expect(res.key?(:spt)).to be(true)
     expect(res.key?(:dual)).to be(true)
     expect(res[:spt].nil?).to be(true)
     expect(res[:dual]).to eq(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
-    expect(mod1.clean!).to eq(DBG)
+    expect(M.debug?).to be(true)
+    expect(M.logs.size).to eq(1)
+    expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
+    expect(M.clean!).to eq(DBG)
 
-    res = mod1.minCoolScheduledSetpoint(model)                    # bad argument
+    res = M.minCoolScheduledSetpoint(model)                    # bad argument
     expect(res.is_a?(Hash)).to be(true)
     expect(res.key?(:spt)).to be(true)
     expect(res.key?(:dual)).to be(true)
     expect(res[:spt].nil?).to be(true)
     expect(res[:dual]).to eq(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
-    expect(mod1.clean!).to eq(DBG)
+    expect(M.debug?).to be(true)
+    expect(M.logs.size).to eq(1)
+    expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
+    expect(M.clean!).to eq(DBG)
   end
 
   it "checks if zones have heating/cooling temperature setpoints" do
@@ -331,8 +334,10 @@ RSpec.describe OSut do
     expect(model.empty?).to be(false)
     model = model.get
 
-    m1 = "OSut::heatingTemperatureSetpoints?"
-    m2 = "OSut::coolingTemperatureSetpoints?"
+    cl1 = OpenStudio::Model::Model
+    cl2 = NilClass
+    m1 = "'model' #{cl2}? expecting #{cl1} (OSut::heatingTemperatureSetpoints?)"
+    m2 = "'model' #{cl2}? expecting #{cl1} (OSut::coolingTemperatureSetpoints?)"
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.heatingTemperatureSetpoints?(model)).to be(true)
@@ -344,13 +349,13 @@ RSpec.describe OSut do
     expect(mod1.heatingTemperatureSetpoints?(nil)).to be(false)   # bad argument
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'model' arg #1 (#{m1})")
+    expect(mod1.logs.first[:message]).to eq(m1)
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.coolingTemperatureSetpoints?(nil)).to be(false)   # bad argument
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'model' arg #1 (#{m2})")
+    expect(mod1.logs.first[:message]).to eq(m2)
   end
 
   it "checks for HVAC air loops" do
@@ -361,7 +366,9 @@ RSpec.describe OSut do
     expect(model.empty?).to be(false)
     model = model.get
 
-    m = "OSut::airLoopsHVAC?"
+    cl1 = OpenStudio::Model::Model
+    cl2 = NilClass
+    m = "'model' #{cl2}? expecting #{cl1} (OSut::airLoopsHVAC?)"
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.airLoopsHVAC?(model)).to be(true)
@@ -370,7 +377,7 @@ RSpec.describe OSut do
     expect(mod1.airLoopsHVAC?(nil)).to be(false)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'model' arg #1 (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m)
 
     file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
     path = OpenStudio::Path.new(file)
@@ -385,7 +392,7 @@ RSpec.describe OSut do
     expect(mod1.airLoopsHVAC?(nil)).to be(false)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'model' arg #1 (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m)
   end
 
   it "checks for plenums" do
@@ -397,49 +404,84 @@ RSpec.describe OSut do
     model = model.get
 
     m  = "OSut::plenum?"
+    m1 = "Invalid 'space' arg #1 (#{m})"
     sp = "Level 0 Ceiling Plenum"
 
     expect(mod1.clean!).to eq(DBG)
-
     loops = mod1.airLoopsHVAC?(model)
     expect(loops).to be(true)
     expect(mod1.status.zero?).to be(true)
-
     setpoints = mod1.heatingTemperatureSetpoints?(model)
     expect(setpoints).to be(true)
     expect(mod1.status.zero?).to be(true)
 
     model.getSpaces.each do |space|
       id = space.nameString
-      expect(mod1.plenum?(space, loops, setpoints)).to be(true) if id == sp
+      expect(mod1.plenum?(space, loops, setpoints)).to be(false)     if id == sp
       expect(mod1.plenum?(space, loops, setpoints)).to be(false) unless id == sp
     end
 
     expect(mod1.status.zero?).to be(true)
-
     expect(mod1.plenum?(nil, loops, setpoints)).to be(false)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'space' arg #1 (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m1)
 
-    translator = OpenStudio::OSVersion::VersionTranslator.new
+
     file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+    expect(mod1.clean!).to eq(DBG)
+    loops = mod1.airLoopsHVAC?(model)
+    expect(loops).to be(false)
+    expect(mod1.status.zero?).to be(true)
+    setpoints = mod1.heatingTemperatureSetpoints?(model)
+    expect(setpoints).to be(true)
+    expect(mod1.status.zero?).to be(true)
+
+    model.getSpaces.each do |space|
+      expect(mod1.plenum?(space, loops, setpoints)).to be(false)
+    end
+
+    expect(mod1.status.zero?).to be(true)
+
+
+    file = File.join(__dir__, "files/osms/in/smalloffice.osm")
     path = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model.empty?).to be(false)
     model = model.get
 
     expect(mod1.clean!).to eq(DBG)
-
     loops = mod1.airLoopsHVAC?(model)
-    expect(loops).to be(false)
+    expect(loops).to be(true)
     expect(mod1.status.zero?).to be(true)
-
     setpoints = mod1.heatingTemperatureSetpoints?(model)
     expect(setpoints).to be(true)
     expect(mod1.status.zero?).to be(true)
 
     model.getSpaces.each do |space|
+      id = space.nameString
+      expect(space.thermalZone.empty?).to be(false)
+      zone = space.thermalZone.get
+
+      heat_spt = mod1.maxHeatScheduledSetpoint(zone)
+      cool_spt = mod1.minCoolScheduledSetpoint(zone)
+      expect(heat_spt.is_a?(Hash)).to be(true)
+      expect(cool_spt.is_a?(Hash)).to be(true)
+      expect(heat_spt.key?(:spt)).to be(true)
+      expect(cool_spt.key?(:spt)).to be(true)
+      expect(heat_spt.key?(:dual)).to be(true)
+      expect(cool_spt.key?(:dual)).to be(true)
+      expect(heat_spt[:spt].nil?).to be(true)                   if id == "Attic"
+      expect(cool_spt[:spt].nil?).to be(true)                   if id == "Attic"
+      expect(heat_spt[:dual]).to be(false)                      if id == "Attic"
+      expect(cool_spt[:dual]).to be(false)                      if id == "Attic"
+      expect(zone.thermostat.empty?)                            if id == "Attic"
+      expect(space.partofTotalFloorArea).to be(true)        unless id == "Attic"
+      expect(space.partofTotalFloorArea).to be(false)           if id == "Attic"
       expect(mod1.plenum?(space, loops, setpoints)).to be(false)
     end
 
@@ -643,6 +685,8 @@ RSpec.describe OSut do
     expect(model.empty?).to be(false)
     model = model.get
 
+    m  = "OSut::thickness"
+    m1 = "holds non-StandardOpaqueMaterial(s) (#{m})"
     expect(cls1.clean!).to eq(DBG)
 
     model.getConstructions.each do |c|
@@ -666,8 +710,7 @@ RSpec.describe OSut do
 
     expect(cls1.status).to eq(ERR)
     expect(cls1.logs.size).to eq(2)
-    msg = "holds non-StandardOpaqueMaterial(s) (OSut::thickness)"
-    cls1.logs.each { |l| expect(l[:message].include?(msg)).to be(true) }
+    cls1.logs.each { |l| expect(l[:message].include?(m1)).to be(true) }
 
     # OSut, and by extension OSlg, are intended to be accessed "globally"
     # once instantiated within a class or module. Here, class instance cls2
@@ -713,6 +756,7 @@ RSpec.describe OSut do
     n2  = "CBECS Before-1980 ExtRoof IEAD ClimateZone 8"
     m1  = "'#{n2}' #{cl2}? expecting #{cl1} (OSut::holdsConstruction?)"
     m5  = "Invalid 'surface type' arg #5 (OSut::holdsConstruction?)"
+    m6  = "Invalid 'set' arg #1 (OSut::holdsConstruction?)"
 
     set = model.getDefaultConstructionSetByName(n1)
     expect(set.empty?).to be(false)
@@ -757,6 +801,13 @@ RSpec.describe OSut do
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m1)
     expect(mod1.clean!).to eq(DBG)
+
+    # INVALID case: arg #1 : model (instead of surface type string)
+    expect(mod1.holdsConstruction?(model, c, true, true, t1)).to be(false)
+    expect(mod1.debug?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m6)
+    expect(mod1.clean!).to eq(DBG)
   end
 
 
@@ -768,6 +819,7 @@ RSpec.describe OSut do
     expect(model.empty?).to be(false)
     model = model.get
 
+    m = "construction not defaulted (defaultConstructionSet)"
     mod1.clean!
 
     model.getSurfaces.each do |s|
@@ -790,8 +842,8 @@ RSpec.describe OSut do
       set = mod1.defaultConstructionSet(model, s)
       expect(set.nil?).to be(true)
       expect(mod1.status).to eq(ERR)
-      msg = "construction not defaulted (defaultConstructionSet)"
-      mod1.logs.each {|l| expect(l[:message].include?(msg)) }
+
+      mod1.logs.each {|l| expect(l[:message].include?(m)) }
     end
   end
 
@@ -803,7 +855,10 @@ RSpec.describe OSut do
     expect(model.empty?).to be(false)
     model = model.get
 
-    m = "OSut::glazingAirFilmRSi"
+    m  = "OSut::glazingAirFilmRSi"
+    m1 = "Invalid 'usi' arg #1 (#{m})"
+    m2 = "'usi' String? expecting Numeric (#{m})"
+    m3 = "'usi' NilClass? expecting Numeric (#{m})"
     expect(mod1.clean!).to eq(DBG)
 
     model.getConstructions.each do |c|
@@ -817,20 +872,19 @@ RSpec.describe OSut do
     expect(mod1.glazingAirFilmRSi(9.0)).to be_within(TOL).of(0.1216)
     expect(mod1.warn?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'usi' arg #1 (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m1)
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.glazingAirFilmRSi("")).to be_within(TOL).of(0.1216)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    message = "'usi' String? expecting Numeric (#{m})"
-    expect(mod1.logs.first[:message]).to eq(message)
+    expect(mod1.logs.first[:message]).to eq(m2)
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.glazingAirFilmRSi(nil)).to be_within(TOL).of(0.1216)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'usi' arg #1 (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m3)
   end
 
   it "checks rsi calculations" do
@@ -841,7 +895,12 @@ RSpec.describe OSut do
     expect(model.empty?).to be(false)
     model = model.get
 
-    m = "OSut::rsi"
+    m  = "OSut::rsi"
+    m1 = "Invalid 'lc' arg #1 (#{m})"
+    m2 = "Negative 'film' (#{m})"
+    m3 = "'film' NilClass? expecting Numeric (#{m})"
+    m4 = "Negative 'temp K' (#{m})"
+    m5 = "'temp K' NilClass? expecting Numeric (#{m})"
     expect(mod1.clean!).to eq(DBG)
 
     model.getSurfaces.each do |s|
@@ -872,13 +931,13 @@ RSpec.describe OSut do
     expect(mod1.rsi("", 0.150)).to be_within(TOL).of(0)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'lc' arg #1 (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m1)
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.rsi(nil, 0.150)).to be_within(TOL).of(0)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'lc' arg #1 (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m1)
 
     lc = model.getLayeredConstructionByName("SLAB-ON-GRADE-FLOOR")
     expect(lc.empty?).to be(false)
@@ -888,26 +947,25 @@ RSpec.describe OSut do
     expect(mod1.rsi(lc, -1)).to be_within(TOL).of(0)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("'film' negative (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m2)
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.rsi(lc, nil)).to be_within(TOL).of(0)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'film' arg #2 (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m3)
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.rsi(lc, 0.150, -300)).to be_within(TOL).of(0)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("'temp K' negative (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m4)
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.rsi(lc, 0.150, nil)).to be_within(TOL).of(0)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    message = "Invalid 'temperature' arg #3 (#{m})"
-    expect(mod1.logs.first[:message]).to eq(message)
+    expect(mod1.logs.first[:message]).to eq(m5)
   end
 
   it "identifies an (opaque) insulating layer within a layered construction" do
@@ -918,7 +976,8 @@ RSpec.describe OSut do
     expect(model.empty?).to be(false)
     model = model.get
 
-    m = "OSut::insulatingLayer"
+    m  = "OSut::insulatingLayer"
+    m1 = "Invalid 'lc' arg #1 (#{m})"
     expect(mod1.clean!).to eq(DBG)
 
     model.getLayeredConstructions.each do |lc|
@@ -972,7 +1031,7 @@ RSpec.describe OSut do
     expect(lyr[:r].zero?).to be(true)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'lc' arg #1 (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m1)
 
     expect(mod1.clean!).to eq(DBG)
     lyr = mod1.insulatingLayer("")
@@ -982,7 +1041,7 @@ RSpec.describe OSut do
     expect(lyr[:r].zero?).to be(true)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'lc' arg #1 (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m1)
 
     expect(mod1.clean!).to eq(DBG)
     lyr = mod1.insulatingLayer(model)
@@ -992,7 +1051,7 @@ RSpec.describe OSut do
     expect(lyr[:r].zero?).to be(true)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'lc' arg #1 (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m1)
   end
 
   it "checks model transformation" do
@@ -1003,7 +1062,8 @@ RSpec.describe OSut do
     expect(model.empty?).to be(false)
     model = model.get
 
-    m = "OSut::transforms"
+    m  = "OSut::transforms"
+    m1 = "Invalid 'group' arg #2 (#{m})"
     expect(mod1.clean!).to eq(DBG)
 
     model.getSpaces.each do |space|
@@ -1043,7 +1103,7 @@ RSpec.describe OSut do
     expect(tr[:r].nil?).to be(true)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'group' arg #2 (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m1)
   end
 
   it "checks flattened 3D points" do
@@ -1054,10 +1114,13 @@ RSpec.describe OSut do
     expect(model.empty?).to be(false)
     model = model.get
 
-    m   = "OSut::flatZ"
     cl1 = OpenStudio::Model::Model
     cl2 = OpenStudio::Point3dVector
     cl3 = OpenStudio::Point3d
+    cl4 = NilClass
+    m   = "OSut::flatZ"
+    m1  = "'points' #{cl4}? expecting #{cl2} (#{m})"
+    m2  = "'points' #{cl1}? expecting #{cl2} (#{m})"
 
     expect(mod1.clean!).to eq(DBG)
 
@@ -1082,7 +1145,7 @@ RSpec.describe OSut do
     expect(flat.empty?).to be(true)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to be(1)
-    expect(mod1.logs.first[:message]).to eq("Invalid 'points' arg #1 (#{m})")
+    expect(mod1.logs.first[:message]).to eq(m1)
 
     expect(mod1.clean!).to eq(DBG)
     flat = mod1.flatZ(model)
@@ -1090,8 +1153,8 @@ RSpec.describe OSut do
     expect(flat.empty?).to be(true)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to be(1)
-    message = "'points' #{cl1}? expecting #{cl2} (#{m})"
-    expect(mod1.logs.first[:message]).to eq(message)
+
+    expect(mod1.logs.first[:message]).to eq(m2)
   end
 
   it "checks surface fits?' & overlaps?" do
