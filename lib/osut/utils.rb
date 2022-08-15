@@ -306,7 +306,7 @@ module OSut
 
       unless equip.to_ZoneHVACLowTemperatureRadiantElectric.empty?
         equip = equip.to_ZoneHVACLowTemperatureRadiantElectric.get
-        sched = equip.heatingSetpointTemperatureSchedule.get
+        sched = equip.heatingSetpointTemperatureSchedule
       end
 
       unless equip.to_ZoneHVACLowTempRadiantConstFlow.empty?
