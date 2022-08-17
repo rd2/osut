@@ -2,7 +2,6 @@ require "osut"
 
 RSpec.describe OSut do
   TOL  = OSut::TOL
-  TOL2 = OSut::TOL2
   DBG  = OSut::DEBUG
   INF  = OSut::INFO
   WRN  = OSut::WARN
@@ -1164,7 +1163,8 @@ RSpec.describe OSut do
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
 
-    model = OpenStudio::Model::Model.new
+    version = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
+    model   = OpenStudio::Model::Model.new
 
     # 10m x 10m parent vertical (wall) surface.
     vec = OpenStudio::Point3dVector.new
@@ -1194,7 +1194,10 @@ RSpec.describe OSut do
     expect(mod1.status.zero?).to be(true)
 
     # Door1 fits?, overlaps?
-    expect(OpenStudio.polygonInPolygon(ft_door1, ft_wall, TOL)).to be(true)
+    unless version < 340
+      expect(OpenStudio.polygonInPolygon(ft_door1, ft_wall, TOL)).to be(true)
+    end
+
     expect(mod1.fits?(door1.vertices, wall.vertices)).to be(true)
     expect(mod1.status.zero?).to be(true)
     expect(mod1.overlaps?(door1.vertices, wall.vertices)).to be(true)
@@ -1275,7 +1278,7 @@ RSpec.describe OSut do
 
     area = OpenStudio.getArea(wall.vertices)
     expect(area.empty?).to be(false)
-    expect(area.get).to be_within(TOL2).of(100)
+    expect(area.get).to be_within(TOL).of(100)
 
     # XY-plane transformation matrix.
     ft = OpenStudio::Transformation::alignFace(wall.vertices)
@@ -1307,7 +1310,7 @@ RSpec.describe OSut do
     expect(mod1.overlaps?(offset1, wall.vertices)).to be(true)
     area = OpenStudio.getArea(offset1)
     expect(area.empty?).to be(false)
-    expect(area.get).to be_within(TOL2).of(104.04)
+    expect(area.get).to be_within(TOL).of(104.04)
 
     offset2 = mod1.offset(wall.vertices, 0.1)
     expect(mod1.status.zero?).to be(true)
@@ -1323,7 +1326,7 @@ RSpec.describe OSut do
     expect(mod1.overlaps?(offset2, wall.vertices)).to be(true)
     area = OpenStudio.getArea(offset2)
     expect(area.empty?).to be(false)
-    expect(area.get).to be_within(TOL2).of(104.04)
+    expect(area.get).to be_within(TOL).of(104.04)
 
     # A model with sub/surface vertices defined clockwise.
     file  = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
@@ -1342,10 +1345,12 @@ RSpec.describe OSut do
     #  0.000, 20.000, 0.000, !- X,Y,Z Vertex 2 {m}
     #  0.000,  0.000, 0.000, !- X,Y,Z Vertex 3 {m}
     #  0.000,  0.000, 3.800; !- X,Y,Z Vertex 4 {m}
+    v2    = srf2.vertices
     gross = srf2.grossArea
-    expect(gross).to be_within(TOL2).of(76.0)
-    expect(srf2.netArea).to be_within(TOL2).of(45.6)
-    v2 = srf2.vertices
+    expect(gross).to be_within(TOL).of(76.0)
+    expect(srf2.netArea).to be_within(TOL).of(45.6)
+    wwr = srf2.windowToWallRatio
+    expect(wwr).to be_within(TOL).of(0.400)
 
     ss2 = model.getSubSurfaceByName("Sub Surface 2")
     expect(ss2.empty?).to be(false)
@@ -1354,20 +1359,20 @@ RSpec.describe OSut do
     #  0.000, 19.975, 0.760, !- X,Y,Z Vertex 2 {m}
     #  0.000,  0.025, 0.760, !- X,Y,Z Vertex 3 {m}
     #  0.000,  0.025, 2.284; !- X,Y,Z Vertex 4 {m}
-    expect(ss2.grossArea).to be_within(TOL2).of(30.4)
-    expect(ss2.netArea  ).to be_within(TOL2).of(30.4)
+    expect(ss2.grossArea).to be_within(TOL).of(30.4)
+    expect(ss2.netArea  ).to be_within(TOL).of(30.4)
     vs2 = ss2.vertices
     expect(mod1.fits?(vs2, v2)).to be(true)
     expect(mod1.overlaps?(vs2, v2)).to be(true)
 
-    expect(gross - srf2.netArea).to be_within(TOL2).of(ss2.grossArea)
+    expect(gross - srf2.netArea).to be_within(TOL).of(ss2.grossArea)
     expect(ss2.allowWindowPropertyFrameAndDivider).to be(true)
     expect(ss2.windowPropertyFrameAndDivider.empty?).to be(true)
 
     unless v1 < 340                     # or, e.g. ss2.respond_to?(:dividerArea)
       expect(ss2.dividerArea.to_i).to eq(0)
       expect(ss2.frameArea.to_i).to eq(0)
-      expect(ss2.roughOpeningArea).to be_within(TOL2).of(ss2.grossArea)
+      expect(ss2.roughOpeningArea).to be_within(TOL).of(ss2.grossArea)
 
       vx2 = ss2.roughOpeningVertices     # same as original vertices without F+D
       expect(vx2.is_a?(Array)).to be(true)
@@ -1403,8 +1408,8 @@ RSpec.describe OSut do
     ss2a.setName("Sub Surface 2a")
     expect(ss2a.setSurface(srf2)).to be(true)
     expect(ss2a.setSubSurfaceType("FixedWindow")).to be(true)
-    expect(ss2a.netArea).to be_within(TOL2).of(0.600)
-    expect(ss2a.grossArea).to be_within(TOL2).of(0.600)
+    expect(ss2a.netArea).to be_within(TOL).of(0.600)
+    expect(ss2a.grossArea).to be_within(TOL).of(0.600)
     expect(ss2a.allowWindowPropertyFrameAndDivider).to be(true)
 
     vec  = OpenStudio::Point3dVector.new
@@ -1416,8 +1421,8 @@ RSpec.describe OSut do
     ss2b.setName("Sub Surface 2b")
     expect(ss2b.setSurface(srf2)).to be(true)
     expect(ss2b.setSubSurfaceType("FixedWindow")).to be(true)
-    expect(ss2b.netArea).to be_within(TOL2).of(0.600)
-    expect(ss2b.grossArea).to be_within(TOL2).of(0.600)
+    expect(ss2b.netArea).to be_within(TOL).of(0.600)
+    expect(ss2b.grossArea).to be_within(TOL).of(0.600)
     expect(ss2b.allowWindowPropertyFrameAndDivider).to be(true)
 
     vec  = OpenStudio::Point3dVector.new
@@ -1429,8 +1434,8 @@ RSpec.describe OSut do
     ss2c.setName("Sub Surface 2c")
     expect(ss2c.setSurface(srf2)).to be(true)
     expect(ss2c.setSubSurfaceType("FixedWindow")).to be(true)
-    expect(ss2c.netArea).to be_within(TOL2).of(0.600)
-    expect(ss2c.grossArea).to be_within(TOL2).of(0.600)
+    expect(ss2c.netArea).to be_within(TOL).of(0.600)
+    expect(ss2c.grossArea).to be_within(TOL).of(0.600)
     expect(ss2c.allowWindowPropertyFrameAndDivider).to be(true)
 
     expect(mod1.fits?( ss2.vertices, v2)).to be(true)
@@ -1442,12 +1447,14 @@ RSpec.describe OSut do
     expect(mod1.overlaps?(vs2, ss2b.vertices)).to be(false)
     expect(mod1.overlaps?(vs2, ss2c.vertices)).to be(false)
 
-    net  = gross
-    net -= ss2.grossArea
-    net -= ss2a.grossArea
-    net -= ss2b.grossArea
-    net -= ss2c.grossArea
-    expect(srf2.netArea).to be_within(TOL2).of(43.8)         # 45.6m2 - 3x 0.6m2
+    net   = gross
+    net  -= ss2.grossArea
+    net  -= ss2a.grossArea
+    net  -= ss2b.grossArea
+    net  -= ss2c.grossArea
+    wwr3x = srf2.windowToWallRatio
+    expect(srf2.netArea).to be_within(TOL).of(43.8)
+    expect(wwr3x).to be_within(TOL).of(0.424)                       # before F+D
 
     fd = OpenStudio::Model::WindowPropertyFrameAndDivider.new(model)
     width = 0.050
@@ -1458,8 +1465,8 @@ RSpec.describe OSut do
     w2a = ss2a.windowPropertyFrameAndDivider.get.frameWidth
     expect(w2a).to be_within(0.001).of(width)
 
-    expect(ss2a.netArea).to be_within(TOL2).of(0.600)
-    expect(ss2a.grossArea).to be_within(TOL2).of(0.600)
+    expect(ss2a.netArea).to be_within(TOL).of(0.600)
+    expect(ss2a.grossArea).to be_within(TOL).of(0.600)
 
     unless v1 < 340
       # ss2a.roughOpeningVertices.each { |vx| puts vx }             # clockwise!
@@ -1472,20 +1479,22 @@ RSpec.describe OSut do
       expect(mod1.logs.empty?).to be(true)
 
       expect(ss2a.roughOpeningArea).to be_within(TOL).of(0.840)
-      net  = gross
-      net -= ss2.grossArea
-      net -= ss2a.roughOpeningArea
-      net -= ss2b.grossArea
-      net -= ss2c.grossArea
-      expect(srf2.netArea).to be_within(TOL2).of(net)             # F+D accepted
+      net2a  = gross
+      net2a -= ss2.grossArea
+      net2a -= ss2a.roughOpeningArea
+      net2a -= ss2b.grossArea
+      net2a -= ss2c.grossArea
+      wwr2a  = srf2.windowToWallRatio
+      expect(wwr2a).to be_within(TOL).of(0.427)         # not previous wwr 43.8%
+      expect(srf2.netArea).to be_within(TOL).of(net2a)            # F+D accepted
     end
 
     expect(ss2b.setWindowPropertyFrameAndDivider(fd)).to be(true)
     w2b = ss2b.windowPropertyFrameAndDivider.get.frameWidth
     expect(w2b).to be_within(TOL).of(width)
 
-    expect(ss2b.netArea).to be_within(TOL2).of(0.600)
-    expect(ss2b.grossArea).to be_within(TOL2).of(0.600)
+    expect(ss2b.netArea).to be_within(TOL).of(0.600)
+    expect(ss2b.grossArea).to be_within(TOL).of(0.600)
 
     unless v1 < 340
       # ss2b.roughOpeningVertices.each { |vx| puts vx }             # clockwise!
@@ -1498,18 +1507,18 @@ RSpec.describe OSut do
       expect(mod1.logs.empty?).to be(true)
 
       expect(ss2a.roughOpeningArea).to be_within(TOL).of(0.840)
-      net  = gross
-      net -= ss2.grossArea
-      net -= ss2a.roughOpeningArea
-      net -= ss2b.roughOpeningArea
-      net -= ss2c.grossArea
-      expect(srf2.netArea).to be_within(TOL2).of(net)            # F+D accepted?
+      net2b  = gross
+      net2b -= ss2.grossArea
+      net2b -= ss2a.roughOpeningArea
+      net2b -= ss2b.roughOpeningArea
+      net2b -= ss2c.grossArea
+      wwr2b  = srf2.windowToWallRatio
+      expect(wwr2b).to be_within(TOL).of(wwr2a)                  # F+D rejected!
+      expect(srf2.netArea).to be_within(TOL).of(net2b)              # not net2a!
 
-      # The rough opening vertices do not fit in parent wall ...
-      #  0.000, 20.000, 3.800, !- X,Y,Z Vertex 1 {m} <<< Z
-      #  0.000, 20.000, 0.000, !- X,Y,Z Vertex 2 {m}
-      #  0.000,  0.000, 0.000, !- X,Y,Z Vertex 3 {m}
-      #  0.000,  0.000, 3.800; !- X,Y,Z Vertex 4 {m} <<< Z
+      # So for v340 and up, rely on OpenStudio-reported WWR to get parent
+      # surface (true) net area to determine whether F+D object addition is
+      # successful or not.
     end
   end
 end

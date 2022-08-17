@@ -1264,6 +1264,7 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Point3dVector
     cl2 = OpenStudio::Point3d
+    version = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
     a   = false
 
     return invalid("id1", mth, 3, DBG, a) unless id1.respond_to?(:to_s)
@@ -1290,12 +1291,32 @@ module OSut
     ft_p1 = flatZ( (ft.inverse * p1)         )
     return  false                                                if ft_p1.empty?
     cw    = OpenStudio.pointInPolygon(ft_p1.first, ft_p1, TOL)
-    ft_p1 = flatZ( (ft.inverse * p1).reverse )                unless cw
-    ft_p2 = flatZ( (ft.inverse * p2).reverse )                unless cw
-    ft_p2 = flatZ( (ft.inverse * p2)         )                    if cw
+    ft_p1 = flatZ( (ft.inverse * p1).reverse )               unless cw
+    ft_p2 = flatZ( (ft.inverse * p2).reverse )               unless cw
+    ft_p2 = flatZ( (ft.inverse * p2)         )                   if cw
     return  false                                                if ft_p2.empty?
 
-    OpenStudio.polygonInPolygon(ft_p1, ft_p2, TOL)
+    version = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
+    return OpenStudio.polygonInPolygon(ft_p1, ft_p2, TOL)   unless version < 340
+
+    area1 = OpenStudio.getArea(ft_p1)
+    area2 = OpenStudio.getArea(ft_p2)
+    return  empty("#{i1} area", mth, ERR, a)                     if area1.empty?
+    return  empty("#{i2} area", mth, ERR, a)                     if area2.empty?
+    area1 = area1.get
+    area2 = area2.get
+    union = OpenStudio.join(ft_p1, ft_p2, TOL2)
+    return  false                                                if union.empty?
+    union = union.get
+    area  = OpenStudio.getArea(union)
+    return  empty("#{i1}:#{i2} union area", mth, ERR, a)         if area.empty?
+    area = area.get
+
+    return false if area < TOL
+    return true  if (area - area2).abs < TOL
+    return false if (area - area2).abs > TOL
+
+     true
   end
 
   ##
