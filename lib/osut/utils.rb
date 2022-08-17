@@ -1384,36 +1384,213 @@ module OSut
   # Generate new vertices, offset by a certain width.
   #
   # @param pts [Array] OpenStudio Point3D vector/array
-  # @param width [Float] offset width (m)
+  # @param w [Float] offset width (min: 0.0254m)
+  # @param v [Integer] OpenStudio SDK version, eg '291' for 'v2.9.1' (optional)
   #
-  # @return [Array] offset OpenStudio 3D points if successful
-  # @return [Array] original OpenStudio points if failed
-  def offset(pts = [], width = 0)
-    mth     = "TBD::#{__callee__}"
-    cl1     = OpenStudio::Point3dVector
-    cl2     = OpenStudio::Point3d
+  # @return [Array] offset points if successful (v > 300)
+  # @return [Array] original points if invalid input
+  def offset(p1 = [], w = 0, v = 0)
+    mth   = "TBD::#{__callee__}"
+    cl    = OpenStudio::Point3d
+    vrsn  = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
 
-    valid = pts.is_a?(cl1) || pts.is_a?(Array)
-    return  mismatch("pts", pts, cl1, mth, DBG, pts) unless valid
-    return  empty(i1, mth, ERR, a)                       if pts.empty?
-    return  invalid("width", mth, 2, DBG, pts) unless width.respond_to?(:to_f)
-    width = width.to_f
-    return  pts                                          if width < TOL
+    valid = p1.is_a?(OpenStudio::Point3dVector) || p1.is_a?(Array)
+    return  mismatch("pts", p1, cl1, mth, DBG, p1)  unless valid
+    return  empty("pts", mth, ERR, p1)                  if p1.empty?
+    valid = p1.size == 3 || p1.size == 4
+    iv    = true if p1.size == 4
+    return  invalid("pts", mth, 1, DBG, p1)         unless valid
+    return  invalid("width", mth, 2, DBG, p1)       unless w.respond_to?(:to_f)
+    w     = w.to_f
+    return  p1                                          if w < 0.0254
+    v     = v.to_i                                      if v.respond_to?(:to_i)
+    v     = 0                                       unless v.respond_to?(:to_i)
+    v     = vrsn                                        if v.zero?
 
-    # XY-plane transformation matrix ... needs to be clockwise for boost.
-    ft     = OpenStudio::Transformation::alignFace(pts)
-    ft_pts = flatZ( (ft.inverse * pts)         )
-    return   pts                                         if ft_pts.empty?
-    cw     = OpenStudio::pointInPolygon(ft_pts.first, ft_pts, TOL)
-    ft_pts = flatZ( (ft.inverse * pts).reverse )     unless cw
+    p1.each { |x| return mismatch("p", x, cl, mth, ERR, p1) unless x.is_a?(cl) }
 
-    offset = OpenStudio.buffer(ft_pts, width, TOL)
-    return   pts                                         if offset.empty?
-    offset = offset.get
-    offset = ft * offset                                 if cw
-    offset = (ft * offset).reverse                   unless cw
+    unless v < 321
+      # XY-plane transformation matrix ... needs to be clockwise for boost.
+      ft     = OpenStudio::Transformation::alignFace(p1)
+      ft_pts = flatZ( (ft.inverse * p1) )
+      return   p1                                       if ft_pts.empty?
+      cw     = OpenStudio::pointInPolygon(ft_pts.first, ft_pts, TOL)
+      ft_pts = flatZ( (ft.inverse * p1).reverse )   unless cw
+      offset = OpenStudio.buffer(ft_pts, w, TOL)
+      return   p1                                       if offset.empty?
+      offset = offset.get
+      return   ft * offset                              if cw
+      return  (ft * offset).reverse                 unless cw
+    else                                                  # brute force approach
+      pz     = {}
+      pz[:A] = {}
+      pz[:B] = {}
+      pz[:C] = {}
+      pz[:D] = {}                                                          if iv
 
-    offset
+      pz[:A][:p] = OpenStudio::Point3d.new(p1[0].x, p1[0].y, p1[0].z)
+      pz[:B][:p] = OpenStudio::Point3d.new(p1[1].x, p1[1].y, p1[1].z)
+      pz[:C][:p] = OpenStudio::Point3d.new(p1[2].x, p1[2].y, p1[2].z)
+      pz[:D][:p] = OpenStudio::Point3d.new(p1[3].x, p1[3].y, p1[3].z)      if iv
+
+      # Generate vector pairs, from next point & from previous point.
+      # :f_n : "from next"
+      # :f_p : "from previous"
+      #
+      #
+      #
+      #
+      #
+      #
+      #             A <---------- B
+      #              ^
+      #               \
+      #                \
+      #                 C (or D)
+      #
+      pz[:A][:f_n] = pz[:A][:p] - pz[:B][:p]
+      pz[:A][:f_p] = pz[:A][:p] - pz[:C][:p]                           unless iv
+      pz[:A][:f_p] = pz[:A][:p] - pz[:D][:p]                               if iv
+
+      pz[:B][:f_n] = pz[:B][:p] - pz[:C][:p]
+      pz[:B][:f_p] = pz[:B][:p] - pz[:A][:p]
+
+      pz[:C][:f_n] = pz[:C][:p] - pz[:A][:p]                           unless iv
+      pz[:C][:f_n] = pz[:C][:p] - pz[:D][:p]                               if iv
+      pz[:C][:f_p] = pz[:C][:p] - pz[:B][:p]
+
+      pz[:D][:f_n] = pz[:D][:p] - pz[:A][:p]                               if iv
+      pz[:D][:f_p] = pz[:D][:p] - pz[:C][:p]                               if iv
+
+      # Generate 3D plane from vectors.
+      #
+      #
+      #             |  <<< 3D plane ... from point A, with normal B>A
+      #             |
+      #             |
+      #             |
+      # <---------- A <---------- B
+      #             |\
+      #             | \
+      #             |  \
+      #             |   C (or D)
+      #
+      pz[:A][:pl_f_n] = OpenStudio::Plane.new(pz[:A][:p], pz[:A][:f_n])
+      pz[:A][:pl_f_p] = OpenStudio::Plane.new(pz[:A][:p], pz[:A][:f_p])
+
+      pz[:B][:pl_f_n] = OpenStudio::Plane.new(pz[:B][:p], pz[:B][:f_n])
+      pz[:B][:pl_f_p] = OpenStudio::Plane.new(pz[:B][:p], pz[:B][:f_p])
+
+      pz[:C][:pl_f_n] = OpenStudio::Plane.new(pz[:C][:p], pz[:C][:f_n])
+      pz[:C][:pl_f_p] = OpenStudio::Plane.new(pz[:C][:p], pz[:C][:f_p])
+
+      pz[:D][:pl_f_n] = OpenStudio::Plane.new(pz[:D][:p], pz[:D][:f_n])    if iv
+      pz[:D][:pl_f_p] = OpenStudio::Plane.new(pz[:D][:p], pz[:D][:f_p])    if iv
+
+      # Project an extended point (pC) unto 3D plane.
+      #
+      #             pC   <<< projected unto extended B>A 3D plane
+      #        eC   |
+      #          \  |
+      #           \ |
+      #            \|
+      # <---------- A <---------- B
+      #             |\
+      #             | \
+      #             |  \
+      #             |   C (or D)
+      #
+      pz[:A][:p_n_pl] = pz[:A][:pl_f_n].project(pz[:A][:p] + pz[:A][:f_p])
+      pz[:A][:n_p_pl] = pz[:A][:pl_f_p].project(pz[:A][:p] + pz[:A][:f_n])
+
+      pz[:B][:p_n_pl] = pz[:B][:pl_f_n].project(pz[:B][:p] + pz[:B][:f_p])
+      pz[:B][:n_p_pl] = pz[:B][:pl_f_p].project(pz[:B][:p] + pz[:B][:f_n])
+
+      pz[:C][:p_n_pl] = pz[:C][:pl_f_n].project(pz[:C][:p] + pz[:C][:f_p])
+      pz[:C][:n_p_pl] = pz[:C][:pl_f_p].project(pz[:C][:p] + pz[:C][:f_n])
+
+      pz[:D][:p_n_pl] = pz[:D][:pl_f_n].project(pz[:D][:p] + pz[:D][:f_p]) if iv
+      pz[:D][:n_p_pl] = pz[:D][:pl_f_p].project(pz[:D][:p] + pz[:D][:f_n]) if iv
+
+      # Generate vector from point (e.g. A) to projected extended point (pC).
+      #
+      #             pC
+      #        eC   ^
+      #          \  |
+      #           \ |
+      #            \|
+      # <---------- A <---------- B
+      #             |\
+      #             | \
+      #             |  \
+      #             |   C (or D)
+      #
+      pz[:A][:n_p_n_pl] = pz[:A][:p_n_pl] - pz[:A][:p]
+      pz[:A][:n_n_p_pl] = pz[:A][:n_p_pl] - pz[:A][:p]
+
+      pz[:B][:n_p_n_pl] = pz[:B][:p_n_pl] - pz[:B][:p]
+      pz[:B][:n_n_p_pl] = pz[:B][:n_p_pl] - pz[:B][:p]
+
+      pz[:C][:n_p_n_pl] = pz[:C][:p_n_pl] - pz[:C][:p]
+      pz[:C][:n_n_p_pl] = pz[:C][:n_p_pl] - pz[:C][:p]
+
+      pz[:D][:n_p_n_pl] = pz[:D][:p_n_pl] - pz[:D][:p]                     if iv
+      pz[:D][:n_n_p_pl] = pz[:D][:n_p_pl] - pz[:D][:p]                     if iv
+
+      # Fetch angle between both extended vectors (A>pC & A>pB),
+      # ... then normalize (Cn).
+      #
+      #             pC
+      #        eC   ^
+      #          \  |
+      #           \ Cn
+      #            \|
+      # <---------- A <---------- B
+      #             |\
+      #             | \
+      #             |  \
+      #             |   C (or D)
+      #
+      pz[:A][:a] = OpenStudio.getAngle(pz[:A][:n_p_n_pl], pz[:A][:n_n_p_pl])
+      pz[:B][:a] = OpenStudio.getAngle(pz[:B][:n_p_n_pl], pz[:B][:n_n_p_pl])
+      pz[:C][:a] = OpenStudio.getAngle(pz[:C][:n_p_n_pl], pz[:C][:n_n_p_pl])
+      pz[:D][:a] = OpenStudio.getAngle(pz[:D][:n_p_n_pl],
+                                       pz[:D][:n_n_p_pl])                  if iv
+
+      # Generate new 3D points A', B', C' (and D') ... zigzag.
+      #
+      #
+      #
+      #
+      #     A' ---------------------- B'
+      #      \
+      #       \      A <---------- B
+      #        \      \
+      #         \      \
+      #          \      \
+      #           C'      C
+      pz[:A][:f_n].normalize
+      pz[:A][:n_p_n_pl].normalize
+      pz[:A][:p] = pz[:A][:p] + w * pz[:A][:n_p_n_pl]
+      pz[:A][:p] = pz[:A][:p] + w * pz[:A][:f_n] * Math.tan(pz[:A][:a]/2)
+
+      pz[:B][:f_n].normalize
+      pz[:B][:n_p_n_pl].normalize
+      pz[:B][:p] = pz[:B][:p] + w * pz[:B][:n_p_n_pl]
+      pz[:B][:p] = pz[:B][:p] + w * pz[:B][:f_n] * Math.tan(pz[:B][:a]/2)
+
+      pz[:C][:f_n].normalize
+      pz[:C][:n_p_n_pl].normalize
+      pz[:C][:p] = pz[:C][:p] + w * pz[:C][:n_p_n_pl]
+      pz[:C][:p] = pz[:C][:p] + w * pz[:C][:f_n] * Math.tan(pz[:C][:a]/2)
+
+      pz[:D][:f_n].normalize                                               if iv
+      pz[:D][:n_p_n_pl].normalize                                          if iv
+      pz[:D][:p] = pz[:D][:p] + w * pz[:D][:n_p_n_pl]                      if iv
+      pz[:D][:p] = pz[:D][:p] + w * pz[:D][:f_n] * Math.tan(pz[:D][:a]/2)  if iv
+
+      pz
+    end
   end
 
   ##

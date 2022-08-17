@@ -1487,6 +1487,23 @@ RSpec.describe OSut do
       wwr2a  = srf2.windowToWallRatio
       expect(wwr2a).to be_within(TOL).of(0.427)         # not previous wwr 43.8%
       expect(srf2.netArea).to be_within(TOL).of(net2a)            # F+D accepted
+
+      ss2a_321 = mod1.offset(ss2a.roughOpeningVertices, width)
+      expect(mod1.logs.empty?).to be(true)
+      expect(ss2a_321.is_a?(Array)).to be(true)
+      expect(ss2a_321.size).to eq(4)
+      # ss2a_321.each { |vx| puts vx }                        # counterclockwise
+      # [0, 1.9, 3.4]                                    # TO DO : 2x the offset
+      # [0, 1.9, 2.9]
+      # [0, 4.1, 2.9]
+      # [0, 4.1, 3.4]
+
+      # ( 0.000, 4.000, 3.300)                                # glazing vertices
+      # ( 0.000, 4.000, 3.000)
+      # ( 0.000, 2.000, 3.000)
+      # ( 0.000, 2.000, 3.300)
+      # ss2a_300 = mod1.offset(ss2a.roughOpeningVertices, width, 300)
+      # expect(mod1.logs.empty?).to be(true)
     end
 
     expect(ss2b.setWindowPropertyFrameAndDivider(fd)).to be(true)
