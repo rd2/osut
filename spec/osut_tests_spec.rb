@@ -810,7 +810,6 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
   end
 
-
   it "retrieves a surface default construction set" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
@@ -1107,11 +1106,14 @@ RSpec.describe OSut do
   end
 
   it "checks flattened 3D points" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
     model = model.get
 
     cl1 = OpenStudio::Model::Model
@@ -1158,8 +1160,11 @@ RSpec.describe OSut do
   end
 
   it "checks surface fits?' & overlaps?" do
-    model = OpenStudio::Model::Model.new
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
+
+    model = OpenStudio::Model::Model.new
 
     # 10m x 10m parent vertical (wall) surface.
     vec = OpenStudio::Point3dVector.new
@@ -1168,8 +1173,13 @@ RSpec.describe OSut do
     vec << OpenStudio::Point3d.new( 10,  0,  0)
     vec << OpenStudio::Point3d.new( 10,  0, 10)
     wall = OpenStudio::Model::Surface.new(vec, model)
-    ft = OpenStudio::Transformation::alignFace(wall.vertices).inverse
-    ft_wall  = mod1.flatZ( (ft * wall.vertices).reverse )
+
+    # XY-plane transformation matrix ... needs to be clockwise for boost.
+    ft      = OpenStudio::Transformation::alignFace(wall.vertices)
+    ft_wall = mod1.flatZ( (ft.inverse * wall.vertices) )
+    cw      = OpenStudio::pointInPolygon(ft_wall.first, ft_wall, TOL)
+    expect(cw).to be(false)
+    ft_wall = mod1.flatZ( (ft.inverse * wall.vertices).reverse )       unless cw
 
     # 1m x 2m corner door (with 2x edges along wall edges)
     vec = OpenStudio::Point3dVector.new
@@ -1178,19 +1188,15 @@ RSpec.describe OSut do
     vec << OpenStudio::Point3d.new(  1,  0,  0)
     vec << OpenStudio::Point3d.new(  1,  0,  2)
     door1 = OpenStudio::Model::SubSurface.new(vec, model)
-    ft_door1 = mod1.flatZ( (ft * door1.vertices).reverse )
 
-    union = OpenStudio::join(ft_wall, ft_door1, TOL2)
-    expect(union.empty?).to be(false)
-    union = union.get
-    area = OpenStudio::getArea(union)
-    expect(area.empty?).to be(false)
-    area = area.get
-    expect(area).to be_within(0.01).of(wall.grossArea)
+    ft_door1 = mod1.flatZ( (ft.inverse * door1.vertices).reverse )     unless cw
+    ft_door1 = mod1.flatZ( (ft.inverse * door1.vertices) )                 if cw
+    expect(mod1.status.zero?).to be(true)
 
     # Door1 fits?, overlaps?
-    expect(mod1.status.zero?).to be(true)
+    expect(OpenStudio.polygonInPolygon(ft_door1, ft_wall, TOL)).to be(true)
     expect(mod1.fits?(door1.vertices, wall.vertices)).to be(true)
+    expect(mod1.status.zero?).to be(true)
     expect(mod1.overlaps?(door1.vertices, wall.vertices)).to be(true)
     expect(mod1.status.zero?).to be(true)
 
@@ -1206,16 +1212,13 @@ RSpec.describe OSut do
     vec << OpenStudio::Point3d.new( 17,  0,  0)
     vec << OpenStudio::Point3d.new( 17,  0,  2)
     door2 = OpenStudio::Model::SubSurface.new(vec, model)
-    ft_door2 = mod1.flatZ( (ft * door2.vertices).reverse )
-    union = OpenStudio::join(ft_wall, ft_door2, TOL2)
-    expect(union.empty?).to be(true)
 
     # Door2 fits?, overlaps?
     expect(mod1.fits?(door2.vertices, wall.vertices)).to be(false)
     expect(mod1.overlaps?(door2.vertices, wall.vertices)).to be(false)
     expect(mod1.status.zero?).to be(true)
 
-    # # Order of arguments doesn't matter.
+    # Order of arguments doesn't matter.
     expect(mod1.fits?(wall.vertices, door2.vertices)).to be(false)
     expect(mod1.overlaps?(wall.vertices, door2.vertices)).to be(false)
     expect(mod1.status.zero?).to be(true)
@@ -1227,14 +1230,6 @@ RSpec.describe OSut do
     vec << OpenStudio::Point3d.new( 11,  0,  9)
     vec << OpenStudio::Point3d.new( 11,  0, 11)
     window = OpenStudio::Model::SubSurface.new(vec, model)
-    ft_window = mod1.flatZ( (ft * window.vertices).reverse )
-    union = OpenStudio::join(ft_wall, ft_window, TOL2)
-    expect(union.empty?).to be(false)
-    union = union.get
-    area = OpenStudio::getArea(union)
-    expect(area.empty?).to be(false)
-    area = area.get
-    expect(area).to be_within(0.01).of(103)
 
     # Window fits?, overlaps?
     expect(mod1.fits?(window.vertices, wall.vertices)).to be(false)
@@ -1261,5 +1256,260 @@ RSpec.describe OSut do
     expect(mod1.fits?(wall.vertices, glazing.vertices)).to be(true)
     expect(mod1.overlaps?(wall.vertices, glazing.vertices)).to be(true)
     expect(mod1.status.zero?).to be(true)
+  end
+
+  it "can safely offset with F+D" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
+    model = OpenStudio::Model::Model.new
+
+    # 10m x 10m parent vertical (wall) surface.
+    vec = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  0,  0, 10)
+    vec << OpenStudio::Point3d.new(  0,  0,  0)
+    vec << OpenStudio::Point3d.new( 10,  0,  0)
+    vec << OpenStudio::Point3d.new( 10,  0, 10)
+    wall = OpenStudio::Model::Surface.new(vec, model)
+
+    area = OpenStudio.getArea(wall.vertices)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL2).of(100)
+
+    # XY-plane transformation matrix.
+    ft = OpenStudio::Transformation::alignFace(wall.vertices)
+    ft_wall = mod1.flatZ( (ft.inverse * wall.vertices) )
+    expect(ft_wall.empty?).to be(false)
+    cw      = OpenStudio::pointInPolygon(ft_wall.first, ft_wall, TOL)
+    expect(cw).to be(false)
+    ft_wall = mod1.flatZ( (ft.inverse * wall.vertices).reverse )       unless cw
+    expect(ft_wall.empty?).to be(false)
+    ft_wall = (ft.inverse * wall.vertices).reverse                     unless cw
+    ft_wall = (ft.inverse * wall.vertices)                                 if cw
+    width   = 0.1
+    offset1 = OpenStudio.buffer(ft_wall, width, TOL)
+    expect(offset1.empty?).to be(false)
+    offset1 = offset1.get
+    offset1 =  ft * offset1                                                if cw
+    offset1 = (ft * offset1).reverse                                   unless cw
+
+    expect(mod1.status.zero?).to be(true)
+    expect(offset1.is_a?(Array)).to be(true)
+    expect(offset1.size).to eq(4)            # ccw, yet not in same order .. OK!
+    # offset1.each { |vx| puts vx }
+    # [10.1, 0, 10.1]
+    # [-0.1, 0, 10.1]
+    # [-0.1, 0, -0.1]
+    # [10.1, 0, -0.1]
+    expect(mod1.fits?(wall.vertices, offset1)).to be(true)
+    expect(mod1.overlaps?(wall.vertices, offset1)).to be(true)
+    expect(mod1.overlaps?(offset1, wall.vertices)).to be(true)
+    area = OpenStudio.getArea(offset1)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL2).of(104.04)
+
+    offset2 = mod1.offset(wall.vertices, 0.1)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset2.is_a?(Array)).to be(true)
+    expect(offset2.size).to eq(4)
+    # offset2.each { |vx| puts vx }
+    # [10.1, 0, 10.1]
+    # [-0.1, 0, 10.1]
+    # [-0.1, 0, -0.1]
+    # [10.1, 0, -0.1]
+    expect(mod1.fits?(wall.vertices, offset2)).to be(true)
+    expect(mod1.overlaps?(wall.vertices, offset2)).to be(true)
+    expect(mod1.overlaps?(offset2, wall.vertices)).to be(true)
+    area = OpenStudio.getArea(offset2)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL2).of(104.04)
+
+    # A model with sub/surface vertices defined clockwise.
+    file  = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+    path  = OpenStudio::Path.new(file)
+    model = OpenStudio::OSVersion::VersionTranslator.new.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+    v1    = model.getVersion.versionIdentifier.split(".").map(&:to_i).join.to_i
+    v2    = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
+    expect(v1).to eq(v2)
+
+    srf2  = model.getSurfaceByName("Surface 2")
+    expect(srf2.empty?).to be(false)
+    srf2  = srf2.get
+    #  0.000, 20.000, 3.800, !- X,Y,Z Vertex 1 {m}
+    #  0.000, 20.000, 0.000, !- X,Y,Z Vertex 2 {m}
+    #  0.000,  0.000, 0.000, !- X,Y,Z Vertex 3 {m}
+    #  0.000,  0.000, 3.800; !- X,Y,Z Vertex 4 {m}
+    gross = srf2.grossArea
+    expect(gross).to be_within(TOL2).of(76.0)
+    expect(srf2.netArea).to be_within(TOL2).of(45.6)
+    v2 = srf2.vertices
+
+    ss2 = model.getSubSurfaceByName("Sub Surface 2")
+    expect(ss2.empty?).to be(false)
+    ss2   = ss2.get
+    #  0.000, 19.975, 2.284, !- X,Y,Z Vertex 1 {m}
+    #  0.000, 19.975, 0.760, !- X,Y,Z Vertex 2 {m}
+    #  0.000,  0.025, 0.760, !- X,Y,Z Vertex 3 {m}
+    #  0.000,  0.025, 2.284; !- X,Y,Z Vertex 4 {m}
+    expect(ss2.grossArea).to be_within(TOL2).of(30.4)
+    expect(ss2.netArea  ).to be_within(TOL2).of(30.4)
+    vs2 = ss2.vertices
+    expect(mod1.fits?(vs2, v2)).to be(true)
+    expect(mod1.overlaps?(vs2, v2)).to be(true)
+
+    expect(gross - srf2.netArea).to be_within(TOL2).of(ss2.grossArea)
+    expect(ss2.allowWindowPropertyFrameAndDivider).to be(true)
+    expect(ss2.windowPropertyFrameAndDivider.empty?).to be(true)
+
+    unless v1 < 340                     # or, e.g. ss2.respond_to?(:dividerArea)
+      expect(ss2.dividerArea.to_i).to eq(0)
+      expect(ss2.frameArea.to_i).to eq(0)
+      expect(ss2.roughOpeningArea).to be_within(TOL2).of(ss2.grossArea)
+
+      vx2 = ss2.roughOpeningVertices     # same as original vertices without F+D
+      expect(vx2.is_a?(Array)).to be(true)
+      expect(vx2.empty?).to be(false)
+      # vx2.each { |vxx| puts vxx }
+      # [0.000, 19.975, 2.284]
+      # [0.000, 19.975, 0.760]
+      # [0.000,  0.025, 0.760]
+      # [0.000,  0.025, 2.284]
+      expect(mod1.fits?(vx2, v2)).to be(true)
+      expect(mod1.overlaps?(vx2, v2)).to be(true)
+    end
+
+    # Insert 3x additional, 300mm-high windows in srf2 - siblings to ss2:
+    #   - ss2a: "Sub Surface 2a": a 2m-wide clerestory - free floating
+    #   - ss2b: "Sub Surface 2b": a 2m-wide clerestory - aligned along ceiling
+    #   - ss2c: "Sub Surface 2c": a 2m-wide clerestory - aligned along ss2
+    #
+    # Neither sibling generate conflicts with parent (i.e. they all fit in),
+    # nor vs each other (i.e. no overlaps, none swallows another).
+    #
+    # Adding a 50mm-wide Frame & Divider (F+D) to each new sibling generates:
+    #   - ss2a: no conflict (safe)
+    #   - ss2b: extends beyond srf2 limits
+    #   - ss2c: overlaps with original ss2
+    # Note: set subsurface type AFTER setting its parent surface - dunno why?
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( 0.000, 4.000, 3.300)
+    vec << OpenStudio::Point3d.new( 0.000, 4.000, 3.000)
+    vec << OpenStudio::Point3d.new( 0.000, 2.000, 3.000)
+    vec << OpenStudio::Point3d.new( 0.000, 2.000, 3.300)
+    ss2a = OpenStudio::Model::SubSurface.new(vec, model)
+    ss2a.setName("Sub Surface 2a")
+    expect(ss2a.setSurface(srf2)).to be(true)
+    expect(ss2a.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(ss2a.netArea).to be_within(TOL2).of(0.600)
+    expect(ss2a.grossArea).to be_within(TOL2).of(0.600)
+    expect(ss2a.allowWindowPropertyFrameAndDivider).to be(true)
+
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( 0.000, 8.000, 3.800)
+    vec << OpenStudio::Point3d.new( 0.000, 8.000, 3.500)
+    vec << OpenStudio::Point3d.new( 0.000, 6.000, 3.500)
+    vec << OpenStudio::Point3d.new( 0.000, 6.000, 3.800)
+    ss2b = OpenStudio::Model::SubSurface.new(vec, model)
+    ss2b.setName("Sub Surface 2b")
+    expect(ss2b.setSurface(srf2)).to be(true)
+    expect(ss2b.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(ss2b.netArea).to be_within(TOL2).of(0.600)
+    expect(ss2b.grossArea).to be_within(TOL2).of(0.600)
+    expect(ss2b.allowWindowPropertyFrameAndDivider).to be(true)
+
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( 0.000,12.000, 2.584)
+    vec << OpenStudio::Point3d.new( 0.000,12.000, 2.284)
+    vec << OpenStudio::Point3d.new( 0.000,10.000, 2.284)
+    vec << OpenStudio::Point3d.new( 0.000,10.000, 2.584)
+    ss2c = OpenStudio::Model::SubSurface.new(vec, model)
+    ss2c.setName("Sub Surface 2c")
+    expect(ss2c.setSurface(srf2)).to be(true)
+    expect(ss2c.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(ss2c.netArea).to be_within(TOL2).of(0.600)
+    expect(ss2c.grossArea).to be_within(TOL2).of(0.600)
+    expect(ss2c.allowWindowPropertyFrameAndDivider).to be(true)
+
+    expect(mod1.fits?( ss2.vertices, v2)).to be(true)
+    expect(mod1.fits?(ss2a.vertices, v2)).to be(true)
+    expect(mod1.fits?(ss2b.vertices, v2)).to be(true)
+    expect(mod1.fits?(ss2c.vertices, v2)).to be(true)
+
+    expect(mod1.overlaps?(vs2, ss2a.vertices)).to be(false)
+    expect(mod1.overlaps?(vs2, ss2b.vertices)).to be(false)
+    expect(mod1.overlaps?(vs2, ss2c.vertices)).to be(false)
+
+    net  = gross
+    net -= ss2.grossArea
+    net -= ss2a.grossArea
+    net -= ss2b.grossArea
+    net -= ss2c.grossArea
+    expect(srf2.netArea).to be_within(TOL2).of(43.8)         # 45.6m2 - 3x 0.6m2
+
+    fd = OpenStudio::Model::WindowPropertyFrameAndDivider.new(model)
+    width = 0.050
+    expect(fd.setFrameWidth(width)).to be(true)   # 50mm (narrow) around glazing
+    expect(fd.setFrameConductance(2.500)).to be(true)
+
+    expect(ss2a.setWindowPropertyFrameAndDivider(fd)).to be(true)
+    w2a = ss2a.windowPropertyFrameAndDivider.get.frameWidth
+    expect(w2a).to be_within(0.001).of(width)
+
+    expect(ss2a.netArea).to be_within(TOL2).of(0.600)
+    expect(ss2a.grossArea).to be_within(TOL2).of(0.600)
+
+    unless v1 < 340
+      # ss2a.roughOpeningVertices.each { |vx| puts vx }             # clockwise!
+      # [0, 1.95, 2.95]
+      # [0, 4.05, 2.95]
+      # [0, 4.05, 3.35]
+      # [0, 1.95, 3.35]
+      expect(mod1.fits?(ss2a.roughOpeningVertices, v2)).to be(false)
+      expect(mod1.fits?(ss2a.roughOpeningVertices.reverse, v2)).to be(true)
+      expect(mod1.logs.empty?).to be(true)
+
+      expect(ss2a.roughOpeningArea).to be_within(TOL).of(0.840)
+      net  = gross
+      net -= ss2.grossArea
+      net -= ss2a.roughOpeningArea
+      net -= ss2b.grossArea
+      net -= ss2c.grossArea
+      expect(srf2.netArea).to be_within(TOL2).of(net)             # F+D accepted
+    end
+
+    expect(ss2b.setWindowPropertyFrameAndDivider(fd)).to be(true)
+    w2b = ss2b.windowPropertyFrameAndDivider.get.frameWidth
+    expect(w2b).to be_within(TOL).of(width)
+
+    expect(ss2b.netArea).to be_within(TOL2).of(0.600)
+    expect(ss2b.grossArea).to be_within(TOL2).of(0.600)
+
+    unless v1 < 340
+      # ss2b.roughOpeningVertices.each { |vx| puts vx }             # clockwise!
+      # [0, 5.95, 3.45]
+      # [0, 8.05, 3.45]
+      # [0, 8.05, 3.85]
+      # [0, 5.95, 3.85]
+      expect(mod1.fits?(ss2b.roughOpeningVertices, v2)).to be(false)
+      expect(mod1.fits?(ss2b.roughOpeningVertices.reverse, v2)).to be(false)
+      expect(mod1.logs.empty?).to be(true)
+
+      expect(ss2a.roughOpeningArea).to be_within(TOL).of(0.840)
+      net  = gross
+      net -= ss2.grossArea
+      net -= ss2a.roughOpeningArea
+      net -= ss2b.roughOpeningArea
+      net -= ss2c.grossArea
+      expect(srf2.netArea).to be_within(TOL2).of(net)            # F+D accepted?
+
+      # The rough opening vertices do not fit in parent wall ...
+      #  0.000, 20.000, 3.800, !- X,Y,Z Vertex 1 {m} <<< Z
+      #  0.000, 20.000, 0.000, !- X,Y,Z Vertex 2 {m}
+      #  0.000,  0.000, 0.000, !- X,Y,Z Vertex 3 {m}
+      #  0.000,  0.000, 3.800; !- X,Y,Z Vertex 4 {m} <<< Z
+    end
   end
 end

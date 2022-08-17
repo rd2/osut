@@ -628,7 +628,7 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Model
 
-    return mismatch("model", model, cl, mth, DBG, false) unless model.is_a?(cl)
+    return mismatch("model", model, cl, mth, DBG, false)  unless model.is_a?(cl)
 
     model.getThermalZones.each do |zone|
       return true if minCoolScheduledSetpoint(zone)[:spt]
@@ -648,12 +648,12 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Model
 
-    return mismatch("model", model, cl, mth, DBG, false) unless model.is_a?(cl)
+    return mismatch("model", model, cl, mth, DBG, false)  unless model.is_a?(cl)
 
     model.getThermalZones.each do |zone|
-      next if zone.canBePlenum
-      return true unless zone.airLoopHVACs.empty?
-      return true if zone.isPlenum
+      next                                           if zone.canBePlenum
+      return true                                unless zone.airLoopHVACs.empty?
+      return true                                    if zone.isPlenum
     end
 
     false
@@ -678,7 +678,7 @@ module OSut
     # A space may be tagged as a plenum if:
     #
     # CASE A: its zone's "isPlenum" == true (SDK method) for a fully-developed
-    #         OpenStudio model (complete with HVAC air loops);
+    #         OpenStudio model (complete with HVAC air loops); OR
     #
     # CASE B: (IN ABSENCE OF HVAC AIRLOOPS) if it's excluded from a building's
     #         total floor area yet linked to a zone holding an 'inactive'
@@ -737,8 +737,8 @@ module OSut
     cl     = OpenStudio::Model::Model
     limits = nil
 
-    return mismatch("model", model, cl, mth)    unless model.is_a?(cl)
-    return invalid("availability", avl, 2, mth) unless avl.respond_to?(:to_s)
+    return mismatch("model", model, cl, mth)       unless model.is_a?(cl)
+    return invalid("availability", avl, 2, mth)    unless avl.respond_to?(:to_s)
 
     # Either fetch availability ScheduleTypeLimits object, or create one.
     model.getScheduleTypeLimitss.each do |l|
@@ -769,9 +769,9 @@ module OSut
     off  = OpenStudio::Model::ScheduleDay.new(model, 0)
 
     # Seasonal availability start/end dates.
-    year = model.yearDescription
-    return empty("yearDescription", mth, ERR) if year.empty?
-    year = year.get
+    year  = model.yearDescription
+    return  empty("yearDescription", mth, ERR) if year.empty?
+    year  = year.get
     may01 = year.makeDate(OpenStudio::MonthOfYear.new("May"),  1)
     oct31 = year.makeDate(OpenStudio::MonthOfYear.new("Oct"), 31)
 
@@ -957,17 +957,17 @@ module OSut
     cl1 = OpenStudio::Model::Model
     cl2 = OpenStudio::Model::Surface
 
-    return mismatch("model", model, cl1, mth) unless model.is_a?(cl1)
-    return invalid("s", mth, 2)               unless s.respond_to?(NS)
-    id = s.nameString
-    return mismatch(id, s, cl2, mth)          unless s.is_a?(cl2)
+    return mismatch("model", model, cl1, mth)           unless model.is_a?(cl1)
+    return invalid("s", mth, 2)                         unless s.respond_to?(NS)
+    id   = s.nameString
+    return mismatch(id, s, cl2, mth)                    unless s.is_a?(cl2)
 
     ok = s.isConstructionDefaulted
     log(ERR, "'#{id}' construction not defaulted (#{mth})")            unless ok
     return nil                                                         unless ok
-    return empty("'#{id}' construction", mth, ERR) if s.construction.empty?
+    return empty("'#{id}' construction", mth, ERR)      if s.construction.empty?
     base = s.construction.get
-    return empty("'#{id}' space", mth, ERR) if s.space.empty?
+    return empty("'#{id}' space", mth, ERR)             if s.space.empty?
     space = s.space.get
     type = s.surfaceType
     ground = false
@@ -981,7 +981,7 @@ module OSut
 
     unless space.defaultConstructionSet.empty?
       set = space.defaultConstructionSet.get
-      return set if holdsConstruction?(set, base, ground, exterior, type)
+      return set        if holdsConstruction?(set, base, ground, exterior, type)
     end
 
     unless space.spaceType.empty?
@@ -989,7 +989,7 @@ module OSut
 
       unless spacetype.defaultConstructionSet.empty?
         set = spacetype.defaultConstructionSet.get
-        return set if holdsConstruction?(set, base, ground, exterior, type)
+        return set      if holdsConstruction?(set, base, ground, exterior, type)
       end
     end
 
@@ -998,7 +998,7 @@ module OSut
 
       unless story.defaultConstructionSet.empty?
         set = story.defaultConstructionSet.get
-        return set if holdsConstruction?(set, base, ground, exterior, type)
+        return set      if holdsConstruction?(set, base, ground, exterior, type)
       end
     end
 
@@ -1006,7 +1006,7 @@ module OSut
 
     unless building.defaultConstructionSet.empty?
       set = building.defaultConstructionSet.get
-      return set if holdsConstruction?(set, base, ground, exterior, type)
+      return set        if holdsConstruction?(set, base, ground, exterior, type)
     end
 
     nil
@@ -1042,9 +1042,9 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::LayeredConstruction
 
-    return invalid("lc", mth, 1, DBG, 0.0)     unless lc.respond_to?(NS)
+    return invalid("lc", mth, 1, DBG, 0.0)             unless lc.respond_to?(NS)
     id = lc.nameString
-    return mismatch(id, lc, cl, mth, DBG, 0.0) unless lc.is_a?(cl)
+    return mismatch(id, lc, cl, mth, DBG, 0.0)         unless lc.is_a?(cl)
 
     ok = standardOpaqueLayers?(lc)
     log(ERR, "'#{id}' holds non-StandardOpaqueMaterial(s) (#{mth})")   unless ok
@@ -1166,9 +1166,9 @@ module OSut
     res = { index: nil, type: nil, r: 0.0 }
     i   = 0                                                           # iterator
 
-    return invalid("lc", mth, 1, DBG, res)      unless lc.respond_to?(NS)
-    id = lc.nameString
-    return mismatch(id, lc, cl1, mth, DBG, res) unless lc.is_a?(cl)
+    return invalid("lc", mth, 1, DBG, res)             unless lc.respond_to?(NS)
+    id   = lc.nameString
+    return mismatch(id, lc, cl1, mth, DBG, res)        unless lc.is_a?(cl)
 
     lc.layers.each do |m|
       unless m.to_MasslessOpaqueMaterial.empty?
@@ -1178,9 +1178,9 @@ module OSut
           i += 1
           next
         else
-          res[:r]     = m.thermalResistance
+          res[:r    ] = m.thermalResistance
           res[:index] = i
-          res[:type]  = :massless
+          res[:type ] = :massless
         end
       end
 
@@ -1193,9 +1193,9 @@ module OSut
           i += 1
           next
         else
-          res[:r]     = d / k
+          res[:r    ] = d / k
           res[:index] = i
-          res[:type]  = :standard
+          res[:type ] = :standard
         end
       end
 
@@ -1243,8 +1243,8 @@ module OSut
     v   = OpenStudio::Point3dVector.new
 
     valid = pts.is_a?(cl1) || pts.is_a?(Array)
-    return mismatch("points", pts, cl1, mth, DBG, v)     unless valid
-    pts.each { |pt| mismatch("pt", pt, cl2, mth, ERR, v) unless pt.is_a?(cl2) }
+    return mismatch("points", pts, cl1, mth, DBG, v)      unless valid
+    pts.each { |pt| mismatch("pt", pt, cl2, mth, ERR, v)  unless pt.is_a?(cl2) }
     pts.each { |pt| v << OpenStudio::Point3d.new(pt.x, pt.y, 0) }
 
     v
@@ -1268,42 +1268,34 @@ module OSut
 
     return invalid("id1", mth, 3, DBG, a) unless id1.respond_to?(:to_s)
     return invalid("id2", mth, 4, DBG, a) unless id2.respond_to?(:to_s)
+
     i1  = id1.to_s
     i2  = id2.to_s
     i1  = "poly1" if i1.empty?
     i2  = "poly2" if i2.empty?
+
     valid1 = p1.is_a?(cl1) || p1.is_a?(Array)
     valid2 = p2.is_a?(cl1) || p2.is_a?(Array)
+
     return mismatch(i1, p1, cl1, mth, DBG, a) unless valid1
     return mismatch(i2, p2, cl1, mth, DBG, a) unless valid2
-    return empty(i1, mth, ERR, a) if p1.empty?
-    return empty(i2, mth, ERR, a) if p2.empty?
+    return empty(i1, mth, ERR, a)                 if p1.empty?
+    return empty(i2, mth, ERR, a)                 if p2.empty?
+
     p1.each { |v| return mismatch(i1, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
     p2.each { |v| return mismatch(i2, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
 
-    ft = OpenStudio::Transformation::alignFace(p1).inverse
-    ft_p1 = flatZ( (ft * p1).reverse )
-    return false if ft_p1.empty?
-    area1 = OpenStudio::getArea(ft_p1)
-    return empty("#{i1} area", mth, ERR, a) if area1.empty?
-    area1 = area1.get
-    ft_p2 = flatZ( (ft * p2).reverse )
-    return false if ft_p2.empty?
-    area2 = OpenStudio::getArea(ft_p2)
-    return empty("#{i2} area", mth, ERR, a) if area2.empty?
-    area2 = area2.get
-    union = OpenStudio::join(ft_p1, ft_p2, TOL2)
-    return false if union.empty?
-    union = union.get
-    area = OpenStudio::getArea(union)
-    return empty("#{i1}:#{i2} union area", mth, ERR, a) if area.empty?
-    area = area.get
+    # XY-plane transformation matrix ... needs to be clockwise for boost.
+    ft    = OpenStudio::Transformation.alignFace(p1)
+    ft_p1 = flatZ( (ft.inverse * p1)         )
+    return  false                                                if ft_p1.empty?
+    cw    = OpenStudio.pointInPolygon(ft_p1.first, ft_p1, TOL)
+    ft_p1 = flatZ( (ft.inverse * p1).reverse )                unless cw
+    ft_p2 = flatZ( (ft.inverse * p2).reverse )                unless cw
+    ft_p2 = flatZ( (ft.inverse * p2)         )                    if cw
+    return  false                                                if ft_p2.empty?
 
-    return false if area < TOL
-    return true if (area - area2).abs < TOL
-    return false if (area - area2).abs > TOL
-
-    true
+    OpenStudio.polygonInPolygon(ft_p1, ft_p2, TOL)
   end
 
   ##
@@ -1324,40 +1316,83 @@ module OSut
 
     return invalid("id1", mth, 3, DBG, a) unless id1.respond_to?(:to_s)
     return invalid("id2", mth, 4, DBG, a) unless id2.respond_to?(:to_s)
+
     i1 = id1.to_s
     i2 = id2.to_s
     i1 = "poly1" if i1.empty?
     i2 = "poly2" if i2.empty?
+
     valid1 = p1.is_a?(cl1) || p1.is_a?(Array)
     valid2 = p2.is_a?(cl1) || p2.is_a?(Array)
+
     return mismatch(i1, p1, cl1, mth, DBG, a) unless valid1
     return mismatch(i2, p2, cl1, mth, DBG, a) unless valid2
-    return empty(i1, mth, ERR, a) if p1.empty?
-    return empty(i2, mth, ERR, a) if p2.empty?
+    return empty(i1, mth, ERR, a)                 if p1.empty?
+    return empty(i2, mth, ERR, a)                 if p2.empty?
+
     p1.each { |v| return mismatch(i1, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
     p2.each { |v| return mismatch(i2, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
 
-    ft = OpenStudio::Transformation::alignFace(p1).inverse
-    ft_p1 = flatZ( (ft * p1).reverse )
-    return false if ft_p1.empty?
-    area1 = OpenStudio::getArea(ft_p1)
-    return empty("#{i1} area", mth, ERR, a) if area1.empty?
+    # XY-plane transformation matrix ... needs to be clockwise for boost.
+    ft    = OpenStudio::Transformation.alignFace(p1)
+    ft_p1 = flatZ( (ft.inverse * p1)         )
+    return  false                                                if ft_p1.empty?
+    cw    = OpenStudio.pointInPolygon(ft_p1.first, ft_p1, TOL)
+    ft_p1 = flatZ( (ft.inverse * p1).reverse )               unless cw
+    ft_p2 = flatZ( (ft.inverse * p2).reverse )               unless cw
+    ft_p2 = flatZ( (ft.inverse * p2)         )                   if cw
+    return  false                                                if ft_p2.empty?
+    area1 = OpenStudio.getArea(ft_p1)
+    area2 = OpenStudio.getArea(ft_p2)
+    return  empty("#{i1} area", mth, ERR, a)                     if area1.empty?
+    return  empty("#{i2} area", mth, ERR, a)                     if area2.empty?
     area1 = area1.get
-    ft_p2 = flatZ( (ft * p2).reverse )
-    return false if ft_p2.empty?
-    area2 = OpenStudio::getArea(ft_p2)
-    return empty("#{i2} area", mth, ERR, a) if area2.empty?
     area2 = area2.get
-    union = OpenStudio::join(ft_p1, ft_p2, TOL2)
-    return false if union.empty?
+    union = OpenStudio.join(ft_p1, ft_p2, TOL2)
+    return  false                                                if union.empty?
     union = union.get
-    area = OpenStudio::getArea(union)
-    return empty("#{i1}:#{i2} union area", mth, ERR, a) if area.empty?
+    area  = OpenStudio.getArea(union)
+    return empty("#{i1}:#{i2} union area", mth, ERR, a)          if area.empty?
     area = area.get
-
-    return false if area < TOL
+    return false                                                 if area < TOL
 
     true
+  end
+
+  ##
+  # Generate new vertices, offset by a certain width.
+  #
+  # @param pts [Array] OpenStudio Point3D vector/array
+  # @param width [Float] offset width (m)
+  #
+  # @return [Array] offset OpenStudio 3D points if successful
+  # @return [Array] original OpenStudio points if failed
+  def offset(pts = [], width = 0)
+    mth     = "TBD::#{__callee__}"
+    cl1     = OpenStudio::Point3dVector
+    cl2     = OpenStudio::Point3d
+
+    valid = pts.is_a?(cl1) || pts.is_a?(Array)
+    return  mismatch("pts", pts, cl1, mth, DBG, pts) unless valid
+    return  empty(i1, mth, ERR, a)                       if pts.empty?
+    return  invalid("width", mth, 2, DBG, pts) unless width.respond_to?(:to_f)
+    width = width.to_f
+    return  pts                                          if width < TOL
+
+    # XY-plane transformation matrix ... needs to be clockwise for boost.
+    ft     = OpenStudio::Transformation::alignFace(pts)
+    ft_pts = flatZ( (ft.inverse * pts)         )
+    return   pts                                         if ft_pts.empty?
+    cw     = OpenStudio::pointInPolygon(ft_pts.first, ft_pts, TOL)
+    ft_pts = flatZ( (ft.inverse * pts).reverse )     unless cw
+
+    offset = OpenStudio.buffer(ft_pts, width, TOL)
+    return   pts                                         if offset.empty?
+    offset = offset.get
+    offset = ft * offset                                 if cw
+    offset = (ft * offset).reverse                   unless cw
+
+    offset
   end
 
   ##
