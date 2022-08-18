@@ -1036,8 +1036,8 @@ module OSut
   #
   # @param lc [OpenStudio::LayeredConstruction] a layered construction
   #
-  # @return [Double] total layered construction thickness
-  # @return [Double] 0 if invalid input
+  # @return [Float] total layered construction thickness
+  # @return [Float] 0 if invalid input
   def thickness(lc = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::LayeredConstruction
@@ -1231,6 +1231,28 @@ module OSut
   end
 
   ##
+  # Return a scalar product of an OpenStudio Vector3d.
+  #
+  # @param v [OpenStudio::Vector3d] a vector
+  # @param m [Float] a scalar
+  #
+  # @return [OpenStudio::Vector3d] modified vector
+  # @return [OpenStudio::Vector3d] provided (or empty) vector if invalid input
+  def scalar(v = OpenStudio::Vector3d.new(0,0,0), m = 0)
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Vector3d
+    cl2 = Numeric
+
+    return mismatch("vector", v, cl1, mth, DBG, v) unless v.is_a?(cl1)
+    return mismatch("x", v.x, cl2, mth, DBG, v)    unless v.x.respond_to?(:to_f)
+    return mismatch("y", v.y, cl2, mth, DBG, v)    unless v.y.respond_to?(:to_f)
+    return mismatch("z", v.z, cl2, mth, DBG, v)    unless v.z.respond_to?(:to_f)
+    return mismatch("m", m, cl2,  mth, DBG, v)     unless m.respond_to?(:to_f)
+
+    OpenStudio::Vector3d.new(m * v.x, m * v.y, m * v.z)
+  end
+
+  ##
   # Flatten OpenStudio 3D points vs Z-axis (Z=0).
   #
   # @param pts [Array] an OpenStudio Point3D array/vector
@@ -1357,11 +1379,13 @@ module OSut
     # XY-plane transformation matrix ... needs to be clockwise for boost.
     ft    = OpenStudio::Transformation.alignFace(p1)
     ft_p1 = flatZ( (ft.inverse * p1)         )
+    ft_p2 = flatZ( (ft.inverse * p2)         )
     return  false                                                if ft_p1.empty?
+    return  false                                                if ft_p2.empty?
     cw    = OpenStudio.pointInPolygon(ft_p1.first, ft_p1, TOL)
     ft_p1 = flatZ( (ft.inverse * p1).reverse )               unless cw
     ft_p2 = flatZ( (ft.inverse * p2).reverse )               unless cw
-    ft_p2 = flatZ( (ft.inverse * p2)         )                   if cw
+    return  false                                                if ft_p1.empty?
     return  false                                                if ft_p2.empty?
     area1 = OpenStudio.getArea(ft_p1)
     area2 = OpenStudio.getArea(ft_p2)
@@ -1383,12 +1407,12 @@ module OSut
   ##
   # Generate new vertices, offset by a certain width.
   #
-  # @param pts [Array] OpenStudio Point3D vector/array
+  # @param p1 [OpenStudio::Point3dVector] OpenStudio Point3D vector/array
   # @param w [Float] offset width (min: 0.0254m)
   # @param v [Integer] OpenStudio SDK version, eg '291' for 'v2.9.1' (optional)
   #
   # @return [Array] offset points if successful (v > 300)
-  # @return [Array] original points if invalid input
+  # @return [OpenStudio::Point3dVector] original points if invalid input
   def offset(p1 = [], w = 0, v = 0)
     mth   = "TBD::#{__callee__}"
     cl    = OpenStudio::Point3d
@@ -1433,6 +1457,11 @@ module OSut
       pz[:C][:p] = OpenStudio::Point3d.new(p1[2].x, p1[2].y, p1[2].z)
       pz[:D][:p] = OpenStudio::Point3d.new(p1[3].x, p1[3].y, p1[3].z)      if iv
 
+      pzAp = pz[:A][:p]
+      pzBp = pz[:B][:p]
+      pzCp = pz[:C][:p]
+      pzDp = pz[:D][:p]                                                    if iv
+
       # Generate vector pairs, from next point & from previous point.
       # :f_n : "from next"
       # :f_p : "from previous"
@@ -1448,19 +1477,19 @@ module OSut
       #                \
       #                 C (or D)
       #
-      pz[:A][:f_n] = pz[:A][:p] - pz[:B][:p]
-      pz[:A][:f_p] = pz[:A][:p] - pz[:C][:p]                           unless iv
-      pz[:A][:f_p] = pz[:A][:p] - pz[:D][:p]                               if iv
+      pz[:A][:f_n] = pzAp - pzBp
+      pz[:A][:f_p] = pzAp - pzCp                                       unless iv
+      pz[:A][:f_p] = pzAp - pzDp                                           if iv
 
-      pz[:B][:f_n] = pz[:B][:p] - pz[:C][:p]
-      pz[:B][:f_p] = pz[:B][:p] - pz[:A][:p]
+      pz[:B][:f_n] = pzBp - pzCp
+      pz[:B][:f_p] = pzBp - pzAp
 
-      pz[:C][:f_n] = pz[:C][:p] - pz[:A][:p]                           unless iv
-      pz[:C][:f_n] = pz[:C][:p] - pz[:D][:p]                               if iv
-      pz[:C][:f_p] = pz[:C][:p] - pz[:B][:p]
+      pz[:C][:f_n] = pzCp - pzAp                                       unless iv
+      pz[:C][:f_n] = pzCp - pzDp                                           if iv
+      pz[:C][:f_p] = pzCp - pzBp
 
-      pz[:D][:f_n] = pz[:D][:p] - pz[:A][:p]                               if iv
-      pz[:D][:f_p] = pz[:D][:p] - pz[:C][:p]                               if iv
+      pz[:D][:f_n] = pzDp - pzAp                                           if iv
+      pz[:D][:f_p] = pzDp - pzCp                                           if iv
 
       # Generate 3D plane from vectors.
       #
@@ -1475,17 +1504,17 @@ module OSut
       #             |  \
       #             |   C (or D)
       #
-      pz[:A][:pl_f_n] = OpenStudio::Plane.new(pz[:A][:p], pz[:A][:f_n])
-      pz[:A][:pl_f_p] = OpenStudio::Plane.new(pz[:A][:p], pz[:A][:f_p])
+      pz[:A][:pl_f_n] = OpenStudio::Plane.new(pzAp, pz[:A][:f_n])
+      pz[:A][:pl_f_p] = OpenStudio::Plane.new(pzAp, pz[:A][:f_p])
 
-      pz[:B][:pl_f_n] = OpenStudio::Plane.new(pz[:B][:p], pz[:B][:f_n])
-      pz[:B][:pl_f_p] = OpenStudio::Plane.new(pz[:B][:p], pz[:B][:f_p])
+      pz[:B][:pl_f_n] = OpenStudio::Plane.new(pzBp, pz[:B][:f_n])
+      pz[:B][:pl_f_p] = OpenStudio::Plane.new(pzBp, pz[:B][:f_p])
 
-      pz[:C][:pl_f_n] = OpenStudio::Plane.new(pz[:C][:p], pz[:C][:f_n])
-      pz[:C][:pl_f_p] = OpenStudio::Plane.new(pz[:C][:p], pz[:C][:f_p])
+      pz[:C][:pl_f_n] = OpenStudio::Plane.new(pzCp, pz[:C][:f_n])
+      pz[:C][:pl_f_p] = OpenStudio::Plane.new(pzCp, pz[:C][:f_p])
 
-      pz[:D][:pl_f_n] = OpenStudio::Plane.new(pz[:D][:p], pz[:D][:f_n])    if iv
-      pz[:D][:pl_f_p] = OpenStudio::Plane.new(pz[:D][:p], pz[:D][:f_p])    if iv
+      pz[:D][:pl_f_n] = OpenStudio::Plane.new(pzDp, pz[:D][:f_n])          if iv
+      pz[:D][:pl_f_p] = OpenStudio::Plane.new(pzDp, pz[:D][:f_p])          if iv
 
       # Project an extended point (pC) unto 3D plane.
       #
@@ -1525,17 +1554,17 @@ module OSut
       #             |  \
       #             |   C (or D)
       #
-      pz[:A][:n_p_n_pl] = pz[:A][:p_n_pl] - pz[:A][:p]
-      pz[:A][:n_n_p_pl] = pz[:A][:n_p_pl] - pz[:A][:p]
+      pz[:A][:n_p_n_pl] = pz[:A][:p_n_pl] - pzAp
+      pz[:A][:n_n_p_pl] = pz[:A][:n_p_pl] - pzAp
 
-      pz[:B][:n_p_n_pl] = pz[:B][:p_n_pl] - pz[:B][:p]
-      pz[:B][:n_n_p_pl] = pz[:B][:n_p_pl] - pz[:B][:p]
+      pz[:B][:n_p_n_pl] = pz[:B][:p_n_pl] - pzBp
+      pz[:B][:n_n_p_pl] = pz[:B][:n_p_pl] - pzBp
 
-      pz[:C][:n_p_n_pl] = pz[:C][:p_n_pl] - pz[:C][:p]
-      pz[:C][:n_n_p_pl] = pz[:C][:n_p_pl] - pz[:C][:p]
+      pz[:C][:n_p_n_pl] = pz[:C][:p_n_pl] - pzCp
+      pz[:C][:n_n_p_pl] = pz[:C][:n_p_pl] - pzCp
 
-      pz[:D][:n_p_n_pl] = pz[:D][:p_n_pl] - pz[:D][:p]                     if iv
-      pz[:D][:n_n_p_pl] = pz[:D][:n_p_pl] - pz[:D][:p]                     if iv
+      pz[:D][:n_p_n_pl] = pz[:D][:p_n_pl] - pzDp                           if iv
+      pz[:D][:n_n_p_pl] = pz[:D][:n_p_pl] - pzDp                           if iv
 
       # Fetch angle between both extended vectors (A>pC & A>pB),
       # ... then normalize (Cn).
@@ -1551,11 +1580,10 @@ module OSut
       #             |  \
       #             |   C (or D)
       #
-      pz[:A][:a] = OpenStudio.getAngle(pz[:A][:n_p_n_pl], pz[:A][:n_n_p_pl])
-      pz[:B][:a] = OpenStudio.getAngle(pz[:B][:n_p_n_pl], pz[:B][:n_n_p_pl])
-      pz[:C][:a] = OpenStudio.getAngle(pz[:C][:n_p_n_pl], pz[:C][:n_n_p_pl])
-      pz[:D][:a] = OpenStudio.getAngle(pz[:D][:n_p_n_pl],
-                                       pz[:D][:n_n_p_pl])                  if iv
+      a1 = OpenStudio.getAngle(pz[:A][:n_p_n_pl], pz[:A][:n_n_p_pl])
+      a2 = OpenStudio.getAngle(pz[:B][:n_p_n_pl], pz[:B][:n_n_p_pl])
+      a3 = OpenStudio.getAngle(pz[:C][:n_p_n_pl], pz[:C][:n_n_p_pl])
+      a4 = OpenStudio.getAngle(pz[:D][:n_p_n_pl], pz[:D][:n_n_p_pl])       if iv
 
       # Generate new 3D points A', B', C' (and D') ... zigzag.
       #
@@ -1571,25 +1599,32 @@ module OSut
       #           C'      C
       pz[:A][:f_n].normalize
       pz[:A][:n_p_n_pl].normalize
-      pz[:A][:p] = pz[:A][:p] + w * pz[:A][:n_p_n_pl]
-      pz[:A][:p] = pz[:A][:p] + w * pz[:A][:f_n] * Math.tan(pz[:A][:a]/2)
+      pzAp = pzAp + scalar(pz[:A][:n_p_n_pl], w)
+      pzAp = pzAp + scalar(pz[:A][:f_n], w * Math.tan(a1/2))
 
       pz[:B][:f_n].normalize
       pz[:B][:n_p_n_pl].normalize
-      pz[:B][:p] = pz[:B][:p] + w * pz[:B][:n_p_n_pl]
-      pz[:B][:p] = pz[:B][:p] + w * pz[:B][:f_n] * Math.tan(pz[:B][:a]/2)
+      pzBp = pzBp + scalar(pz[:B][:n_p_n_pl], w)
+      pzBp = pzBp + scalar(pz[:B][:f_n], w * Math.tan(a2/2))
 
       pz[:C][:f_n].normalize
       pz[:C][:n_p_n_pl].normalize
-      pz[:C][:p] = pz[:C][:p] + w * pz[:C][:n_p_n_pl]
-      pz[:C][:p] = pz[:C][:p] + w * pz[:C][:f_n] * Math.tan(pz[:C][:a]/2)
+      pzCp = pzCp + scalar(pz[:C][:n_p_n_pl], w)
+      pzCp = pzCp + scalar(pz[:C][:f_n], w * Math.tan(a3/2))
 
       pz[:D][:f_n].normalize                                               if iv
       pz[:D][:n_p_n_pl].normalize                                          if iv
-      pz[:D][:p] = pz[:D][:p] + w * pz[:D][:n_p_n_pl]                      if iv
-      pz[:D][:p] = pz[:D][:p] + w * pz[:D][:f_n] * Math.tan(pz[:D][:a]/2)  if iv
+      pzDp = pzDp + scalar(pz[:D][:n_p_n_pl], w)                           if iv
+      pzDp = pzDp + scalar(pz[:D][:f_n], w * Math.tan(a4/2))               if iv
 
-      pz
+      # Re-convert to OpenStudio 3D points.
+      vec = OpenStudio::Point3dVector.new
+      vec << OpenStudio::Point3d.new(pzAp.x, pzAp.y, pzAp.z)
+      vec << OpenStudio::Point3d.new(pzBp.x, pzBp.y, pzBp.z)
+      vec << OpenStudio::Point3d.new(pzCp.x, pzCp.y, pzCp.z)
+      vec << OpenStudio::Point3d.new(pzDp.x, pzDp.y, pzDp.z)               if iv
+
+      return vec.to_a
     end
   end
 

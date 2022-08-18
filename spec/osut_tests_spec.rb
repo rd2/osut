@@ -1266,7 +1266,8 @@ RSpec.describe OSut do
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
 
-    model = OpenStudio::Model::Model.new
+    model   = OpenStudio::Model::Model.new
+    version = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
 
     # 10m x 10m parent vertical (wall) surface.
     vec = OpenStudio::Point3dVector.new
@@ -1280,47 +1281,49 @@ RSpec.describe OSut do
     expect(area.empty?).to be(false)
     expect(area.get).to be_within(TOL).of(100)
 
-    # XY-plane transformation matrix.
-    ft = OpenStudio::Transformation::alignFace(wall.vertices)
-    ft_wall = mod1.flatZ( (ft.inverse * wall.vertices) )
-    expect(ft_wall.empty?).to be(false)
-    cw      = OpenStudio::pointInPolygon(ft_wall.first, ft_wall, TOL)
-    expect(cw).to be(false)
-    ft_wall = mod1.flatZ( (ft.inverse * wall.vertices).reverse )       unless cw
-    expect(ft_wall.empty?).to be(false)
-    ft_wall = (ft.inverse * wall.vertices).reverse                     unless cw
-    ft_wall = (ft.inverse * wall.vertices)                                 if cw
-    width   = 0.1
-    offset1 = OpenStudio.buffer(ft_wall, width, TOL)
-    expect(offset1.empty?).to be(false)
-    offset1 = offset1.get
-    offset1 =  ft * offset1                                                if cw
-    offset1 = (ft * offset1).reverse                                   unless cw
+    unless version < 321
+      # XY-plane transformation matrix.
+      ft = OpenStudio::Transformation::alignFace(wall.vertices)
+      ft_wall = mod1.flatZ( (ft.inverse * wall.vertices) )
+      expect(ft_wall.empty?).to be(false)
+      cw      = OpenStudio::pointInPolygon(ft_wall.first, ft_wall, TOL)
+      expect(cw).to be(false)
+      ft_wall = mod1.flatZ( (ft.inverse * wall.vertices).reverse )     unless cw
+      expect(ft_wall.empty?).to be(false)
+      ft_wall = (ft.inverse * wall.vertices).reverse                   unless cw
+      ft_wall = (ft.inverse * wall.vertices)                               if cw
+      width   = 0.1
+      offset1 = OpenStudio.buffer(ft_wall, width, TOL)
+      expect(offset1.empty?).to be(false)
+      offset1 = offset1.get
+      offset1 =  ft * offset1                                              if cw
+      offset1 = (ft * offset1).reverse                                 unless cw
 
-    expect(mod1.status.zero?).to be(true)
-    expect(offset1.is_a?(Array)).to be(true)
-    expect(offset1.size).to eq(4)            # ccw, yet not in same order .. OK!
-    # offset1.each { |vx| puts vx }
-    # [10.1, 0, 10.1]
-    # [-0.1, 0, 10.1]
-    # [-0.1, 0, -0.1]
-    # [10.1, 0, -0.1]
-    expect(mod1.fits?(wall.vertices, offset1)).to be(true)
-    expect(mod1.overlaps?(wall.vertices, offset1)).to be(true)
-    expect(mod1.overlaps?(offset1, wall.vertices)).to be(true)
-    area = OpenStudio.getArea(offset1)
-    expect(area.empty?).to be(false)
-    expect(area.get).to be_within(TOL).of(104.04)
+      expect(mod1.status.zero?).to be(true)
+      expect(offset1.is_a?(Array)).to be(true)
+      expect(offset1.size).to eq(4)         # ccw, yet not in same order ... OK!
+      # offset1.each { |vx| puts vx }
+      # [10.1, 0, 10.1]
+      # [-0.1, 0, 10.1]
+      # [-0.1, 0, -0.1]
+      # [10.1, 0, -0.1]
+      expect(mod1.fits?(wall.vertices, offset1)).to be(true)
+      expect(mod1.overlaps?(wall.vertices, offset1)).to be(true)
+      expect(mod1.overlaps?(offset1, wall.vertices)).to be(true)
+      area = OpenStudio.getArea(offset1)
+      expect(area.empty?).to be(false)
+      expect(area.get).to be_within(TOL).of(104.04)
+    end
 
-    offset2 = mod1.offset(wall.vertices, 0.1)
+    offset2 = mod1.offset(wall.vertices, 0.1, 300)
     expect(mod1.status.zero?).to be(true)
     expect(offset2.is_a?(Array)).to be(true)
-    expect(offset2.size).to eq(4)
+    expect(offset2.size).to eq(4)                # ccw, in same order .. better!
     # offset2.each { |vx| puts vx }
-    # [10.1, 0, 10.1]
     # [-0.1, 0, 10.1]
     # [-0.1, 0, -0.1]
     # [10.1, 0, -0.1]
+    # [10.1, 0, 10.1]
     expect(mod1.fits?(wall.vertices, offset2)).to be(true)
     expect(mod1.overlaps?(wall.vertices, offset2)).to be(true)
     expect(mod1.overlaps?(offset2, wall.vertices)).to be(true)
@@ -1328,15 +1331,11 @@ RSpec.describe OSut do
     expect(area.empty?).to be(false)
     expect(area.get).to be_within(TOL).of(104.04)
 
-    # A model with sub/surface vertices defined clockwise.
     file  = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
     path  = OpenStudio::Path.new(file)
     model = OpenStudio::OSVersion::VersionTranslator.new.loadModel(path)
     expect(model.empty?).to be(false)
     model = model.get
-    v1    = model.getVersion.versionIdentifier.split(".").map(&:to_i).join.to_i
-    v2    = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
-    expect(v1).to eq(v2)
 
     srf2  = model.getSurfaceByName("Surface 2")
     expect(srf2.empty?).to be(false)
@@ -1369,7 +1368,7 @@ RSpec.describe OSut do
     expect(ss2.allowWindowPropertyFrameAndDivider).to be(true)
     expect(ss2.windowPropertyFrameAndDivider.empty?).to be(true)
 
-    unless v1 < 340                     # or, e.g. ss2.respond_to?(:dividerArea)
+    unless version < 340                # or, e.g. ss2.respond_to?(:dividerArea)
       expect(ss2.dividerArea.to_i).to eq(0)
       expect(ss2.frameArea.to_i).to eq(0)
       expect(ss2.roughOpeningArea).to be_within(TOL).of(ss2.grossArea)
@@ -1464,11 +1463,10 @@ RSpec.describe OSut do
     expect(ss2a.setWindowPropertyFrameAndDivider(fd)).to be(true)
     w2a = ss2a.windowPropertyFrameAndDivider.get.frameWidth
     expect(w2a).to be_within(0.001).of(width)
-
     expect(ss2a.netArea).to be_within(TOL).of(0.600)
     expect(ss2a.grossArea).to be_within(TOL).of(0.600)
 
-    unless v1 < 340
+    unless version < 340
       # ss2a.roughOpeningVertices.each { |vx| puts vx }             # clockwise!
       # [0, 1.95, 2.95]
       # [0, 4.05, 2.95]
@@ -1486,34 +1484,46 @@ RSpec.describe OSut do
       net2a -= ss2c.grossArea
       wwr2a  = srf2.windowToWallRatio
       expect(wwr2a).to be_within(TOL).of(0.427)         # not previous wwr 43.8%
-      expect(srf2.netArea).to be_within(TOL).of(net2a)            # F+D accepted
+      expect(srf2.netArea).to be_within(TOL).of(net2a)           # F+D accepted!
 
-      ss2a_321 = mod1.offset(ss2a.roughOpeningVertices, width)
+      ss2a_321 = mod1.offset(ss2a.vertices, width)
       expect(mod1.logs.empty?).to be(true)
       expect(ss2a_321.is_a?(Array)).to be(true)
       expect(ss2a_321.size).to eq(4)
-      # ss2a_321.each { |vx| puts vx }                        # counterclockwise
-      # [0, 1.9, 3.4]                                    # TO DO : 2x the offset
-      # [0, 1.9, 2.9]
-      # [0, 4.1, 2.9]
-      # [0, 4.1, 3.4]
+      # ss2a_321.each { |vx| puts vx } # counterclockwise, reverse order vs ss2a
+      # [0, 1.95, 3.35]
+      # [0, 4.05, 3.35]
+      # [0, 4.05, 2.95]
+      # [0, 1.95, 2.95]
+      ss2a_321_area = OpenStudio.getArea(ss2a_321)
+      expect(ss2a_321_area.empty?).to be(false)
+      expect(ss2a_321_area.get).to be_within(TOL).of(ss2a.roughOpeningArea)
 
-      # ( 0.000, 4.000, 3.300)                                # glazing vertices
-      # ( 0.000, 4.000, 3.000)
-      # ( 0.000, 2.000, 3.000)
-      # ( 0.000, 2.000, 3.300)
-      # ss2a_300 = mod1.offset(ss2a.roughOpeningVertices, width, 300)
-      # expect(mod1.logs.empty?).to be(true)
+      ss2a_300 = mod1.offset(ss2a.vertices, width, 300)  # oldest version tested
+      expect(mod1.logs.empty?).to be(true)
+      expect(ss2a_300.is_a?(Array)).to be(true)
+      expect(ss2a_300.size).to eq(4)
+      # ss2a_300.each { |vx| puts vx } # counterclockwise same order as original
+      # [0, 4.05, 3.35]
+      # [0, 4.05, 2.95]
+      # [0, 1.95, 2.95]
+      # [0, 1.95, 3.35]
+      # vec << OpenStudio::Point3d.new( 0.000, 4.000, 3.300)
+      # vec << OpenStudio::Point3d.new( 0.000, 4.000, 3.000)
+      # vec << OpenStudio::Point3d.new( 0.000, 2.000, 3.000)
+      # vec << OpenStudio::Point3d.new( 0.000, 2.000, 3.300)
+      ss2a_300_area = OpenStudio.getArea(ss2a_300)
+      expect(ss2a_300_area.empty?).to be(false)
+      expect(ss2a_300_area.get).to be_within(TOL).of(ss2a.roughOpeningArea)
     end
 
     expect(ss2b.setWindowPropertyFrameAndDivider(fd)).to be(true)
     w2b = ss2b.windowPropertyFrameAndDivider.get.frameWidth
     expect(w2b).to be_within(TOL).of(width)
-
     expect(ss2b.netArea).to be_within(TOL).of(0.600)
     expect(ss2b.grossArea).to be_within(TOL).of(0.600)
 
-    unless v1 < 340
+    unless version < 340
       # ss2b.roughOpeningVertices.each { |vx| puts vx }             # clockwise!
       # [0, 5.95, 3.45]
       # [0, 8.05, 3.45]
@@ -1523,19 +1533,118 @@ RSpec.describe OSut do
       expect(mod1.fits?(ss2b.roughOpeningVertices.reverse, v2)).to be(false)
       expect(mod1.logs.empty?).to be(true)
 
-      expect(ss2a.roughOpeningArea).to be_within(TOL).of(0.840)
+      # SDK will keep in memory offset vertices, even when it conflicts.
+      expect(ss2b.roughOpeningArea).to be_within(TOL).of(0.840)
       net2b  = gross
       net2b -= ss2.grossArea
       net2b -= ss2a.roughOpeningArea
       net2b -= ss2b.roughOpeningArea
       net2b -= ss2c.grossArea
       wwr2b  = srf2.windowToWallRatio
-      expect(wwr2b).to be_within(TOL).of(wwr2a)                  # F+D rejected!
-      expect(srf2.netArea).to be_within(TOL).of(net2b)              # not net2a!
+      expect(wwr2b).to be_within(TOL).of(wwr2a)                 #  F+D rejected!
+      expect(srf2.netArea).to be_within(TOL).of(net2b)    # updated - not net2a!
+
+      ss2b_321 = mod1.offset(ss2b.vertices, width)
+      expect(mod1.logs.empty?).to be(true)
+      expect(ss2b_321.is_a?(Array)).to be(true)
+      expect(ss2b_321.size).to eq(4)
+      # ss2b_321.each { |vx| puts vx } # counterclockwise, reverse order vs ss2b
+      # [0, 5.95, 3.85]
+      # [0, 8.05, 3.85]
+      # [0, 8.05, 3.45]
+      # [0, 5.95, 3.45]
+
+      ss2b_321_area = OpenStudio.getArea(ss2b_321)
+      expect(ss2b_321_area.empty?).to be(false)
+      expect(ss2b_321_area.get).to be_within(TOL).of(ss2b.roughOpeningArea)
+
+      ss2b_300 = mod1.offset(ss2b.vertices, width, 300)  # oldest version tested
+      expect(mod1.logs.empty?).to be(true)
+      expect(ss2b_300.is_a?(Array)).to be(true)
+      expect(ss2b_300.size).to eq(4)
+      # ss2b_300.each { |vx| puts vx } # counterclockwise same order as original
+      # [0, 8.05, 3.85]
+      # [0, 8.05, 3.45]
+      # [0, 5.95, 3.45]
+      # [0, 5.95, 3.85]
+      # vec << OpenStudio::Point3d.new( 0.000, 8.000, 3.800)
+      # vec << OpenStudio::Point3d.new( 0.000, 8.000, 3.500)
+      # vec << OpenStudio::Point3d.new( 0.000, 6.000, 3.500)
+      # vec << OpenStudio::Point3d.new( 0.000, 6.000, 3.800)
+      ss2b_300_area = OpenStudio.getArea(ss2b_300)
+      expect(ss2b_300_area.empty?).to be(false)
+      expect(ss2b_300_area.get).to be_within(TOL).of(ss2b.roughOpeningArea)
 
       # So for v340 and up, rely on OpenStudio-reported WWR to get parent
       # surface (true) net area to determine whether F+D object addition is
-      # successful or not.
+      # successful or not. For earlier SDK versions, NEVER trust reported
+      # surface net area when dealing with successful F+D objects.
+    end
+
+    expect(ss2c.setWindowPropertyFrameAndDivider(fd)).to be(true)
+    w2c = ss2c.windowPropertyFrameAndDivider.get.frameWidth
+    expect(w2c).to be_within(TOL).of(width)
+    expect(ss2c.netArea).to be_within(TOL).of(0.600)
+    expect(ss2c.grossArea).to be_within(TOL).of(0.600)
+
+    unless version < 340
+      # ss2c.roughOpeningVertices.each { |vx| puts vx }             # clockwise!
+      # [0,  9.95, 2.234]
+      # [0, 12.05, 2.234]
+      # [0, 12.05, 2.634]
+      # [0,  9.95, 2.634]
+      expect(mod1.fits?(ss2c.roughOpeningVertices, v2)).to be(false)
+      expect(mod1.fits?(ss2c.roughOpeningVertices.reverse, v2)).to be(true)
+      expect(mod1.overlaps?(ss2c.roughOpeningVertices.reverse, vs2)).to be(true)
+      expect(mod1.logs.empty?).to be(true)
+
+      # SDK will keep in memory offset vertices, even when it conflicts.
+      expect(ss2b.roughOpeningArea).to be_within(TOL).of(0.840)
+      net2c  = gross
+      net2c -= ss2.grossArea
+      net2c -= ss2a.roughOpeningArea
+      net2c -= ss2b.roughOpeningArea
+      net2c -= ss2c.roughOpeningArea
+      wwr2c  = srf2.windowToWallRatio
+      expect(wwr2c).to be_within(TOL).of(wwr2a)                 #  F+D rejected!
+      expect(srf2.netArea).to be_within(TOL).of(net2c)    # updated - not net2a!
+
+      ss2c_321 = mod1.offset(ss2c.vertices, width)
+      expect(mod1.logs.empty?).to be(true)
+      expect(ss2c_321.is_a?(Array)).to be(true)
+      expect(ss2c_321.size).to eq(4)
+      # ss2c_321.each { |vx| puts vx } # counterclockwise, reverse order vs ss2b
+      # [0,  9.95, 2.634]
+      # [0, 12.05, 2.634]
+      # [0, 12.05, 2.234]
+      # [0,  9.95, 2.234]
+      expect(mod1.overlaps?(ss2c_321, vs2)).to be(true)
+      ss2c_321_area = OpenStudio.getArea(ss2c_321)
+      expect(ss2c_321_area.empty?).to be(false)
+      expect(ss2c_321_area.get).to be_within(TOL).of(ss2c.roughOpeningArea)
+
+      ss2c_300 = mod1.offset(ss2c.vertices, width, 300)  # oldest version tested
+      expect(mod1.logs.empty?).to be(true)
+      expect(ss2c_300.is_a?(Array)).to be(true)
+      expect(ss2c_300.size).to eq(4)
+      # ss2c_300.each { |vx| puts vx } # counterclockwise same order as original
+      # [0, 12.05, 2.634]
+      # [0, 12.05, 2.234]
+      # [0,  9.95, 2.234]
+      # [0,  9.95, 2.634]
+      # vec << OpenStudio::Point3d.new( 0.000,12.000, 2.584)
+      # vec << OpenStudio::Point3d.new( 0.000,12.000, 2.284)
+      # vec << OpenStudio::Point3d.new( 0.000,10.000, 2.284)
+      # vec << OpenStudio::Point3d.new( 0.000,10.000, 2.584)
+      expect(mod1.overlaps?(ss2c_300, vs2)).to be(true)
+      ss2c_300_area = OpenStudio.getArea(ss2c_300)
+      expect(ss2c_300_area.empty?).to be(false)
+      expect(ss2c_300_area.get).to be_within(TOL).of(ss2c.roughOpeningArea)
+
+      # So for v340 and up, rely on OpenStudio-reported WWR to get parent
+      # surface (true) net area to determine whether F+D object addition is
+      # successful or not. For earlier SDK versions, NEVER trust reported
+      # surface net area when dealing with successful F+D objects.
     end
   end
 end
