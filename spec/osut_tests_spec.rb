@@ -1768,86 +1768,89 @@ RSpec.describe OSut do
     expect(sky.setSubSurfaceType("Skylight")).to be(true)
     expect(sky.netArea).to be_within(TOL).of(1)
     expect(sky.grossArea).to be_within(TOL).of(1)
-    expect(sky.allowWindowPropertyFrameAndDivider).to be(true)
-    expect(mod1.fits?(sky.vertices, v30)).to be(true)
 
-    net  = gross
-    net -= sky.grossArea
-    srr  = s30.skylightToRoofRatio
-    expect(srr).to be_within(TOL).of(0)
-    expect(s30.netArea).to be_within(TOL).of(334.14)
-    expect(srr).to be_within(0.001).of(0.003)                       # before F+D
+    unless version < 321
+      expect(sky.allowWindowPropertyFrameAndDivider).to be(true)
+      expect(mod1.fits?(sky.vertices, v30)).to be(true)
 
-    fd = OpenStudio::Model::WindowPropertyFrameAndDivider.new(model)
-    width = 0.050
-    expect(fd.setFrameWidth(width)).to be(true)   # 50mm (narrow) around glazing
-    expect(fd.setFrameConductance(2.500)).to be(true)
+      net  = gross
+      net -= sky.grossArea
+      srr  = s30.skylightToRoofRatio
+      expect(srr).to be_within(TOL).of(0)
+      expect(s30.netArea).to be_within(TOL).of(334.14)
+      expect(srr).to be_within(0.001).of(0.003)                     # before F+D
 
-    expect(sky.setWindowPropertyFrameAndDivider(fd)).to be(true)
-    sky_w = sky.windowPropertyFrameAndDivider.get.frameWidth
-    expect(sky_w).to be_within(0.001).of(width)
-    expect(sky.netArea).to be_within(TOL).of(1)
-    expect(sky.grossArea).to be_within(TOL).of(1)
+      fd = OpenStudio::Model::WindowPropertyFrameAndDivider.new(model)
+      width = 0.050
+      expect(fd.setFrameWidth(width)).to be(true) # 50mm (narrow) around glazing
+      expect(fd.setFrameConductance(2.500)).to be(true)
 
-    unless version < 340
-      # sky.roughOpeningVertices.each { |vx| puts vx }              # clockwise!
-      #   [14.88, 5.98, 3.8]
-      #   [15.98, 5.98, 3.8]
-      #   [15.98, 4.88, 3.8]
-      #   [14.88, 4.88, 3.8]
-      expect(mod1.fits?(sky.roughOpeningVertices, v30)).to be(false)
-      expect(mod1.fits?(sky.roughOpeningVertices.reverse, v30)).to be(true)
-      expect(mod1.logs.empty?).to be(true)
+      expect(sky.setWindowPropertyFrameAndDivider(fd)).to be(true)
+      sky_w = sky.windowPropertyFrameAndDivider.get.frameWidth
+      expect(sky_w).to be_within(0.001).of(width)
+      expect(sky.netArea).to be_within(TOL).of(1)
+      expect(sky.grossArea).to be_within(TOL).of(1)
 
-      expect(sky.roughOpeningArea).to be_within(TOL).of(1.21)
-      net1  = gross
-      net1 -= sky.roughOpeningArea
-      expect(s30.netArea).to be_within(TOL).of(net1)             # F+D accepted!
-      srr1  = s30.skylightToRoofRatio
-      expect(srr1).to be_within(TOL).of(srr)     # yet not updated for skylights
-      #
-      #   https://github.com/NREL/OpenStudio/blob/
-      #   e5c1e375db39b0f9b10512e9d6361cfec66308d6/src/model/Surface.cpp#L1547
-      #
-      #     vs
-      #
-      #   https://github.com/NREL/OpenStudio/blob/
-      #   e5c1e375db39b0f9b10512e9d6361cfec66308d6/src/model/Surface.cpp#L1471
-      #
-      # In fact, when dealing with F+D objects, the updated SDK v340 WWR
-      # calculations only consider subsurface types:
-      #   - FixedWindow
-      #   - OperableWindow
-      #
-      #   https://github.com/NREL/OpenStudio/blob/
-      #   e5c1e375db39b0f9b10512e9d6361cfec66308d6/src/model/Surface.cpp#L1511
-      #
-      # ... bummer!
-      sky_321 = mod1.offset(sky.vertices, width)
-      expect(mod1.logs.empty?).to be(true)
-      expect(sky_321.is_a?(Array)).to be(true)
-      expect(sky_321.size).to eq(4)
-      # sky_321.each { |x| puts x } # counterclockwise, reverse order
-      # [14.88, 4.88, 3.8]
-      # [15.98, 4.88, 3.8]
-      # [15.98, 5.98, 3.8]
-      # [14.88, 5.98, 3.8]
-      sky_321_area = OpenStudio.getArea(sky_321)
-      expect(sky_321_area.empty?).to be(false)
-      expect(sky_321_area.get).to be_within(TOL).of(sky.roughOpeningArea)
+      unless version < 340
+        # sky.roughOpeningVertices.each { |vx| puts vx }            # clockwise!
+        #   [14.88, 5.98, 3.8]
+        #   [15.98, 5.98, 3.8]
+        #   [15.98, 4.88, 3.8]
+        #   [14.88, 4.88, 3.8]
+        expect(mod1.fits?(sky.roughOpeningVertices, v30)).to be(false)
+        expect(mod1.fits?(sky.roughOpeningVertices.reverse, v30)).to be(true)
+        expect(mod1.logs.empty?).to be(true)
 
-      sky_300 = mod1.offset(sky.vertices, width, 300)    # oldest version tested
-      expect(mod1.logs.empty?).to be(true)
-      expect(sky_300.is_a?(Array)).to be(true)
-      expect(sky_300.size).to eq(4)
-      # sky_300.each { |vx| puts vx } # counterclockwise same order as originals
-      # [15.98, 4.88, 3.8]
-      # [15.98, 5.98, 3.8]
-      # [14.88, 5.98, 3.8]
-      # [14.88, 4.88, 3.8]
-      sky_300_area = OpenStudio.getArea(sky_300)
-      expect(sky_300_area.empty?).to be(false)
-      expect(sky_300_area.get).to be_within(TOL).of(sky.roughOpeningArea)
+        expect(sky.roughOpeningArea).to be_within(TOL).of(1.21)
+        net1  = gross
+        net1 -= sky.roughOpeningArea
+        expect(s30.netArea).to be_within(TOL).of(net1)           # F+D accepted!
+        srr1  = s30.skylightToRoofRatio
+        expect(srr1).to be_within(TOL).of(srr)   # yet not updated for skylights
+        #
+        #   https://github.com/NREL/OpenStudio/blob/
+        #   e5c1e375db39b0f9b10512e9d6361cfec66308d6/src/model/Surface.cpp#L1547
+        #
+        #     vs
+        #
+        #   https://github.com/NREL/OpenStudio/blob/
+        #   e5c1e375db39b0f9b10512e9d6361cfec66308d6/src/model/Surface.cpp#L1471
+        #
+        # In fact, when dealing with F+D objects, the updated SDK v340 WWR
+        # calculations only consider subsurface types:
+        #   - FixedWindow
+        #   - OperableWindow
+        #
+        #   https://github.com/NREL/OpenStudio/blob/
+        #   e5c1e375db39b0f9b10512e9d6361cfec66308d6/src/model/Surface.cpp#L1511
+        #
+        # ... bummer!
+        sky_321 = mod1.offset(sky.vertices, width)
+        expect(mod1.logs.empty?).to be(true)
+        expect(sky_321.is_a?(Array)).to be(true)
+        expect(sky_321.size).to eq(4)
+        # sky_321.each { |x| puts x }          # counterclockwise, reverse order
+        # [14.88, 4.88, 3.8]
+        # [15.98, 4.88, 3.8]
+        # [15.98, 5.98, 3.8]
+        # [14.88, 5.98, 3.8]
+        sky_321_area = OpenStudio.getArea(sky_321)
+        expect(sky_321_area.empty?).to be(false)
+        expect(sky_321_area.get).to be_within(TOL).of(sky.roughOpeningArea)
+
+        sky_300 = mod1.offset(sky.vertices, width, 300)  # oldest version tested
+        expect(mod1.logs.empty?).to be(true)
+        expect(sky_300.is_a?(Array)).to be(true)
+        expect(sky_300.size).to eq(4)
+        # sky_300.each { |vx| puts vx }         # counterclockwise, as originals
+        # [15.98, 4.88, 3.8]
+        # [15.98, 5.98, 3.8]
+        # [14.88, 5.98, 3.8]
+        # [14.88, 4.88, 3.8]
+        sky_300_area = OpenStudio.getArea(sky_300)
+        expect(sky_300_area.empty?).to be(false)
+        expect(sky_300_area.get).to be_within(TOL).of(sky.roughOpeningArea)
+      end
     end
 
     # So for OpenStudio SDK v340+, one can rely on reported WWR to get a wall's
@@ -1861,6 +1864,8 @@ RSpec.describe OSut do
     # reported WWR for walls, reported skylight-to-roof ratios (SRRs) do not!
     # And so other (bespoke) means are required, maybe resting on OSut's 'fits?'
     # & 'overlaps?' methods, to determine successful skylight F+D additions.
+    #
+    # Note: v321 skylights cannot have F+D objects.
     #
     # Good luck with (exceptionally rare) glazed subsurface insertions in
     # exposed (e.g. cantilevered) floors.
