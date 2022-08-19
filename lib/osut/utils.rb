@@ -1405,13 +1405,13 @@ module OSut
   end
 
   ##
-  # Generate new vertices, offset by a certain width.
+  # Generate offset vertices (by width) for a 3- or 4-sided, convex polygon.
   #
   # @param p1 [OpenStudio::Point3dVector] OpenStudio Point3D vector/array
   # @param w [Float] offset width (min: 0.0254m)
-  # @param v [Integer] OpenStudio SDK version, eg '291' for 'v2.9.1' (optional)
+  # @param v [Integer] OpenStudio SDK version, eg '321' for 'v3.2.1' (optional)
   #
-  # @return [Array] offset points if successful (v > 300)
+  # @return [Array] offset points if successful
   # @return [OpenStudio::Point3dVector] original points if invalid input
   def offset(p1 = [], w = 0, v = 0)
     mth   = "TBD::#{__callee__}"
@@ -1618,7 +1618,7 @@ module OSut
       pzDp = pzDp + scalar(pz[:D][:f_n], w * Math.tan(a4/2))               if iv
 
       # Re-convert to OpenStudio 3D points.
-      vec = OpenStudio::Point3dVector.new
+      vec  = OpenStudio::Point3dVector.new
       vec << OpenStudio::Point3d.new(pzAp.x, pzAp.y, pzAp.z)
       vec << OpenStudio::Point3d.new(pzBp.x, pzBp.y, pzBp.z)
       vec << OpenStudio::Point3d.new(pzCp.x, pzCp.y, pzCp.z)

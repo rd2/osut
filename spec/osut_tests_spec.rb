@@ -1266,11 +1266,104 @@ RSpec.describe OSut do
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
 
-    model   = OpenStudio::Model::Model.new
     version = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
 
+    # Basic test: triangular surface with 2x acute angles.
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  2.00,  8.00,  0.00)
+    vec << OpenStudio::Point3d.new(  1.00,  6.00,  0.00)
+    vec << OpenStudio::Point3d.new(  4.00,  9.00,  0.00)
+
+    offset = mod1.offset(vec, 0.2, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset.is_a?(Array)).to be(true)
+    expect(offset.size).to eq(3)
+    # offset.each { |q| puts q }                               # these check out
+    #   1.85, 8.15, 0.00
+    #   0.27, 4.99, 0.00
+    #   5.01, 9.73, 0.00
+    a1 = OpenStudio.getArea(vec)
+    a2 = OpenStudio.getArea(offset)
+    expect(a1.empty?).to be(false)
+    expect(a2.empty?).to be(false)
+    a1 = a1.get
+    a2 = a2.get
+    expect(a1).to be_within(TOL).of(1.50)
+    expect(a2).to be_within(TOL).of(3.75)
+
+    unless version < 321                     # accessing Boost's buffer function
+      offset = mod1.offset(vec, 0.2)
+      expect(mod1.status.zero?).to be(true)
+      expect(offset.is_a?(Array)).to be(true)
+      expect(offset.size).to eq(6)
+      # offset.each { |q| puts q }                       # extra colinear points
+      #   4.81, 9.58, 0.00
+      #   3.91, 9.18, 0.00
+      #   1.85, 8.15, 0.00
+      #   0.82, 6.09, 0.00
+      #   0.42, 5.19, 0.00
+      #   1.14, 5.86, 0.00
+      a2 = OpenStudio.getArea(offset)
+      expect(a2.empty?).to be(false)
+      a2 = a2.get
+      expect(a2).to be_within(TOL).of(3.57) # 5% less accurate with acute angles
+    end
+
+    # Basic test: 4-sided, irregular polygon: 1x concave angle.
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  5.00,  2.00,  0.00)
+    vec << OpenStudio::Point3d.new(  6.00,  5.00,  0.00)
+    vec << OpenStudio::Point3d.new(  8.00,  3.00,  0.00)
+    vec << OpenStudio::Point3d.new(  6.00,  3.00,  0.00)
+
+    # OSut' offset method is designed for 3- or 4-sided, convex polygons (e.g.
+    # OpenStudio subSurfaces) ONLY. It is NOT designed for concave polygons.
+    # A reminder: OpenStudio will convert any irregular subsurface polygon to a
+    # regular, 4-sided polygon in the background. This is the case for a 3-sided
+    # subsurface, and/or for one with a Frame & Divider (F+D) object. So the
+    # results comparison here is somewhat academic, i.e. may have little to no
+    # effect on energy simulation results - it depends. But it nonetheless
+    # remains relevant to ensure app stability & harmonized results.
+    offset = mod1.offset(vec, 0.2, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset.is_a?(Array)).to be(true)
+    expect(offset.size).to eq(4)
+    # offset.each { |q| puts q }      # last vertex is off the mark, as expected
+    #   4.54, 1.26, 0.00
+    #   5.91, 5.37, 0.00
+    #   8.48, 2.80, 0.00
+    #   5.92, 3.20, 0.00               << Y: should be 2.8 (as preceding vertex)
+    a1 = OpenStudio.getArea(vec)
+    a2 = OpenStudio.getArea(offset)
+    expect(a1.empty?).to be(false)
+    expect(a2.empty?).to be(false)
+    a1 = a1.get
+    a2 = a2.get
+    expect(a1).to be_within(TOL).of(3.00)
+    expect(a2).to be_within(TOL).of(4.28) # << should be 5.2 m2, ~18% inaccuracy
+
+    unless version < 321                     # accessing Boost's buffer function
+      offset = mod1.offset(vec, 0.2)
+      expect(mod1.status.zero?).to be(true)
+      expect(offset.is_a?(Array)).to be(true)
+      expect(offset.size).to eq(4)
+      # offset.each { |q| puts q }                             # these check out
+      #   4.54, 1.26, 0.00
+      #   5.91, 5.37, 0.00
+      #   8.48, 2.80, 0.00
+      #   6.08, 2.80, 0.00
+      a2 = OpenStudio.getArea(offset)
+      expect(a2.empty?).to be(false)
+      a2 = a2.get
+      expect(a2).to be_within(TOL).of(5.20)                    # right on target
+    end
+
+
+    # Testing OpenStudio surfaces & subsurfaces.
+    model   = OpenStudio::Model::Model.new
+
     # 10m x 10m parent vertical (wall) surface.
-    vec = OpenStudio::Point3dVector.new
+    vec  = OpenStudio::Point3dVector.new
     vec << OpenStudio::Point3d.new(  0,  0, 10)
     vec << OpenStudio::Point3d.new(  0,  0,  0)
     vec << OpenStudio::Point3d.new( 10,  0,  0)
@@ -1397,7 +1490,12 @@ RSpec.describe OSut do
     #   - ss2a: no conflict (safe)
     #   - ss2b: extends beyond srf2 limits
     #   - ss2c: overlaps with original ss2
+    #
     # Note: set subsurface type AFTER setting its parent surface - dunno why?
+    #
+    # Note: F+D objects only allowed for glazed subsurface types. However,
+    #       corrected WWR calculations (SDK v340+) do not consider F+D objects
+    #       of glass doors.
     vec  = OpenStudio::Point3dVector.new
     vec << OpenStudio::Point3d.new( 0.000, 4.000, 3.300)
     vec << OpenStudio::Point3d.new( 0.000, 4.000, 3.000)
@@ -1406,7 +1504,7 @@ RSpec.describe OSut do
     ss2a = OpenStudio::Model::SubSurface.new(vec, model)
     ss2a.setName("Sub Surface 2a")
     expect(ss2a.setSurface(srf2)).to be(true)
-    expect(ss2a.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(ss2a.setSubSurfaceType("OperableWindow")).to be(true)
     expect(ss2a.netArea).to be_within(TOL).of(0.600)
     expect(ss2a.grossArea).to be_within(TOL).of(0.600)
     expect(ss2a.allowWindowPropertyFrameAndDivider).to be(true)
@@ -1574,11 +1672,6 @@ RSpec.describe OSut do
       ss2b_300_area = OpenStudio.getArea(ss2b_300)
       expect(ss2b_300_area.empty?).to be(false)
       expect(ss2b_300_area.get).to be_within(TOL).of(ss2b.roughOpeningArea)
-
-      # So for v340 and up, rely on OpenStudio-reported WWR to get parent
-      # surface (true) net area to determine whether F+D object addition is
-      # successful or not. For earlier SDK versions, NEVER trust reported
-      # surface net area when dealing with successful F+D objects.
     end
 
     expect(ss2c.setWindowPropertyFrameAndDivider(fd)).to be(true)
@@ -1640,11 +1733,139 @@ RSpec.describe OSut do
       ss2c_300_area = OpenStudio.getArea(ss2c_300)
       expect(ss2c_300_area.empty?).to be(false)
       expect(ss2c_300_area.get).to be_within(TOL).of(ss2c.roughOpeningArea)
-
-      # So for v340 and up, rely on OpenStudio-reported WWR to get parent
-      # surface (true) net area to determine whether F+D object addition is
-      # successful or not. For earlier SDK versions, NEVER trust reported
-      # surface net area when dealing with successful F+D objects.
     end
+
+    # Testing skylights.
+    model   = OpenStudio::Model::Model.new
+
+    file  = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+    path  = OpenStudio::Path.new(file)
+    model = OpenStudio::OSVersion::VersionTranslator.new.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    s30 = model.getSurfaceByName("Surface 30")
+    expect(s30.empty?).to be(false)
+    s30 = s30.get
+    v30 = s30.vertices
+    # v30.each {|x| puts x}
+    #   30.86,  0.00, 3.80
+    #   30.86, 10.86, 3.80
+    #    0.00, 10.86, 3.80
+    #    0.00,  0.00, 3.80
+    gross = s30.grossArea
+    expect(gross).to be_within(TOL).of(335.14)
+    expect(s30.netArea).to be_within(TOL).of(gross)
+
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(15.93, 4.93, 3.80)
+    vec << OpenStudio::Point3d.new(15.93, 5.93, 3.80)
+    vec << OpenStudio::Point3d.new(14.93, 5.93, 3.80)
+    vec << OpenStudio::Point3d.new(14.93, 4.93, 3.80)
+    sky  = OpenStudio::Model::SubSurface.new(vec, model)
+    sky.setName("Skylight30")
+    expect(sky.setSurface(s30)).to be(true)
+    expect(sky.setSubSurfaceType("Skylight")).to be(true)
+    expect(sky.netArea).to be_within(TOL).of(1)
+    expect(sky.grossArea).to be_within(TOL).of(1)
+    expect(sky.allowWindowPropertyFrameAndDivider).to be(true)
+    expect(mod1.fits?(sky.vertices, v30)).to be(true)
+
+    net  = gross
+    net -= sky.grossArea
+    srr  = s30.skylightToRoofRatio
+    expect(srr).to be_within(TOL).of(0)
+    expect(s30.netArea).to be_within(TOL).of(334.14)
+    expect(srr).to be_within(0.001).of(0.003)                       # before F+D
+
+    fd = OpenStudio::Model::WindowPropertyFrameAndDivider.new(model)
+    width = 0.050
+    expect(fd.setFrameWidth(width)).to be(true)   # 50mm (narrow) around glazing
+    expect(fd.setFrameConductance(2.500)).to be(true)
+
+    expect(sky.setWindowPropertyFrameAndDivider(fd)).to be(true)
+    sky_w = sky.windowPropertyFrameAndDivider.get.frameWidth
+    expect(sky_w).to be_within(0.001).of(width)
+    expect(sky.netArea).to be_within(TOL).of(1)
+    expect(sky.grossArea).to be_within(TOL).of(1)
+
+    unless version < 340
+      # sky.roughOpeningVertices.each { |vx| puts vx }              # clockwise!
+      #   [14.88, 5.98, 3.8]
+      #   [15.98, 5.98, 3.8]
+      #   [15.98, 4.88, 3.8]
+      #   [14.88, 4.88, 3.8]
+      expect(mod1.fits?(sky.roughOpeningVertices, v30)).to be(false)
+      expect(mod1.fits?(sky.roughOpeningVertices.reverse, v30)).to be(true)
+      expect(mod1.logs.empty?).to be(true)
+
+      expect(sky.roughOpeningArea).to be_within(TOL).of(1.21)
+      net1  = gross
+      net1 -= sky.roughOpeningArea
+      expect(s30.netArea).to be_within(TOL).of(net1)             # F+D accepted!
+      srr1  = s30.skylightToRoofRatio
+      expect(srr1).to be_within(TOL).of(srr)     # yet not updated for skylights
+      #
+      #   https://github.com/NREL/OpenStudio/blob/
+      #   e5c1e375db39b0f9b10512e9d6361cfec66308d6/src/model/Surface.cpp#L1547
+      #
+      #     vs
+      #
+      #   https://github.com/NREL/OpenStudio/blob/
+      #   e5c1e375db39b0f9b10512e9d6361cfec66308d6/src/model/Surface.cpp#L1471
+      #
+      # In fact, when dealing with F+D objects, the updated SDK v340 WWR
+      # calculations only consider subsurface types:
+      #   - FixedWindow
+      #   - OperableWindow
+      #
+      #   https://github.com/NREL/OpenStudio/blob/
+      #   e5c1e375db39b0f9b10512e9d6361cfec66308d6/src/model/Surface.cpp#L1511
+      #
+      # ... bummer!
+      sky_321 = mod1.offset(sky.vertices, width)
+      expect(mod1.logs.empty?).to be(true)
+      expect(sky_321.is_a?(Array)).to be(true)
+      expect(sky_321.size).to eq(4)
+      # sky_321.each { |x| puts x } # counterclockwise, reverse order
+      # [14.88, 4.88, 3.8]
+      # [15.98, 4.88, 3.8]
+      # [15.98, 5.98, 3.8]
+      # [14.88, 5.98, 3.8]
+      sky_321_area = OpenStudio.getArea(sky_321)
+      expect(sky_321_area.empty?).to be(false)
+      expect(sky_321_area.get).to be_within(TOL).of(sky.roughOpeningArea)
+
+      sky_300 = mod1.offset(sky.vertices, width, 300)    # oldest version tested
+      expect(mod1.logs.empty?).to be(true)
+      expect(sky_300.is_a?(Array)).to be(true)
+      expect(sky_300.size).to eq(4)
+      # sky_300.each { |vx| puts vx } # counterclockwise same order as originals
+      # [15.98, 4.88, 3.8]
+      # [15.98, 5.98, 3.8]
+      # [14.88, 5.98, 3.8]
+      # [14.88, 4.88, 3.8]
+      sky_300_area = OpenStudio.getArea(sky_300)
+      expect(sky_300_area.empty?).to be(false)
+      expect(sky_300_area.get).to be_within(TOL).of(sky.roughOpeningArea)
+    end
+
+    # So for OpenStudio SDK v340+, one can rely on reported WWR to get a wall's
+    # TRUE wall 'net area', as a means of determining whether added F+D objects
+    # are valid or not. However, this is limited to operable or fixed windows:
+    # F+D objects of glass doors are ignored in SDK v340-reported WWR. Opaque
+    # doors are ignored altogether.
+    #
+    # When dealing with F+D added to skylights, the updated v340 'roof.netArea'
+    # method indeed considers successfully-added F+D objects. Yet contrary to
+    # reported WWR for walls, reported skylight-to-roof ratios (SRRs) do not!
+    # And so other (bespoke) means are required, maybe resting on OSut's 'fits?'
+    # & 'overlaps?' methods, to determine successful skylight F+D additions.
+    #
+    # Good luck with (exceptionally rare) glazed subsurface insertions in
+    # exposed (e.g. cantilevered) floors.
+    #
+    # For earlier SDK versions, just NEVER rely on reported surface net area
+    # or WWR/SRR when dealing with successful (or unsuccessful) F+D objects.
   end
 end
