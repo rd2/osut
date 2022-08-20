@@ -1853,24 +1853,61 @@ RSpec.describe OSut do
       end
     end
 
-    # So for OpenStudio SDK v340+, one can rely on reported WWR to get a wall's
-    # TRUE wall 'net area', as a means of determining whether added F+D objects
-    # are valid or not. However, this is limited to operable or fixed windows:
-    # F+D objects of glass doors are ignored in SDK v340-reported WWR. Opaque
-    # doors are ignored altogether.
+    # OVERVIEW: Frame & Dividers (F+Ds), added to OpenStudio windows and
+    # skylights, must be accounted for in building energy codes, e.g.:
     #
-    # When dealing with F+D added to skylights, the updated v340 'roof.netArea'
-    # method indeed considers successfully-added F+D objects. Yet contrary to
-    # reported WWR for walls, reported skylight-to-roof ratios (SRRs) do not!
-    # And so other (bespoke) means are required, maybe resting on OSut's 'fits?'
-    # & 'overlaps?' methods, to determine successful skylight F+D additions.
+    #   - window-to-wall ratios (WWRs)
+    #   - skylight-to-roof ratios (SRRs)
+    #   - net wall or roof areas for thermal bridging/derating
     #
-    # Note: v321 skylights cannot have F+D objects.
+    # OpenStudio (and EnergyPlus) subsurface vertices define the 'rough
+    # opening' needed in a parent surface to host a (manufactured off-site)
+    # window or skylight. When adding an optional F+D, the vertices instead
+    # define the glazed portion of the manufactured product - no longer the
+    # rough opening. This can be confusing for many.
     #
-    # Good luck with (exceptionally rare) glazed subsurface insertions in
-    # exposed (e.g. cantilevered) floors.
+    # With an F+D, the 'actual' or 'true' rough opening area is necessarily
+    # larger than the one defined by the subsurface vertices. The required
+    # 'offset' adjustment is applied automatically (behind the scenes) when
+    # ultimately running an EnergyPlus simulation. As of v340, similar
+    # adjustments are available in OpenStudio, e.g.:
     #
-    # For earlier SDK versions, just NEVER rely on reported surface net area
-    # or WWR/SRR when dealing with successful (or unsuccessful) F+D objects.
+    #   - window or skylight 'rough opening' vertices are available
+    #   - a wall's reported 'net area' factors-in successfully-added F+Ds
+    #   - invalid* window F+Ds are red-flagged and excluded from reported WWRs
+    #
+    # Known v340 limitations:
+    #
+    #   - invalid F+Ds are not excluded from a wall's 'net area'
+    #   - reported SRRs (as opposed to WWRs) do not exclude invalid F+Ds
+    #   - glass doors are allowed to have F+Ds, yet aren't supported as such
+    #
+    # Invalid F+Ds? If an OpenStudio user adds F+Ds without first adjusting
+    # subsurface vertices, then overlapping conflicts can arise with other
+    # nearby subsurfaces, or the rough opening may no longer 'fit' within
+    # the parent surface polygon. In such instances, OpenStudio/EnergyPlus
+    # should safely set aside conflicting objects, while warning users of
+    # invalid model inputs.
+    #
+    # Related limitations (not restricted to v340):
+    #
+    #   - some energy codes (like Canadian NECBs) require a 'fenestration & door
+    #     to wall ratio' (FWDR), which would include opaque doors and tubular
+    #     dome/diffusers
+    #   - SDK versions < 321 do not support adding F+Ds to skylight
+    #   - although exceptionally rare, glazed subsurface insertions in
+    #     exposed (e.g. cantilevered) floors are not supported
+    #
+    # In light of these observations, the recommendation use of OSut's 'offset'
+    # method, when dealing with 3- or 4-sided convex subsurfaces, is to specify
+    # an SDK version prior to v321 (optional 3rd argument), e.g. v300:
+    #
+    #   rough_opening = OSut.offset(sub.vertices, 0.050, 300)
+    #
+    # Generated offset vertices are more accurate, and available in the same
+    # first-to-last sequence and counter/clockwise order as the original
+    # subsurface vertices. Although currently unsupported, it would not be a
+    # monumental task to offset concave polygons, or polygons beyond 4 vertices
+    # in the future ...
   end
 end
