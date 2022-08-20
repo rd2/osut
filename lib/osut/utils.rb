@@ -1286,7 +1286,6 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Point3dVector
     cl2 = OpenStudio::Point3d
-    version = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
     a   = false
 
     return invalid("id1", mth, 3, DBG, a) unless id1.respond_to?(:to_s)
@@ -1317,10 +1316,6 @@ module OSut
     ft_p2 = flatZ( (ft.inverse * p2).reverse )               unless cw
     ft_p2 = flatZ( (ft.inverse * p2)         )                   if cw
     return  false                                                if ft_p2.empty?
-
-    version = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
-    return OpenStudio.polygonInPolygon(ft_p1, ft_p2, TOL)   unless version < 340
-
     area1 = OpenStudio.getArea(ft_p1)
     area2 = OpenStudio.getArea(ft_p2)
     return  empty("#{i1} area", mth, ERR, a)                     if area1.empty?
@@ -1333,12 +1328,11 @@ module OSut
     area  = OpenStudio.getArea(union)
     return  empty("#{i1}:#{i2} union area", mth, ERR, a)         if area.empty?
     area = area.get
+    return false                                     if area < TOL
+    return true                                      if (area - area2).abs < TOL
+    return false                                     if (area - area2).abs > TOL
 
-    return false if area < TOL
-    return true  if (area - area2).abs < TOL
-    return false if (area - area2).abs > TOL
-
-     true
+    true
   end
 
   ##
@@ -1411,7 +1405,7 @@ module OSut
   # @param w [Float] offset width (min: 0.0254m)
   # @param v [Integer] OpenStudio SDK version, eg '321' for 'v3.2.1' (optional)
   #
-  # @return [Array] offset points if successful
+  # @return [OpenStudio::Point3dVector] offset points if successful
   # @return [OpenStudio::Point3dVector] original points if invalid input
   def offset(p1 = [], w = 0, v = 0)
     mth   = "TBD::#{__callee__}"
@@ -1433,7 +1427,7 @@ module OSut
 
     p1.each { |x| return mismatch("p", x, cl, mth, ERR, p1) unless x.is_a?(cl) }
 
-    unless v < 321
+    unless v < 340
       # XY-plane transformation matrix ... needs to be clockwise for boost.
       ft     = OpenStudio::Transformation::alignFace(p1)
       ft_pts = flatZ( (ft.inverse * p1) )
@@ -1443,8 +1437,12 @@ module OSut
       offset = OpenStudio.buffer(ft_pts, w, TOL)
       return   p1                                       if offset.empty?
       offset = offset.get
-      return   ft * offset                              if cw
-      return  (ft * offset).reverse                 unless cw
+      offset =  ft * offset                             if cw
+      offset = (ft * offset).reverse                unless cw
+
+      pz = OpenStudio::Point3dVector.new
+      offset.each { |o| pz << OpenStudio::Point3d.new(o.x, o.y, o.z ) }
+      return pz
     else                                                  # brute force approach
       pz     = {}
       pz[:A] = {}
@@ -1624,7 +1622,7 @@ module OSut
       vec << OpenStudio::Point3d.new(pzCp.x, pzCp.y, pzCp.z)
       vec << OpenStudio::Point3d.new(pzDp.x, pzDp.y, pzDp.z)               if iv
 
-      return vec.to_a
+      return vec
     end
   end
 
