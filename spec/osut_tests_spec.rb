@@ -164,7 +164,7 @@ RSpec.describe OSut do
     expect(cls1.logs.size).to eq(1)
     expect(cls1.logs.first[:message]).to eq(m2)
   end
-
+  
   it "checks scheduleCompactMinMax (from within module instances)" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
@@ -1295,12 +1295,12 @@ RSpec.describe OSut do
     expect(a1).to be_within(TOL).of(1.50)
     expect(a2).to be_within(TOL).of(3.75)
 
-    unless version < 321                     # accessing Boost's buffer function
+    unless version < 340                     # accessing Boost's buffer function
       offset = mod1.offset(vec, 0.2)
       expect(mod1.status.zero?).to be(true)
       expect(offset.is_a?(OpenStudio::Point3dVector)).to be(true)
       expect(offset.size).to eq(6)
-      # offset.each { |o| puts o }                       # extra colinear points
+      # offset.each { |o| puts o }
       #   4.81, 9.58, 0.00
       #   3.91, 9.18, 0.00
       #   1.85, 8.15, 0.00
@@ -1346,7 +1346,7 @@ RSpec.describe OSut do
     expect(a1).to be_within(TOL).of(3.00)
     expect(a2).to be_within(TOL).of(4.28) # << should be 5.2 m2, ~18% inaccuracy
 
-    unless version < 321                     # accessing Boost's buffer function
+    unless version < 340                     # accessing Boost's buffer function
       offset = mod1.offset(vec, 0.2)
       expect(mod1.status.zero?).to be(true)
       expect(offset.is_a?(OpenStudio::Point3dVector)).to be(true)
