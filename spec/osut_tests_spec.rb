@@ -2,7 +2,6 @@ require "osut"
 
 RSpec.describe OSut do
   TOL  = OSut::TOL
-  TOL2 = OSut::TOL2
   DBG  = OSut::DEBUG
   INF  = OSut::INFO
   WRN  = OSut::WARN
@@ -165,7 +164,7 @@ RSpec.describe OSut do
     expect(cls1.logs.size).to eq(1)
     expect(cls1.logs.first[:message]).to eq(m2)
   end
-
+  
   it "checks scheduleCompactMinMax (from within module instances)" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
@@ -810,7 +809,6 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
   end
 
-
   it "retrieves a surface default construction set" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
@@ -1055,6 +1053,10 @@ RSpec.describe OSut do
   end
 
   it "checks model transformation" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
@@ -1107,11 +1109,14 @@ RSpec.describe OSut do
   end
 
   it "checks flattened 3D points" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
     model = model.get
 
     cl1 = OpenStudio::Model::Model
@@ -1158,8 +1163,12 @@ RSpec.describe OSut do
   end
 
   it "checks surface fits?' & overlaps?" do
-    model = OpenStudio::Model::Model.new
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
+
+    version = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
+    model   = OpenStudio::Model::Model.new
 
     # 10m x 10m parent vertical (wall) surface.
     vec = OpenStudio::Point3dVector.new
@@ -1168,8 +1177,13 @@ RSpec.describe OSut do
     vec << OpenStudio::Point3d.new( 10,  0,  0)
     vec << OpenStudio::Point3d.new( 10,  0, 10)
     wall = OpenStudio::Model::Surface.new(vec, model)
-    ft = OpenStudio::Transformation::alignFace(wall.vertices).inverse
-    ft_wall  = mod1.flatZ( (ft * wall.vertices).reverse )
+
+    # XY-plane transformation matrix ... needs to be clockwise for boost.
+    ft      = OpenStudio::Transformation::alignFace(wall.vertices)
+    ft_wall = mod1.flatZ( (ft.inverse * wall.vertices) )
+    cw      = OpenStudio::pointInPolygon(ft_wall.first, ft_wall, TOL)
+    expect(cw).to be(false)
+    ft_wall = mod1.flatZ( (ft.inverse * wall.vertices).reverse )       unless cw
 
     # 1m x 2m corner door (with 2x edges along wall edges)
     vec = OpenStudio::Point3dVector.new
@@ -1178,19 +1192,18 @@ RSpec.describe OSut do
     vec << OpenStudio::Point3d.new(  1,  0,  0)
     vec << OpenStudio::Point3d.new(  1,  0,  2)
     door1 = OpenStudio::Model::SubSurface.new(vec, model)
-    ft_door1 = mod1.flatZ( (ft * door1.vertices).reverse )
 
-    union = OpenStudio::join(ft_wall, ft_door1, TOL2)
-    expect(union.empty?).to be(false)
-    union = union.get
-    area = OpenStudio::getArea(union)
-    expect(area.empty?).to be(false)
-    area = area.get
-    expect(area).to be_within(0.01).of(wall.grossArea)
+    ft_door1 = mod1.flatZ( (ft.inverse * door1.vertices).reverse )     unless cw
+    ft_door1 = mod1.flatZ( (ft.inverse * door1.vertices) )                 if cw
+    expect(mod1.status.zero?).to be(true)
 
     # Door1 fits?, overlaps?
-    expect(mod1.status.zero?).to be(true)
+    unless version < 340
+      expect(OpenStudio.polygonInPolygon(ft_door1, ft_wall, TOL)).to be(true)
+    end
+
     expect(mod1.fits?(door1.vertices, wall.vertices)).to be(true)
+    expect(mod1.status.zero?).to be(true)
     expect(mod1.overlaps?(door1.vertices, wall.vertices)).to be(true)
     expect(mod1.status.zero?).to be(true)
 
@@ -1206,16 +1219,13 @@ RSpec.describe OSut do
     vec << OpenStudio::Point3d.new( 17,  0,  0)
     vec << OpenStudio::Point3d.new( 17,  0,  2)
     door2 = OpenStudio::Model::SubSurface.new(vec, model)
-    ft_door2 = mod1.flatZ( (ft * door2.vertices).reverse )
-    union = OpenStudio::join(ft_wall, ft_door2, TOL2)
-    expect(union.empty?).to be(true)
 
     # Door2 fits?, overlaps?
     expect(mod1.fits?(door2.vertices, wall.vertices)).to be(false)
     expect(mod1.overlaps?(door2.vertices, wall.vertices)).to be(false)
     expect(mod1.status.zero?).to be(true)
 
-    # # Order of arguments doesn't matter.
+    # Order of arguments doesn't matter.
     expect(mod1.fits?(wall.vertices, door2.vertices)).to be(false)
     expect(mod1.overlaps?(wall.vertices, door2.vertices)).to be(false)
     expect(mod1.status.zero?).to be(true)
@@ -1227,14 +1237,6 @@ RSpec.describe OSut do
     vec << OpenStudio::Point3d.new( 11,  0,  9)
     vec << OpenStudio::Point3d.new( 11,  0, 11)
     window = OpenStudio::Model::SubSurface.new(vec, model)
-    ft_window = mod1.flatZ( (ft * window.vertices).reverse )
-    union = OpenStudio::join(ft_wall, ft_window, TOL2)
-    expect(union.empty?).to be(false)
-    union = union.get
-    area = OpenStudio::getArea(union)
-    expect(area.empty?).to be(false)
-    area = area.get
-    expect(area).to be_within(0.01).of(103)
 
     # Window fits?, overlaps?
     expect(mod1.fits?(window.vertices, wall.vertices)).to be(false)
@@ -1261,5 +1263,964 @@ RSpec.describe OSut do
     expect(mod1.fits?(wall.vertices, glazing.vertices)).to be(true)
     expect(mod1.overlaps?(wall.vertices, glazing.vertices)).to be(true)
     expect(mod1.status.zero?).to be(true)
+  end
+
+  it "can safely offset with F+D" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
+    version = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
+
+    # Basic test: triangular surface with 2x acute angles.
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  2.00,  8.00,  0.00)
+    vec << OpenStudio::Point3d.new(  1.00,  6.00,  0.00)
+    vec << OpenStudio::Point3d.new(  4.00,  9.00,  0.00)
+
+    offset = mod1.offset(vec, 0.2, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(offset.size).to eq(3)
+    # offset.each { |o| puts o }                               # these check out
+    #   1.85, 8.15, 0.00
+    #   0.27, 4.99, 0.00
+    #   5.01, 9.73, 0.00
+    a1 = OpenStudio.getArea(vec)
+    a2 = OpenStudio.getArea(offset)
+    expect(a1.empty?).to be(false)
+    expect(a2.empty?).to be(false)
+    a1 = a1.get
+    a2 = a2.get
+    expect(a1).to be_within(TOL).of(1.50)
+    expect(a2).to be_within(TOL).of(3.75)
+
+    unless version < 340                     # accessing Boost's buffer function
+      offset = mod1.offset(vec, 0.2)
+      expect(mod1.status.zero?).to be(true)
+      expect(offset.is_a?(OpenStudio::Point3dVector)).to be(true)
+      expect(offset.size).to eq(6)
+      # offset.each { |o| puts o }
+      #   4.81, 9.58, 0.00
+      #   3.91, 9.18, 0.00
+      #   1.85, 8.15, 0.00
+      #   0.82, 6.09, 0.00
+      #   0.42, 5.19, 0.00
+      #   1.14, 5.86, 0.00
+      a2 = OpenStudio.getArea(offset)
+      expect(a2.empty?).to be(false)
+      a2 = a2.get
+      expect(a2).to be_within(TOL).of(3.57) # 5% less accurate with acute angles
+    end
+
+    # Basic test: 4-sided, irregular polygon: 1x concave angle.
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  5.00,  2.00,  0.00)
+    vec << OpenStudio::Point3d.new(  6.00,  5.00,  0.00)
+    vec << OpenStudio::Point3d.new(  8.00,  3.00,  0.00)
+    vec << OpenStudio::Point3d.new(  6.00,  3.00,  0.00)
+
+    # OSut' offset method is designed for 3- or 4-sided, convex polygons (e.g.
+    # OpenStudio subSurfaces) ONLY. It is NOT designed for concave polygons.
+    # A reminder: OpenStudio will convert any irregular subsurface polygon to a
+    # regular, 4-sided polygon in the background. This is the case for a 3-sided
+    # subsurface, and/or for one with a Frame & Divider (F+D) object. So the
+    # results comparison here is somewhat academic, i.e. may have little to no
+    # effect on energy simulation results - it depends. But it nonetheless
+    # remains relevant to ensure app stability & harmonized results.
+    offset = mod1.offset(vec, 0.2, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(offset.size).to eq(4)
+    # offset.each { |o| puts o }      # last vertex is off the mark, as expected
+      # 4.54, 1.26, 0.00
+      # 5.91, 5.37, 0.00
+      # 8.48, 2.80, 0.00
+      # 5.92, 3.20, 0.00               << Y: should be 2.8 (as preceding vertex)
+    a1 = OpenStudio.getArea(vec)
+    a2 = OpenStudio.getArea(offset)
+    expect(a1.empty?).to be(false)
+    expect(a2.empty?).to be(false)
+    a1 = a1.get
+    a2 = a2.get
+    expect(a1).to be_within(TOL).of(3.00)
+    expect(a2).to be_within(TOL).of(4.28) # << should be 5.2 m2, ~18% inaccuracy
+
+    unless version < 340                     # accessing Boost's buffer function
+      offset = mod1.offset(vec, 0.2)
+      expect(mod1.status.zero?).to be(true)
+      expect(offset.is_a?(OpenStudio::Point3dVector)).to be(true)
+      expect(offset.size).to eq(4)
+      # offset.each { |o| puts o }                             # these check out
+      # [4.54, 1.26, 0.00]
+      # [5.91, 5.37, 0.00]
+      # [8.48, 2.80, 0.00]
+      # [6.08, 2.80, 0.00]
+      a2 = OpenStudio.getArea(offset)
+      expect(a2.empty?).to be(false)
+      a2 = a2.get
+      expect(a2).to be_within(TOL).of(5.20)                    # right on target
+    end
+
+    # --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- --- #
+    # Testing more complex cases e.g., triangular windows, irregular 4-side
+    # windows, rough opening edges overlapping parent surface edges.
+    model = OpenStudio::Model::Model.new
+
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  0.00,  0.00, 10.00)
+    vec << OpenStudio::Point3d.new(  0.00,  0.00,  0.00)
+    vec << OpenStudio::Point3d.new( 10.00,  0.00,  0.00)
+    vec << OpenStudio::Point3d.new( 10.00,  0.00, 10.00)
+    dad  = OpenStudio::Model::Surface.new(vec, model)
+    dad.setName("dad")
+
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  2.00,  0.00,  8.00)
+    vec << OpenStudio::Point3d.new(  1.00,  0.00,  6.00)
+    vec << OpenStudio::Point3d.new(  4.00,  0.00,  9.00)
+    w1   = OpenStudio::Model::SubSurface.new(vec, model)
+    w1.setName("w1")
+    expect(w1.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(w1.setSurface(dad)).to be(true)
+    expect(w1.netArea).to be_within(TOL).of(1.5)
+    expect(w1.grossArea).to be_within(TOL).of(1.5)
+    expect(mod1.fits?(w1.vertices, dad.vertices)).to be(true)
+
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  7.00,  0.00,  4.00)
+    vec << OpenStudio::Point3d.new(  4.00,  0.00,  1.00)
+    vec << OpenStudio::Point3d.new(  8.00,  0.00,  2.00)
+    vec << OpenStudio::Point3d.new(  9.00,  0.00,  3.00)
+    w2   = OpenStudio::Model::SubSurface.new(vec, model)
+    w2.setName("w2")
+    expect(w2.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(w2.setSurface(dad)).to be(true)
+    expect(w2.netArea).to be_within(TOL).of(6.0)
+    expect(w2.grossArea).to be_within(TOL).of(6.0)
+    expect(mod1.fits?(w2.vertices, dad.vertices)).to be(true)
+
+    vec = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  9.00,  0.00,  9.80)
+    vec << OpenStudio::Point3d.new(  9.80,  0.00,  9.00)
+    vec << OpenStudio::Point3d.new(  9.80,  0.00,  9.80)
+    w3 = OpenStudio::Model::SubSurface.new(vec, model)
+    w3.setName("w3")
+    expect(w3.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(w3.setSurface(dad)).to be(true)
+    expect(w3.netArea).to be_within(TOL).of(0.32)
+    expect(w3.grossArea).to be_within(TOL).of(0.32)
+    expect(mod1.fits?(w3.vertices, dad.vertices)).to be(true)
+
+    offset1 = mod1.offset(w1.vertices, 0.2, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset1.size).to eq(3)    # 6 without the '300' offset argument above
+    area = OpenStudio.getArea(offset1)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL).of(3.75)
+    expect(offset1[0].x).to be_within(0.01).of( 1.85)
+    expect(offset1[0].y).to be_within(0.01).of( 0.00)
+    expect(offset1[0].z).to be_within(0.01).of( 8.15)
+    expect(offset1[1].x).to be_within(0.01).of( 0.27)
+    expect(offset1[1].y).to be_within(0.01).of( 0.00)
+    expect(offset1[1].z).to be_within(0.01).of( 4.99)
+    expect(offset1[2].x).to be_within(0.01).of( 5.01)
+    expect(offset1[2].y).to be_within(0.01).of( 0.00)
+    expect(offset1[2].z).to be_within(0.01).of( 9.73)
+    expect(mod1.fits?(offset1, dad.vertices)).to be(true)
+
+    offset2 = mod1.offset(w2.vertices, 0.2, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset2.size).to eq(4)
+    area = OpenStudio.getArea(offset2)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL).of(8.64)
+    expect(offset2[0].x).to be_within(0.01).of( 6.96)
+    expect(offset2[0].y).to be_within(0.01).of( 0.00)
+    expect(offset2[0].z).to be_within(0.01).of( 4.24)
+    expect(offset2[1].x).to be_within(0.01).of( 3.35)
+    expect(offset2[1].y).to be_within(0.01).of( 0.00)
+    expect(offset2[1].z).to be_within(0.01).of( 0.63)
+    expect(offset2[2].x).to be_within(0.01).of( 8.10)
+    expect(offset2[2].y).to be_within(0.01).of( 0.00)
+    expect(offset2[2].z).to be_within(0.01).of( 1.82)
+    expect(offset2[3].x).to be_within(0.01).of( 9.34)
+    expect(offset2[3].y).to be_within(0.01).of( 0.00)
+    expect(offset2[3].z).to be_within(0.01).of( 3.05)
+    expect(mod1.fits?(offset2, dad.vertices)).to be(true)
+
+    offset3 = mod1.offset(w3.vertices, 0.2, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset3.size).to eq(3)
+    area = OpenStudio.getArea(offset3)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL).of(1.10)
+    expect(offset3[0].x).to be_within(0.01).of( 8.52)
+    expect(offset3[0].y).to be_within(0.01).of( 0.00)
+    expect(offset3[0].z).to be_within(0.01).of(10.00)
+    expect(offset3[1].x).to be_within(0.01).of(10.00)
+    expect(offset3[1].y).to be_within(0.01).of( 0.00)
+    expect(offset3[1].z).to be_within(0.01).of( 8.52)
+    expect(offset3[2].x).to be_within(0.01).of(10.00)
+    expect(offset3[2].y).to be_within(0.01).of( 0.00)
+    expect(offset3[2].z).to be_within(0.01).of(10.00)
+    expect(mod1.fits?(offset3, dad.vertices)).to be(true)
+
+    # --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- --- #
+    # Repeat exercise, with parent surface & subsurfaces rotated 120 (CW).
+    # (i.e., negative coordinates, Y-axis coordinates, etc.)
+    model = OpenStudio::Model::Model.new
+
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  0.00,  0.00, 10.00)
+    vec << OpenStudio::Point3d.new(  0.00,  0.00,  0.00)
+    vec << OpenStudio::Point3d.new( -5.00, -8.66,  0.00)
+    vec << OpenStudio::Point3d.new( -5.00, -8.66, 10.00)
+    dad  = OpenStudio::Model::Surface.new(vec, model)
+    dad.setName("dad")
+
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( -1.00, -1.73,  8.00)
+    vec << OpenStudio::Point3d.new( -0.50, -0.87,  6.00)
+    vec << OpenStudio::Point3d.new( -2.00, -3.46,  9.00)
+    w1   = OpenStudio::Model::SubSurface.new(vec, model)
+    w1.setName("w1")
+    expect(w1.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(w1.setSurface(dad)).to be(true)
+    expect(w1.netArea).to be_within(TOL).of(1.5)
+    expect(w1.grossArea).to be_within(TOL).of(1.5)
+    expect(mod1.fits?(w1.vertices, dad.vertices)).to be(true)
+
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( -3.50, -6.06,  4.00)
+    vec << OpenStudio::Point3d.new( -2.00, -3.46,  1.00)
+    vec << OpenStudio::Point3d.new( -4.00, -6.93,  2.00)
+    vec << OpenStudio::Point3d.new( -4.50, -7.79,  3.00)
+    w2 =   OpenStudio::Model::SubSurface.new(vec, model)
+    w2.setName("w2")
+    expect(w2.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(w2.setSurface(dad)).to be(true)
+    expect(w2.netArea).to be_within(TOL).of(6.0)
+    expect(w2.grossArea).to be_within(TOL).of(6.0)
+    expect(mod1.fits?(w2.vertices, dad.vertices)).to be(true)
+
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( -4.50, -7.79,  9.80)
+    vec << OpenStudio::Point3d.new( -4.90, -8.49,  9.00)
+    vec << OpenStudio::Point3d.new( -4.90, -8.49,  9.80)
+    w3   = OpenStudio::Model::SubSurface.new(vec, model)
+    w3.setName("w3")
+    expect(w3.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(w3.setSurface(dad)).to be(true)
+    expect(w3.netArea).to be_within(TOL).of(0.32)
+    expect(w3.grossArea).to be_within(TOL).of(0.32)
+    expect(mod1.fits?(w3.vertices, dad.vertices)).to be(true)
+
+    offset1 = mod1.offset(w1.vertices, 0.2, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset1.size).to eq(3)
+    area = OpenStudio.getArea(offset1)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL).of(3.75)
+    expect(offset1[0].x).to be_within(0.01).of(-0.93)
+    expect(offset1[0].y).to be_within(0.01).of(-1.60)
+    expect(offset1[0].z).to be_within(0.01).of( 8.15)
+    expect(offset1[1].x).to be_within(0.01).of(-0.13)
+    expect(offset1[1].y).to be_within(0.01).of(-0.24) # SketchUP (-0.23)
+    expect(offset1[1].z).to be_within(0.01).of( 4.99)
+    expect(offset1[2].x).to be_within(0.01).of(-2.51)
+    expect(offset1[2].y).to be_within(0.01).of(-4.34)
+    expect(offset1[2].z).to be_within(0.01).of( 9.73)
+    expect(mod1.fits?(offset1, dad.vertices)).to be(true)
+
+    offset2 = mod1.offset(w2.vertices, 0.2, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset2.size).to eq(4)
+    area = OpenStudio.getArea(offset2)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL).of(8.64)
+    expect(offset2[0].x).to be_within(0.01).of(-3.48)
+    expect(offset2[0].y).to be_within(0.01).of(-6.03)
+    expect(offset2[0].z).to be_within(0.01).of( 4.24)
+    expect(offset2[1].x).to be_within(0.01).of(-1.67)
+    expect(offset2[1].y).to be_within(0.01).of(-2.90)
+    expect(offset2[1].z).to be_within(0.01).of( 0.63)
+    expect(offset2[2].x).to be_within(0.01).of(-4.05)
+    expect(offset2[2].y).to be_within(0.01).of(-7.02)
+    expect(offset2[2].z).to be_within(0.01).of( 1.82)
+    expect(offset2[3].x).to be_within(0.01).of(-4.67)
+    expect(offset2[3].y).to be_within(0.01).of(-8.09)
+    expect(offset2[3].z).to be_within(0.01).of( 3.05)
+
+    offset3 = mod1.offset(w3.vertices, 0.2, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset3.size).to eq(3)
+    area = OpenStudio.getArea(offset3)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL).of(1.10)
+    expect(offset3[0].x).to be_within(0.01).of(-4.26)
+    expect(offset3[0].y).to be_within(0.01).of(-7.37) # SketchUp (-7.38)
+    expect(offset3[0].z).to be_within(0.01).of(10.00)
+    expect(offset3[1].x).to be_within(0.01).of(-5.00)
+    expect(offset3[1].y).to be_within(0.01).of(-8.66)
+    expect(offset3[1].z).to be_within(0.01).of( 8.52)
+    expect(offset3[2].x).to be_within(0.01).of(-5.00)
+    expect(offset3[2].y).to be_within(0.01).of(-8.66)
+    expect(offset3[2].z).to be_within(0.01).of(10.00)
+
+    # --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- --- #
+    # Repeat 3rd time - 2x 30° rotations (along the 2 other axes).
+    model = OpenStudio::Model::Model.new
+
+    vec = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( -1.25,  6.50,  7.50)
+    vec << OpenStudio::Point3d.new(  0.00,  0.00,  0.00)
+    vec << OpenStudio::Point3d.new( -6.50, -6.25,  4.33)
+    vec << OpenStudio::Point3d.new( -7.75,  0.25, 11.83)
+    dad = OpenStudio::Model::Surface.new(vec, model)
+    dad.setName("dad")
+
+    vec = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( -2.30,  3.95,  6.87)
+    vec << OpenStudio::Point3d.new( -1.40,  3.27,  4.93)
+    vec << OpenStudio::Point3d.new( -3.72,  3.35,  8.48)
+    w1 = OpenStudio::Model::SubSurface.new(vec, model)
+    w1.setName("w1")
+    expect(w1.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(w1.setSurface(dad)).to be(true)
+    expect(w1.netArea).to be_within(TOL).of(1.5)
+    expect(w1.grossArea).to be_within(TOL).of(1.5)
+    expect(mod1.fits?(w1.vertices, dad.vertices)).to be(true)
+
+    vec = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( -5.05, -1.78,  6.03)
+    vec << OpenStudio::Point3d.new( -2.72, -1.85,  2.48)
+    vec << OpenStudio::Point3d.new( -5.45, -3.70,  4.96)
+    vec << OpenStudio::Point3d.new( -6.22, -3.68,  6.15)
+    w2 = OpenStudio::Model::SubSurface.new(vec, model)
+    w2.setName("w2")
+    expect(w2.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(w2.setSurface(dad)).to be(true)
+    expect(w2.netArea).to be_within(TOL).of(6.0)
+    expect(w2.grossArea).to be_within(TOL).of(6.0)
+    expect(mod1.fits?(w2.vertices, dad.vertices)).to be(true)
+
+    vec = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( -7.07,  0.74, 11.25)
+    vec << OpenStudio::Point3d.new( -7.49, -0.28, 10.99)
+    vec << OpenStudio::Point3d.new( -7.59,  0.24, 11.59)
+    w3 = OpenStudio::Model::SubSurface.new(vec, model)
+    w3.setName("w3")
+    expect(w3.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(w3.setSurface(dad)).to be(true)
+    expect(w3.netArea).to be_within(TOL).of(0.32)
+    expect(w3.grossArea).to be_within(TOL).of(0.32)
+    expect(mod1.fits?(w3.vertices, dad.vertices)).to be(true)
+
+    offset1 = mod1.offset(w1.vertices, 0.2, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset1.size).to eq(3)
+    area = OpenStudio.getArea(offset1)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL).of(3.75)
+    expect(offset1[0].x).to be_within(0.01).of(-2.22)
+    expect(offset1[0].y).to be_within(0.01).of( 4.14)
+    expect(offset1[0].z).to be_within(0.01).of( 6.91)
+    expect(offset1[1].x).to be_within(0.01).of(-0.80)
+    expect(offset1[1].y).to be_within(0.01).of( 3.07)
+    expect(offset1[1].z).to be_within(0.01).of( 3.86)
+    expect(offset1[2].x).to be_within(0.01).of(-4.47)
+    expect(offset1[2].y).to be_within(0.01).of( 3.19)
+    expect(offset1[2].z).to be_within(0.01).of( 9.46) # SketchUp (-9.47)
+    expect(mod1.fits?(offset1, dad.vertices)).to be(true)
+
+    offset2 = mod1.offset(w2.vertices, 0.2, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset2.size).to eq(4)
+    area = OpenStudio.getArea(offset2)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL).of(8.64)
+    expect(offset2[0].x).to be_within(0.01).of(-5.05)
+    expect(offset2[0].y).to be_within(0.01).of(-1.59)
+    expect(offset2[0].z).to be_within(0.01).of( 6.20)
+    expect(offset2[1].x).to be_within(0.01).of(-2.25)
+    expect(offset2[1].y).to be_within(0.01).of(-1.68)
+    expect(offset2[1].z).to be_within(0.01).of( 1.92)
+    expect(offset2[2].x).to be_within(0.01).of(-5.49)
+    expect(offset2[2].y).to be_within(0.01).of(-3.88)
+    expect(offset2[2].z).to be_within(0.01).of( 4.87)
+    expect(offset2[3].x).to be_within(0.01).of(-6.45)
+    expect(offset2[3].y).to be_within(0.01).of(-3.85)
+    expect(offset2[3].z).to be_within(0.01).of( 6.33)
+    expect(mod1.fits?(offset2, dad.vertices)).to be(true)
+
+    offset3 = mod1.offset(w3.vertices, 0.2, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset3.size).to eq(3)
+    area = OpenStudio.getArea(offset3)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL).of(1.10)
+    expect(offset3[0].x).to be_within(0.01).of(-6.78)
+    expect(offset3[0].y).to be_within(0.01).of( 1.17)
+    expect(offset3[0].z).to be_within(0.01).of(11.19)
+    expect(offset3[1].x).to be_within(0.01).of(-7.56)
+    expect(offset3[1].y).to be_within(0.01).of(-0.72)
+    expect(offset3[1].z).to be_within(0.01).of(10.72)
+    expect(offset3[2].x).to be_within(0.01).of(-7.75)
+    expect(offset3[2].y).to be_within(0.01).of( 0.25)
+    expect(offset3[2].z).to be_within(0.01).of(11.83)
+    expect(mod1.fits?(offset3, dad.vertices)).to be(true)
+
+    # --- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- ---- --- #
+    # Testing OpenStudio SDK-versions.
+    model   = OpenStudio::Model::Model.new
+
+    # 10m x 10m parent vertical (wall) surface.
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(  0,  0, 10)
+    vec << OpenStudio::Point3d.new(  0,  0,  0)
+    vec << OpenStudio::Point3d.new( 10,  0,  0)
+    vec << OpenStudio::Point3d.new( 10,  0, 10)
+    wall = OpenStudio::Model::Surface.new(vec, model)
+
+    area = OpenStudio.getArea(wall.vertices)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL).of(100)
+
+    unless version < 321
+      # XY-plane transformation matrix.
+      ft = OpenStudio::Transformation::alignFace(wall.vertices)
+      ft_wall = mod1.flatZ( (ft.inverse * wall.vertices) )
+      expect(ft_wall.empty?).to be(false)
+      cw      = OpenStudio::pointInPolygon(ft_wall.first, ft_wall, TOL)
+      expect(cw).to be(false)
+      ft_wall = mod1.flatZ( (ft.inverse * wall.vertices).reverse )     unless cw
+      expect(ft_wall.empty?).to be(false)
+      ft_wall = (ft.inverse * wall.vertices).reverse                   unless cw
+      ft_wall = (ft.inverse * wall.vertices)                               if cw
+      width   = 0.1
+      offset1 = OpenStudio.buffer(ft_wall, width, TOL)
+      expect(offset1.empty?).to be(false)
+      offset1 = offset1.get
+      offset1 =  ft * offset1                                              if cw
+      offset1 = (ft * offset1).reverse                                 unless cw
+
+      expect(mod1.status.zero?).to be(true)
+      expect(offset1.is_a?(Array)).to be(true)
+      expect(offset1.size).to eq(4)         # ccw, yet not in same order ... OK!
+      # offset1.each { |o| puts o }
+      # [10.1, 0, 10.1]
+      # [-0.1, 0, 10.1]
+      # [-0.1, 0, -0.1]
+      # [10.1, 0, -0.1]
+      expect(mod1.fits?(wall.vertices, offset1)).to be(true)
+      expect(mod1.overlaps?(wall.vertices, offset1)).to be(true)
+      expect(mod1.overlaps?(offset1, wall.vertices)).to be(true)
+      area = OpenStudio.getArea(offset1)
+      expect(area.empty?).to be(false)
+      expect(area.get).to be_within(TOL).of(104.04)
+    end
+
+    offset2 = mod1.offset(wall.vertices, 0.1, 300)
+    expect(mod1.status.zero?).to be(true)
+    expect(offset2.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(offset2.size).to eq(4)                # ccw, in same order .. better!
+    # offset2.each { |o| puts o }
+    # [-0.1, 0, 10.1]
+    # [-0.1, 0, -0.1]
+    # [10.1, 0, -0.1]
+    # [10.1, 0, 10.1]
+    expect(mod1.fits?(wall.vertices, offset2)).to be(true)
+    expect(mod1.overlaps?(wall.vertices, offset2)).to be(true)
+    expect(mod1.overlaps?(offset2, wall.vertices)).to be(true)
+    area = OpenStudio.getArea(offset2)
+    expect(area.empty?).to be(false)
+    expect(area.get).to be_within(TOL).of(104.04)
+
+    file  = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+    path  = OpenStudio::Path.new(file)
+    model = OpenStudio::OSVersion::VersionTranslator.new.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    srf2  = model.getSurfaceByName("Surface 2")
+    expect(srf2.empty?).to be(false)
+    srf2  = srf2.get
+    #  0.000, 20.000, 3.800, !- X,Y,Z Vertex 1 {m}
+    #  0.000, 20.000, 0.000, !- X,Y,Z Vertex 2 {m}
+    #  0.000,  0.000, 0.000, !- X,Y,Z Vertex 3 {m}
+    #  0.000,  0.000, 3.800; !- X,Y,Z Vertex 4 {m}
+    v2    = srf2.vertices
+    gross = srf2.grossArea
+    expect(gross).to be_within(TOL).of(76.0)
+    expect(srf2.netArea).to be_within(TOL).of(45.6)
+    wwr = srf2.windowToWallRatio
+    expect(wwr).to be_within(TOL).of(0.400)
+
+    ss2 = model.getSubSurfaceByName("Sub Surface 2")
+    expect(ss2.empty?).to be(false)
+    ss2   = ss2.get
+    #  0.000, 19.975, 2.284, !- X,Y,Z Vertex 1 {m}
+    #  0.000, 19.975, 0.760, !- X,Y,Z Vertex 2 {m}
+    #  0.000,  0.025, 0.760, !- X,Y,Z Vertex 3 {m}
+    #  0.000,  0.025, 2.284; !- X,Y,Z Vertex 4 {m}
+    expect(ss2.grossArea).to be_within(TOL).of(30.4)
+    expect(ss2.netArea  ).to be_within(TOL).of(30.4)
+    vs2 = ss2.vertices
+    expect(mod1.fits?(vs2, v2)).to be(true)
+    expect(mod1.overlaps?(vs2, v2)).to be(true)
+
+    expect(gross - srf2.netArea).to be_within(TOL).of(ss2.grossArea)
+    expect(ss2.allowWindowPropertyFrameAndDivider).to be(true)
+    expect(ss2.windowPropertyFrameAndDivider.empty?).to be(true)
+
+    unless version < 340                # or, e.g. ss2.respond_to?(:dividerArea)
+      expect(ss2.dividerArea.to_i).to eq(0)
+      expect(ss2.frameArea.to_i).to eq(0)
+      expect(ss2.roughOpeningArea).to be_within(TOL).of(ss2.grossArea)
+
+      vx2 = ss2.roughOpeningVertices     # same as original vertices without F+D
+      expect(vx2.is_a?(Array)).to be(true)
+      expect(vx2.empty?).to be(false)
+      # vx2.each { |o| puts o }
+      # [0.000, 19.975, 2.284]
+      # [0.000, 19.975, 0.760]
+      # [0.000,  0.025, 0.760]
+      # [0.000,  0.025, 2.284]
+      expect(mod1.fits?(vx2, v2)).to be(true)
+      expect(mod1.overlaps?(vx2, v2)).to be(true)
+    end
+
+    # Insert 3x additional, 300mm-high windows in srf2 - siblings to ss2:
+    #   - ss2a: "Sub Surface 2a": a 2m-wide clerestory - free floating
+    #   - ss2b: "Sub Surface 2b": a 2m-wide clerestory - aligned along ceiling
+    #   - ss2c: "Sub Surface 2c": a 2m-wide clerestory - aligned along ss2
+    #
+    # Neither sibling generate conflicts with parent (i.e. they all fit in),
+    # nor vs each other (i.e. no overlaps, none swallows another).
+    #
+    # Adding a 50mm-wide Frame & Divider (F+D) to each new sibling generates:
+    #   - ss2a: no conflict (safe)
+    #   - ss2b: extends beyond srf2 limits
+    #   - ss2c: overlaps with original ss2
+    #
+    # Note: set subsurface type AFTER setting its parent surface - dunno why?
+    #
+    # Note: F+D objects only allowed for glazed subsurface types. However,
+    #       corrected WWR calculations (SDK v340+) do not consider F+D objects
+    #       of glass doors.
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( 0.000, 4.000, 3.300)
+    vec << OpenStudio::Point3d.new( 0.000, 4.000, 3.000)
+    vec << OpenStudio::Point3d.new( 0.000, 2.000, 3.000)
+    vec << OpenStudio::Point3d.new( 0.000, 2.000, 3.300)
+    ss2a = OpenStudio::Model::SubSurface.new(vec, model)
+    ss2a.setName("Sub Surface 2a")
+    expect(ss2a.setSurface(srf2)).to be(true)
+    expect(ss2a.setSubSurfaceType("OperableWindow")).to be(true)
+    expect(ss2a.netArea).to be_within(TOL).of(0.600)
+    expect(ss2a.grossArea).to be_within(TOL).of(0.600)
+    expect(ss2a.allowWindowPropertyFrameAndDivider).to be(true)
+
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( 0.000, 8.000, 3.800)
+    vec << OpenStudio::Point3d.new( 0.000, 8.000, 3.500)
+    vec << OpenStudio::Point3d.new( 0.000, 6.000, 3.500)
+    vec << OpenStudio::Point3d.new( 0.000, 6.000, 3.800)
+    ss2b = OpenStudio::Model::SubSurface.new(vec, model)
+    ss2b.setName("Sub Surface 2b")
+    expect(ss2b.setSurface(srf2)).to be(true)
+    expect(ss2b.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(ss2b.netArea).to be_within(TOL).of(0.600)
+    expect(ss2b.grossArea).to be_within(TOL).of(0.600)
+    expect(ss2b.allowWindowPropertyFrameAndDivider).to be(true)
+
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new( 0.000,12.000, 2.584)
+    vec << OpenStudio::Point3d.new( 0.000,12.000, 2.284)
+    vec << OpenStudio::Point3d.new( 0.000,10.000, 2.284)
+    vec << OpenStudio::Point3d.new( 0.000,10.000, 2.584)
+    ss2c = OpenStudio::Model::SubSurface.new(vec, model)
+    ss2c.setName("Sub Surface 2c")
+    expect(ss2c.setSurface(srf2)).to be(true)
+    expect(ss2c.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(ss2c.netArea).to be_within(TOL).of(0.600)
+    expect(ss2c.grossArea).to be_within(TOL).of(0.600)
+    expect(ss2c.allowWindowPropertyFrameAndDivider).to be(true)
+
+    expect(mod1.fits?( ss2.vertices, v2)).to be(true)
+    expect(mod1.fits?(ss2a.vertices, v2)).to be(true)
+    expect(mod1.fits?(ss2b.vertices, v2)).to be(true)
+    expect(mod1.fits?(ss2c.vertices, v2)).to be(true)
+
+    expect(mod1.overlaps?(vs2, ss2a.vertices)).to be(false)
+    expect(mod1.overlaps?(vs2, ss2b.vertices)).to be(false)
+    expect(mod1.overlaps?(vs2, ss2c.vertices)).to be(false)
+
+    net   = gross
+    net  -= ss2.grossArea
+    net  -= ss2a.grossArea
+    net  -= ss2b.grossArea
+    net  -= ss2c.grossArea
+    wwr3x = srf2.windowToWallRatio
+    expect(srf2.netArea).to be_within(TOL).of(43.8)
+    expect(wwr3x).to be_within(TOL).of(0.424)                       # before F+D
+
+    fd = OpenStudio::Model::WindowPropertyFrameAndDivider.new(model)
+    width = 0.050
+    expect(fd.setFrameWidth(width)).to be(true)   # 50mm (narrow) around glazing
+    expect(fd.setFrameConductance(2.500)).to be(true)
+
+    expect(ss2a.setWindowPropertyFrameAndDivider(fd)).to be(true)
+    w2a = ss2a.windowPropertyFrameAndDivider.get.frameWidth
+    expect(w2a).to be_within(0.001).of(width)
+    expect(ss2a.netArea).to be_within(TOL).of(0.600)
+    expect(ss2a.grossArea).to be_within(TOL).of(0.600)
+
+    unless version < 340
+      # ss2a.roughOpeningVertices.each { |o| puts o }               # clockwise!
+      # [0, 1.95, 2.95]
+      # [0, 4.05, 2.95]
+      # [0, 4.05, 3.35]
+      # [0, 1.95, 3.35]
+      expect(mod1.fits?(ss2a.roughOpeningVertices, v2)).to be(false)
+      expect(mod1.fits?(ss2a.roughOpeningVertices.reverse, v2)).to be(true)
+      expect(mod1.logs.empty?).to be(true)
+
+      expect(ss2a.roughOpeningArea).to be_within(TOL).of(0.840)
+      net2a  = gross
+      net2a -= ss2.grossArea
+      net2a -= ss2a.roughOpeningArea
+      net2a -= ss2b.grossArea
+      net2a -= ss2c.grossArea
+      wwr2a  = srf2.windowToWallRatio
+      expect(wwr2a).to be_within(TOL).of(0.427)         # not previous wwr 43.8%
+      expect(srf2.netArea).to be_within(TOL).of(net2a)           # F+D accepted!
+
+      ss2a_321 = mod1.offset(ss2a.vertices, width)
+      expect(mod1.logs.empty?).to be(true)
+      expect(ss2a_321.is_a?(OpenStudio::Point3dVector)).to be(true)
+      expect(ss2a_321.size).to eq(4)
+      # ss2a_321.each { |o| puts o }   # counterclockwise, reverse order vs ss2a
+      # [0, 1.95, 3.35]
+      # [0, 4.05, 3.35]
+      # [0, 4.05, 2.95]
+      # [0, 1.95, 2.95]
+      ss2a_321_area = OpenStudio.getArea(ss2a_321)
+      expect(ss2a_321_area.empty?).to be(false)
+      expect(ss2a_321_area.get).to be_within(TOL).of(ss2a.roughOpeningArea)
+
+      ss2a_300 = mod1.offset(ss2a.vertices, width, 300)  # oldest version tested
+      expect(mod1.logs.empty?).to be(true)
+      expect(ss2a_300.is_a?(OpenStudio::Point3dVector)).to be(true)
+      expect(ss2a_300.size).to eq(4)
+      # ss2a_300.each { |o| puts o }   # counterclockwise same order as original
+      # [0, 4.05, 3.35]
+      # [0, 4.05, 2.95]
+      # [0, 1.95, 2.95]
+      # [0, 1.95, 3.35]
+      # vec << OpenStudio::Point3d.new( 0.000, 4.000, 3.300)
+      # vec << OpenStudio::Point3d.new( 0.000, 4.000, 3.000)
+      # vec << OpenStudio::Point3d.new( 0.000, 2.000, 3.000)
+      # vec << OpenStudio::Point3d.new( 0.000, 2.000, 3.300)
+      ss2a_300_area = OpenStudio.getArea(ss2a_300)
+      expect(ss2a_300_area.empty?).to be(false)
+      expect(ss2a_300_area.get).to be_within(TOL).of(ss2a.roughOpeningArea)
+    end
+
+    expect(ss2b.setWindowPropertyFrameAndDivider(fd)).to be(true)
+    w2b = ss2b.windowPropertyFrameAndDivider.get.frameWidth
+    expect(w2b).to be_within(TOL).of(width)
+    expect(ss2b.netArea).to be_within(TOL).of(0.600)
+    expect(ss2b.grossArea).to be_within(TOL).of(0.600)
+
+    unless version < 340
+      # ss2b.roughOpeningVertices.each { |o| puts o }               # clockwise!
+      # [0, 5.95, 3.45]
+      # [0, 8.05, 3.45]
+      # [0, 8.05, 3.85]
+      # [0, 5.95, 3.85]
+      expect(mod1.fits?(ss2b.roughOpeningVertices, v2)).to be(false)
+      expect(mod1.fits?(ss2b.roughOpeningVertices.reverse, v2)).to be(false)
+      expect(mod1.logs.empty?).to be(true)
+
+      # SDK will keep in memory offset vertices, even when it conflicts.
+      expect(ss2b.roughOpeningArea).to be_within(TOL).of(0.840)
+      net2b  = gross
+      net2b -= ss2.grossArea
+      net2b -= ss2a.roughOpeningArea
+      net2b -= ss2b.roughOpeningArea
+      net2b -= ss2c.grossArea
+      wwr2b  = srf2.windowToWallRatio
+      expect(wwr2b).to be_within(TOL).of(wwr2a)                 #  F+D rejected!
+      expect(srf2.netArea).to be_within(TOL).of(net2b)    # updated - not net2a!
+
+      ss2b_321 = mod1.offset(ss2b.vertices, width)
+      expect(mod1.logs.empty?).to be(true)
+      expect(ss2b_321.is_a?(OpenStudio::Point3dVector)).to be(true)
+      expect(ss2b_321.size).to eq(4)
+      # ss2b_321.each { |o| puts o }   # counterclockwise, reverse order vs ss2b
+      # [0, 5.95, 3.85]
+      # [0, 8.05, 3.85]
+      # [0, 8.05, 3.45]
+      # [0, 5.95, 3.45]
+
+      ss2b_321_area = OpenStudio.getArea(ss2b_321)
+      expect(ss2b_321_area.empty?).to be(false)
+      expect(ss2b_321_area.get).to be_within(TOL).of(ss2b.roughOpeningArea)
+
+      ss2b_300 = mod1.offset(ss2b.vertices, width, 300)  # oldest version tested
+      expect(mod1.logs.empty?).to be(true)
+      expect(ss2b_300.is_a?(OpenStudio::Point3dVector)).to be(true)
+      expect(ss2b_300.size).to eq(4)
+      # ss2b_300.each { |o| puts o }   # counterclockwise same order as original
+      # [0, 8.05, 3.85]
+      # [0, 8.05, 3.45]
+      # [0, 5.95, 3.45]
+      # [0, 5.95, 3.85]
+      # vec << OpenStudio::Point3d.new( 0.000, 8.000, 3.800)
+      # vec << OpenStudio::Point3d.new( 0.000, 8.000, 3.500)
+      # vec << OpenStudio::Point3d.new( 0.000, 6.000, 3.500)
+      # vec << OpenStudio::Point3d.new( 0.000, 6.000, 3.800)
+      ss2b_300_area = OpenStudio.getArea(ss2b_300)
+      expect(ss2b_300_area.empty?).to be(false)
+      expect(ss2b_300_area.get).to be_within(TOL).of(ss2b.roughOpeningArea)
+    end
+
+    expect(ss2c.setWindowPropertyFrameAndDivider(fd)).to be(true)
+    w2c = ss2c.windowPropertyFrameAndDivider.get.frameWidth
+    expect(w2c).to be_within(TOL).of(width)
+    expect(ss2c.netArea).to be_within(TOL).of(0.600)
+    expect(ss2c.grossArea).to be_within(TOL).of(0.600)
+
+    unless version < 340
+      # ss2c.roughOpeningVertices.each { |o| puts o }               # clockwise!
+      # [0,  9.95, 2.234]
+      # [0, 12.05, 2.234]
+      # [0, 12.05, 2.634]
+      # [0,  9.95, 2.634]
+      expect(mod1.fits?(ss2c.roughOpeningVertices, v2)).to be(false)
+      expect(mod1.fits?(ss2c.roughOpeningVertices.reverse, v2)).to be(true)
+      expect(mod1.overlaps?(ss2c.roughOpeningVertices.reverse, vs2)).to be(true)
+      expect(mod1.logs.empty?).to be(true)
+
+      # SDK will keep in memory offset vertices, even when it conflicts.
+      expect(ss2b.roughOpeningArea).to be_within(TOL).of(0.840)
+      net2c  = gross
+      net2c -= ss2.grossArea
+      net2c -= ss2a.roughOpeningArea
+      net2c -= ss2b.roughOpeningArea
+      net2c -= ss2c.roughOpeningArea
+      wwr2c  = srf2.windowToWallRatio
+      expect(wwr2c).to be_within(TOL).of(wwr2a)                 #  F+D rejected!
+      expect(srf2.netArea).to be_within(TOL).of(net2c)    # updated - not net2a!
+
+      ss2c_321 = mod1.offset(ss2c.vertices, width)
+      expect(mod1.logs.empty?).to be(true)
+      expect(ss2c_321.is_a?(OpenStudio::Point3dVector)).to be(true)
+      expect(ss2c_321.size).to eq(4)
+      # ss2c_321.each { |o| puts o }   # counterclockwise, reverse order vs ss2b
+      # [0,  9.95, 2.634]
+      # [0, 12.05, 2.634]
+      # [0, 12.05, 2.234]
+      # [0,  9.95, 2.234]
+      expect(mod1.overlaps?(ss2c_321, vs2)).to be(true)
+      ss2c_321_area = OpenStudio.getArea(ss2c_321)
+      expect(ss2c_321_area.empty?).to be(false)
+      expect(ss2c_321_area.get).to be_within(TOL).of(ss2c.roughOpeningArea)
+
+      ss2c_300 = mod1.offset(ss2c.vertices, width, 300)  # oldest version tested
+      expect(mod1.logs.empty?).to be(true)
+      expect(ss2c_300.is_a?(OpenStudio::Point3dVector)).to be(true)
+      expect(ss2c_300.size).to eq(4)
+      # ss2c_300.each { |o| puts o }   # counterclockwise same order as original
+      # [0, 12.05, 2.634]
+      # [0, 12.05, 2.234]
+      # [0,  9.95, 2.234]
+      # [0,  9.95, 2.634]
+      # vec << OpenStudio::Point3d.new( 0.000,12.000, 2.584)
+      # vec << OpenStudio::Point3d.new( 0.000,12.000, 2.284)
+      # vec << OpenStudio::Point3d.new( 0.000,10.000, 2.284)
+      # vec << OpenStudio::Point3d.new( 0.000,10.000, 2.584)
+      expect(mod1.overlaps?(ss2c_300, vs2)).to be(true)
+      ss2c_300_area = OpenStudio.getArea(ss2c_300)
+      expect(ss2c_300_area.empty?).to be(false)
+      expect(ss2c_300_area.get).to be_within(TOL).of(ss2c.roughOpeningArea)
+    end
+
+    # Testing skylights.
+    model   = OpenStudio::Model::Model.new
+
+    file  = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+    path  = OpenStudio::Path.new(file)
+    model = OpenStudio::OSVersion::VersionTranslator.new.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    s30 = model.getSurfaceByName("Surface 30")
+    expect(s30.empty?).to be(false)
+    s30 = s30.get
+    v30 = s30.vertices
+    # v30.each { |o| puts o }
+    #   30.86,  0.00, 3.80
+    #   30.86, 10.86, 3.80
+    #    0.00, 10.86, 3.80
+    #    0.00,  0.00, 3.80
+    gross = s30.grossArea
+    expect(gross).to be_within(TOL).of(335.14)
+    expect(s30.netArea).to be_within(TOL).of(gross)
+
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(15.93, 4.93, 3.80)
+    vec << OpenStudio::Point3d.new(15.93, 5.93, 3.80)
+    vec << OpenStudio::Point3d.new(14.93, 5.93, 3.80)
+    vec << OpenStudio::Point3d.new(14.93, 4.93, 3.80)
+    sky  = OpenStudio::Model::SubSurface.new(vec, model)
+    sky.setName("Skylight30")
+    expect(sky.setSurface(s30)).to be(true)
+    expect(sky.setSubSurfaceType("Skylight")).to be(true)
+    expect(sky.netArea).to be_within(TOL).of(1)
+    expect(sky.grossArea).to be_within(TOL).of(1)
+
+    unless version < 321
+      expect(sky.allowWindowPropertyFrameAndDivider).to be(true)
+      expect(mod1.fits?(sky.vertices, v30)).to be(true)
+
+      net  = gross
+      net -= sky.grossArea
+      srr  = s30.skylightToRoofRatio
+      expect(srr).to be_within(TOL).of(0)
+      expect(s30.netArea).to be_within(TOL).of(334.14)
+      expect(srr).to be_within(0.001).of(0.003)                     # before F+D
+
+      fd = OpenStudio::Model::WindowPropertyFrameAndDivider.new(model)
+      width = 0.050
+      expect(fd.setFrameWidth(width)).to be(true) # 50mm (narrow) around glazing
+      expect(fd.setFrameConductance(2.500)).to be(true)
+
+      expect(sky.setWindowPropertyFrameAndDivider(fd)).to be(true)
+      sky_w = sky.windowPropertyFrameAndDivider.get.frameWidth
+      expect(sky_w).to be_within(0.001).of(width)
+      expect(sky.netArea).to be_within(TOL).of(1)
+      expect(sky.grossArea).to be_within(TOL).of(1)
+
+      unless version < 340
+        # sky.roughOpeningVertices.each { |o| puts o }              # clockwise!
+        #   [14.88, 5.98, 3.8]
+        #   [15.98, 5.98, 3.8]
+        #   [15.98, 4.88, 3.8]
+        #   [14.88, 4.88, 3.8]
+        expect(mod1.fits?(sky.roughOpeningVertices, v30)).to be(false)
+        expect(mod1.fits?(sky.roughOpeningVertices.reverse, v30)).to be(true)
+        expect(mod1.logs.empty?).to be(true)
+
+        expect(sky.roughOpeningArea).to be_within(TOL).of(1.21)
+        net1  = gross
+        net1 -= sky.roughOpeningArea
+        expect(s30.netArea).to be_within(TOL).of(net1)           # F+D accepted!
+        srr1  = s30.skylightToRoofRatio
+        expect(srr1).to be_within(TOL).of(srr)   # yet not updated for skylights
+        #
+        #   https://github.com/NREL/OpenStudio/blob/
+        #   e5c1e375db39b0f9b10512e9d6361cfec66308d6/src/model/Surface.cpp#L1547
+        #
+        #     vs
+        #
+        #   https://github.com/NREL/OpenStudio/blob/
+        #   e5c1e375db39b0f9b10512e9d6361cfec66308d6/src/model/Surface.cpp#L1471
+        #
+        # When dealing with F+D objects, the updated SDK v340 WWR calculations
+        # only consider subsurface types:
+        #
+        #   - FixedWindow
+        #   - OperableWindow
+        #
+        #   https://github.com/NREL/OpenStudio/blob/
+        #   e5c1e375db39b0f9b10512e9d6361cfec66308d6/src/model/Surface.cpp#L1511
+        #
+        # ... bummer!
+        sky_321 = mod1.offset(sky.vertices, width)
+        expect(mod1.logs.empty?).to be(true)
+        expect(sky_321.is_a?(OpenStudio::Point3dVector)).to be(true)
+        expect(sky_321.size).to eq(4)
+        # sky_321.each { |o| puts o }          # counterclockwise, reverse order
+        # [14.88, 4.88, 3.8]
+        # [15.98, 4.88, 3.8]
+        # [15.98, 5.98, 3.8]
+        # [14.88, 5.98, 3.8]
+        sky_321_area = OpenStudio.getArea(sky_321)
+        expect(sky_321_area.empty?).to be(false)
+        expect(sky_321_area.get).to be_within(TOL).of(sky.roughOpeningArea)
+
+        sky_300 = mod1.offset(sky.vertices, width, 300)  # oldest version tested
+        expect(mod1.logs.empty?).to be(true)
+        expect(sky_300.is_a?(OpenStudio::Point3dVector)).to be(true)
+        expect(sky_300.size).to eq(4)
+        # sky_300.each { |o| puts o }         # counterclockwise, as originals
+        # [15.98, 4.88, 3.8]
+        # [15.98, 5.98, 3.8]
+        # [14.88, 5.98, 3.8]
+        # [14.88, 4.88, 3.8]
+        sky_300_area = OpenStudio.getArea(sky_300)
+        expect(sky_300_area.empty?).to be(false)
+        expect(sky_300_area.get).to be_within(TOL).of(sky.roughOpeningArea)
+      end
+    end
+
+    # CASE USE of OFFSET: Frame & Dividers (F+Ds), added to OpenStudio windows
+    # and skylights, must be accounted for in building energy codes, e.g.:
+    #
+    #   - window-to-wall ratios (WWRs)
+    #   - skylight-to-roof ratios (SRRs)
+    #   - net wall or roof areas for thermal bridging/derating
+    #
+    # OpenStudio (and EnergyPlus) subsurface vertices define the 'rough
+    # opening' needed in a parent surface to host a (manufactured off-site)
+    # window or skylight. When adding an optional F+D, the vertices instead
+    # define the glazed portion of the manufactured product - no longer the
+    # rough opening. This can be confusing for many.
+    #
+    # With an F+D, the 'actual' or 'true' rough opening area is necessarily
+    # larger than the one defined by the subsurface vertices. The required
+    # 'offset' adjustment is applied automatically (behind the scenes) when
+    # ultimately running an EnergyPlus simulation. As of v340, similar
+    # adjustments are available in OpenStudio, e.g.:
+    #
+    #   - window or skylight 'rough opening' vertices are available
+    #   - a wall's reported 'net area' factors-in added F+Ds
+    #   - invalid window F+Ds are red-flagged and excluded from reported WWRs
+    #
+    # Known v340 limitations:
+    #
+    #   - invalid F+Ds are not excluded from a wall's 'net area'
+    #   - reported SRRs (as opposed to WWRs) do not exclude invalid F+Ds
+    #   - glass doors are allowed to have F+Ds, yet aren't similarly supported
+    #
+    # Invalid F+Ds? If an OpenStudio user adds F+Ds without first adjusting
+    # subsurface vertices, then overlapping conflicts can arise with other
+    # nearby subsurfaces, or the rough opening may no longer 'fit' within
+    # the parent surface polygon. In such instances, OpenStudio/EnergyPlus
+    # should safely set aside conflicting objects, while warning users of
+    # invalid model inputs.
+    #
+    # Related limitations (not restricted to v340):
+    #
+    #   - some energy codes (like Canadian NECBs) require a 'fenestration & door
+    #     to wall ratio' (FWDR), which include opaque doors and dome/diffusers
+    #   - SDK versions < 321 do not support adding F+Ds to skylight
+    #   - although exceptionally rare, glazed subsurface insertions in
+    #     exposed (e.g. cantilevered) floors are not supported
+    #
+    # In light of these observations, the recommended use of OSut's 'offset'
+    # method, when dealing with 3- or 4-sided convex subsurfaces, is to specify
+    # an SDK version prior to v321 (optional 3rd argument), e.g. v300:
+    #
+    #   rough_opening = OSut.offset(sub.vertices, 0.050, 300)
+    #
+    # Generated offset vertices are more accurate, and available in the same
+    # first-to-last sequence and counter/clockwise order as the original
+    # subsurface vertices. Although currently unsupported, it would not be a
+    # monumental task to offset concave polygons, or polygons beyond 4 vertices
+    # in the future ...
   end
 end
