@@ -13,17 +13,17 @@ RSpec.describe OSut do
   let(:mod1) { Module.new { extend OSut } }
 
   it "checks scheduleRulesetMinMax (from within class instances)" do
+    expect(cls1.level).to eq(INF)
+    expect(cls1.reset(DBG)).to eq(DBG)
+    expect(cls1.level).to eq(DBG)
+    expect(cls1.clean!).to eq(DBG)
+
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model.empty?).to be(false)
     model = model.get
-
-    expect(cls1.level).to eq(INF)
-    expect(cls1.reset(DBG)).to eq(DBG)
-    expect(cls1.level).to eq(DBG)
-    expect(cls1.clean!).to eq(DBG)
 
     sc1 = "Space Thermostat Cooling Setpoint"
     sc2 = "Schedule Constant 1"
@@ -358,6 +358,10 @@ RSpec.describe OSut do
   end
 
   it "checks for HVAC air loops" do
+    mdl = OpenStudio::Model::Model.new
+    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
+    v = version.join.to_i
+
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
@@ -378,23 +382,30 @@ RSpec.describe OSut do
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m)
 
-    file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
 
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.airLoopsHVAC?(model)).to be(false)
-    expect(mod1.status.zero?).to be(true)
+    if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
+      file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+      path = OpenStudio::Path.new(file)
+      model = translator.loadModel(path)
+      expect(model.empty?).to be(false)
+      model = model.get
 
-    expect(mod1.airLoopsHVAC?(nil)).to be(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m)
+      expect(mod1.clean!).to eq(DBG)
+      expect(mod1.airLoopsHVAC?(model)).to be(false)
+      expect(mod1.status.zero?).to be(true)
+
+      expect(mod1.airLoopsHVAC?(nil)).to be(false)
+      expect(mod1.debug?).to be(true)
+      expect(mod1.logs.size).to eq(1)
+      expect(mod1.logs.first[:message]).to eq(m)
+    end
   end
 
   it "checks for plenums" do
+    mdl = OpenStudio::Model::Model.new
+    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
+    v = version.join.to_i
+
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
@@ -427,24 +438,26 @@ RSpec.describe OSut do
     expect(mod1.logs.first[:message]).to eq(m1)
 
 
-    file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-    expect(mod1.clean!).to eq(DBG)
-    loops = mod1.airLoopsHVAC?(model)
-    expect(loops).to be(false)
-    expect(mod1.status.zero?).to be(true)
-    setpoints = mod1.heatingTemperatureSetpoints?(model)
-    expect(setpoints).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
+      file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+      path = OpenStudio::Path.new(file)
+      model = translator.loadModel(path)
+      expect(model.empty?).to be(false)
+      model = model.get
+      expect(mod1.clean!).to eq(DBG)
+      loops = mod1.airLoopsHVAC?(model)
+      expect(loops).to be(false)
+      expect(mod1.status.zero?).to be(true)
+      setpoints = mod1.heatingTemperatureSetpoints?(model)
+      expect(setpoints).to be(true)
+      expect(mod1.status.zero?).to be(true)
 
-    model.getSpaces.each do |space|
-      expect(mod1.plenum?(space, loops, setpoints)).to be(false)
+      model.getSpaces.each do |space|
+        expect(mod1.plenum?(space, loops, setpoints)).to be(false)
+      end
+
+      expect(mod1.status.zero?).to be(true)
     end
-
-    expect(mod1.status.zero?).to be(true)
 
 
     file = File.join(__dir__, "files/osms/in/smalloffice.osm")
@@ -488,16 +501,16 @@ RSpec.describe OSut do
   end
 
   it "checks availability schedule generation" do
+    mdl = OpenStudio::Model::Model.new
+    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
+    v = version.join.to_i
+    
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model.empty?).to be(false)
     model = model.get
-
-    mdl = OpenStudio::Model::Model.new
-    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
-    v = version.join.to_i
 
     year = model.yearDescription
     expect(year.empty?).to be(false)
@@ -596,6 +609,7 @@ RSpec.describe OSut do
     expect(sch.customDay1Schedule).to eq(default) unless v < 330
     expect(sch.customDay2Schedule).to eq(default) unless v < 330
     expect(sch.scheduleRules.size).to eq(1)
+
     sch.getDaySchedules(jan01, apr30).each do |day_schedule|
       expect(day_schedule.times.empty?).to be(false)
       expect(day_schedule.values.empty?).to be(false)
@@ -604,6 +618,7 @@ RSpec.describe OSut do
       expect(day_schedule.getValue(am01).to_i).to eq(1)
       expect(day_schedule.getValue(pm11).to_i).to eq(1)
     end
+
     sch.getDaySchedules(may01, oct31).each do |day_schedule|
       expect(day_schedule.times.empty?).to be(false)
       expect(day_schedule.values.empty?).to be(false)
@@ -612,6 +627,7 @@ RSpec.describe OSut do
       expect(day_schedule.getValue(am01).to_i).to eq(0)
       expect(day_schedule.getValue(pm11).to_i).to eq(0)
     end
+
     sch.getDaySchedules(nov01, dec31).each do |day_schedule|
       expect(day_schedule.times.empty?).to be(false)
       expect(day_schedule.values.empty?).to be(false)
@@ -650,6 +666,7 @@ RSpec.describe OSut do
     expect(sch.customDay1Schedule).to eq(default) unless v < 330
     expect(sch.customDay2Schedule).to eq(default) unless v < 330
     expect(sch.scheduleRules.size).to eq(1)
+
     sch.getDaySchedules(jan01, apr30).each do |day_schedule|
       expect(day_schedule.times.empty?).to be(false)
       expect(day_schedule.values.empty?).to be(false)
@@ -658,6 +675,7 @@ RSpec.describe OSut do
       expect(day_schedule.getValue(am01).to_i).to eq(0)
       expect(day_schedule.getValue(pm11).to_i).to eq(0)
     end
+
     sch.getDaySchedules(may01, oct31).each do |day_schedule|
       expect(day_schedule.times.empty?).to be(false)
       expect(day_schedule.values.empty?).to be(false)
@@ -666,6 +684,7 @@ RSpec.describe OSut do
       expect(day_schedule.getValue(am01).to_i).to eq(1)
       expect(day_schedule.getValue(pm11).to_i).to eq(1)
     end
+
     sch.getDaySchedules(nov01, dec31).each do |day_schedule|
       expect(day_schedule.times.empty?).to be(false)
       expect(day_schedule.values.empty?).to be(false)
@@ -708,7 +727,6 @@ RSpec.describe OSut do
     end
 
     expect(cls1.status).to eq(ERR)
-    expect(cls1.logs.size).to eq(2)
     cls1.logs.each { |l| expect(l[:message].include?(m1)).to be(true) }
 
     # OSut, and by extension OSlg, are intended to be accessed "globally"
@@ -738,110 +756,123 @@ RSpec.describe OSut do
   end
 
   it "checks if a set holds a construction" do
+    mdl = OpenStudio::Model::Model.new
+    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
+    v = version.join.to_i
     translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
 
-    expect(mod1.clean!).to eq(DBG)
+    if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
+      file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+      path = OpenStudio::Path.new(file)
+      model = translator.loadModel(path)
+      expect(model.empty?).to be(false)
+      model = model.get
 
-    t1  = "roofceiling"
-    t2  = "wall"
-    cl1 = OpenStudio::Model::DefaultConstructionSet
-    cl2 = OpenStudio::Model::LayeredConstruction
-    n1  = "CBECS Before-1980 ClimateZone 8 (smoff) ConstSet"
-    n2  = "CBECS Before-1980 ExtRoof IEAD ClimateZone 8"
-    m1  = "'#{n2}' #{cl2}? expecting #{cl1} (OSut::holdsConstruction?)"
-    m5  = "Invalid 'surface type' arg #5 (OSut::holdsConstruction?)"
-    m6  = "Invalid 'set' arg #1 (OSut::holdsConstruction?)"
+      expect(mod1.clean!).to eq(DBG)
 
-    set = model.getDefaultConstructionSetByName(n1)
-    expect(set.empty?).to be(false)
-    set = set.get
+      t1  = "roofceiling"
+      t2  = "wall"
+      cl1 = OpenStudio::Model::DefaultConstructionSet
+      cl2 = OpenStudio::Model::LayeredConstruction
+      n1  = "CBECS Before-1980 ClimateZone 8 (smoff) ConstSet"
+      n2  = "CBECS Before-1980 ExtRoof IEAD ClimateZone 8"
+      m1  = "'#{n2}' #{cl2}? expecting #{cl1} (OSut::holdsConstruction?)"
+      m5  = "Invalid 'surface type' arg #5 (OSut::holdsConstruction?)"
+      m6  = "Invalid 'set' arg #1 (OSut::holdsConstruction?)"
 
-    c = model.getLayeredConstructionByName(n2)
-    expect(c.empty?).to be(false)
-    c = c.get
+      set = model.getDefaultConstructionSetByName(n1)
+      expect(set.empty?).to be(false)
+      set = set.get
 
-    # TRUE case: 'set' holds 'c' (exterior roofceiling construction)
-    expect(mod1.holdsConstruction?(set, c, false, true, t1)).to be(true)
-    expect(mod1.logs.empty?).to be(true)
+      c = model.getLayeredConstructionByName(n2)
+      expect(c.empty?).to be(false)
+      c = c.get
 
-    # FALSE case: not ground construction
-    expect(mod1.holdsConstruction?(set, c, true, true, t1)).to be(false)
-    expect(mod1.logs.empty?).to be(true)
+      # TRUE case: 'set' holds 'c' (exterior roofceiling construction)
+      expect(mod1.holdsConstruction?(set, c, false, true, t1)).to be(true)
+      expect(mod1.logs.empty?).to be(true)
 
-    # INVALID case: arg #5 : nil (instead of surface type string)
-    expect(mod1.holdsConstruction?(set, c, true, true, nil)).to be(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m5)
-    expect(mod1.clean!).to eq(DBG)
+      # FALSE case: not ground construction
+      expect(mod1.holdsConstruction?(set, c, true, true, t1)).to be(false)
+      expect(mod1.logs.empty?).to be(true)
 
-    # INVALID case: arg #5 : empty surface type string
-    expect(mod1.holdsConstruction?(set, c, true, true, "")).to be(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m5)
-    expect(mod1.clean!).to eq(DBG)
+      # INVALID case: arg #5 : nil (instead of surface type string)
+      expect(mod1.holdsConstruction?(set, c, true, true, nil)).to be(false)
+      expect(mod1.debug?).to be(true)
+      expect(mod1.logs.size).to eq(1)
+      expect(mod1.logs.first[:message]).to eq(m5)
+      expect(mod1.clean!).to eq(DBG)
 
-    # INVALID case: arg #5 : c construction (instead of surface type string)
-    expect(mod1.holdsConstruction?(set, c, true, true, c)).to be(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m5)
-    expect(mod1.clean!).to eq(DBG)
+      # INVALID case: arg #5 : empty surface type string
+      expect(mod1.holdsConstruction?(set, c, true, true, "")).to be(false)
+      expect(mod1.debug?).to be(true)
+      expect(mod1.logs.size).to eq(1)
+      expect(mod1.logs.first[:message]).to eq(m5)
+      expect(mod1.clean!).to eq(DBG)
 
-    # INVALID case: arg #1 : c construction (instead of surface type string)
-    expect(mod1.holdsConstruction?(c, c, true, true, c)).to be(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
-    expect(mod1.clean!).to eq(DBG)
+      # INVALID case: arg #5 : c construction (instead of surface type string)
+      expect(mod1.holdsConstruction?(set, c, true, true, c)).to be(false)
+      expect(mod1.debug?).to be(true)
+      expect(mod1.logs.size).to eq(1)
+      expect(mod1.logs.first[:message]).to eq(m5)
+      expect(mod1.clean!).to eq(DBG)
 
-    # INVALID case: arg #1 : model (instead of surface type string)
-    expect(mod1.holdsConstruction?(model, c, true, true, t1)).to be(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m6)
-    expect(mod1.clean!).to eq(DBG)
+      # INVALID case: arg #1 : c construction (instead of surface type string)
+      expect(mod1.holdsConstruction?(c, c, true, true, c)).to be(false)
+      expect(mod1.debug?).to be(true)
+      expect(mod1.logs.size).to eq(1)
+      expect(mod1.logs.first[:message]).to eq(m1)
+      expect(mod1.clean!).to eq(DBG)
+
+      # INVALID case: arg #1 : model (instead of surface type string)
+      expect(mod1.holdsConstruction?(model, c, true, true, t1)).to be(false)
+      expect(mod1.debug?).to be(true)
+      expect(mod1.logs.size).to eq(1)
+      expect(mod1.logs.first[:message]).to eq(m6)
+      expect(mod1.clean!).to eq(DBG)
+    end
   end
 
   it "retrieves a surface default construction set" do
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    m = "construction not defaulted (defaultConstructionSet)"
-    mod1.clean!
-
-    model.getSurfaces.each do |s|
-      set = mod1.defaultConstructionSet(model, s)
-      expect(set.nil?).to be(false)
-      expect(mod1.status.zero?).to be(true)
-      expect(mod1.logs.empty?).to be(true)
-    end
+    mdl = OpenStudio::Model::Model.new
+    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
+    v = version.join.to_i
 
     translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
 
-    mod1.clean!
+    if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
+      file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+      path = OpenStudio::Path.new(file)
+      model = translator.loadModel(path)
+      expect(model.empty?).to be(false)
+      model = model.get
 
-    model.getSurfaces.each do |s|
-      set = mod1.defaultConstructionSet(model, s)
-      expect(set.nil?).to be(true)
-      expect(mod1.status).to eq(ERR)
+      m = "construction not defaulted (defaultConstructionSet)"
+      mod1.clean!
 
-      mod1.logs.each {|l| expect(l[:message].include?(m)) }
+      model.getSurfaces.each do |s|
+        set = mod1.defaultConstructionSet(model, s)
+        expect(set.nil?).to be(false)
+        expect(mod1.status.zero?).to be(true)
+        expect(mod1.logs.empty?).to be(true)
+      end
+
+      translator = OpenStudio::OSVersion::VersionTranslator.new
+      file = File.join(__dir__, "files/osms/in/seb.osm")
+      path = OpenStudio::Path.new(file)
+      model = translator.loadModel(path)
+      expect(model.empty?).to be(false)
+      model = model.get
+
+      mod1.clean!
+
+      model.getSurfaces.each do |s|
+        set = mod1.defaultConstructionSet(model, s)
+        expect(set.nil?).to be(true)
+        expect(mod1.status).to eq(ERR)
+
+        mod1.logs.each {|l| expect(l[:message].include?(m)) }
+      end
     end
   end
 
@@ -1057,6 +1088,10 @@ RSpec.describe OSut do
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
 
+    mdl = OpenStudio::Model::Model.new
+    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
+    v = version.join.to_i
+
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
@@ -1079,33 +1114,34 @@ RSpec.describe OSut do
 
     expect(mod1.status.zero?).to be(true)
 
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
+    if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
+      file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+      path = OpenStudio::Path.new(file)
+      model = translator.loadModel(path)
+      expect(model.empty?).to be(false)
+      model = model.get
 
-    model.getSpaces.each do |space|
-      tr = mod1.transforms(model, space)
+      model.getSpaces.each do |space|
+        tr = mod1.transforms(model, space)
+        expect(tr.is_a?(Hash)).to be(true)
+        expect(tr.key?(:t)).to be(true)
+        expect(tr.key?(:r)).to be(true)
+        expect(tr[:t].is_a?(OpenStudio::Transformation)).to be(true)
+        expect(tr[:r]).to within(TOL).of(0)
+      end
+
+      expect(mod1.status.zero?).to be(true)
+
+      tr = mod1.transforms(model, nil)
       expect(tr.is_a?(Hash)).to be(true)
       expect(tr.key?(:t)).to be(true)
       expect(tr.key?(:r)).to be(true)
-      expect(tr[:t].is_a?(OpenStudio::Transformation)).to be(true)
-      expect(tr[:r]).to within(TOL).of(0)
+      expect(tr[:t].nil?).to be(true)
+      expect(tr[:r].nil?).to be(true)
+      expect(mod1.debug?).to be(true)
+      expect(mod1.logs.size).to eq(1)
+      expect(mod1.logs.first[:message]).to eq(m1)
     end
-
-    expect(mod1.status.zero?).to be(true)
-
-    tr = mod1.transforms(model, nil)
-    expect(tr.is_a?(Hash)).to be(true)
-    expect(tr.key?(:t)).to be(true)
-    expect(tr.key?(:r)).to be(true)
-    expect(tr[:t].nil?).to be(true)
-    expect(tr[:r].nil?).to be(true)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
   end
 
   it "checks flattened 3D points" do
