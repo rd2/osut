@@ -8,4 +8,6 @@ _yardoc
 doc/
 rdoc
 
+spec/files/osms/out/
+
 .DS_Store

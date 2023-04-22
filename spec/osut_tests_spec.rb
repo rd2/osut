@@ -12,1076 +12,1076 @@ RSpec.describe OSut do
   let(:cls2) { Class.new  { extend OSut } }
   let(:mod1) { Module.new { extend OSut } }
 
-  it "checks scheduleRulesetMinMax (from within class instances)" do
-    expect(cls1.level).to eq(INF)
-    expect(cls1.reset(DBG)).to eq(DBG)
-    expect(cls1.level).to eq(DBG)
-    expect(cls1.clean!).to eq(DBG)
-
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    sc1 = "Space Thermostat Cooling Setpoint"
-    sc2 = "Schedule Constant 1"
-    cl1 = OpenStudio::Model::ScheduleRuleset
-    cl2 = OpenStudio::Model::ScheduleConstant
-    m1  = "Invalid 'sched' arg #1 (OSut::scheduleRulesetMinMax)"
-    m2  = "'#{sc2}' #{cl2}? expecting #{cl1} (OSut::scheduleRulesetMinMax)"
-
-    sched = model.getScheduleRulesetByName(sc1)
-    expect(sched.empty?).to be(false)
-    sched = sched.get
-    expect(sched.is_a?(cl1)).to be(true)
-
-    sch = model.getScheduleConstantByName(sc2)
-    expect(sch.empty?).to be(false)
-    sch = sch.get
-    expect(sch.is_a?(cl2)).to be(true)
-
-    # Valid case.
-    minmax = cls1.scheduleRulesetMinMax(sched)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min]).to be_within(TOL).of(23.89)
-    expect(minmax[:min]).to be_within(TOL).of(23.89)
-    expect(cls1.status.zero?).to be(true)
-    expect(cls1.logs.empty?).to be(true)
-
-    # Invalid parameter.
-    minmax = cls1.scheduleRulesetMinMax(nil)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(cls1.debug?).to be(true)
-    expect(cls1.logs.size).to eq(1)
-    expect(cls1.logs.first[:message]).to eq(m1)
-
-    expect(cls1.clean!).to eq(DBG)
-
-    # Invalid parameter.
-    minmax = cls1.scheduleRulesetMinMax(model)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(cls1.debug?).to be(true)
-    expect(cls1.logs.size).to eq(1)
-    expect(cls1.logs.first[:message]).to eq(m1)
-
-    expect(cls1.clean!).to eq(DBG)
-
-    # Invalid parameter (wrong schedule type)
-    minmax = cls1.scheduleRulesetMinMax(sch)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(cls1.debug?).to be(true)
-    expect(cls1.logs.size).to eq(1)
-    expect(cls1.logs.first[:message]).to eq(m2)
-  end
-
-  it "checks scheduleConstantMinMax" do
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    expect(cls1.clean!).to eq(DBG)
-
-    sc1 = "Schedule Constant 1"
-    sc2 = "Space Thermostat Cooling Setpoint"
-    cl1 = OpenStudio::Model::ScheduleConstant
-    cl2 = OpenStudio::Model::ScheduleRuleset
-    m1  = "Invalid 'sched' arg #1 (OSut::scheduleConstantMinMax)"
-    m2  = "'#{sc2}' #{cl2}? expecting #{cl1} (OSut::scheduleConstantMinMax)"
-
-    sched = model.getScheduleConstantByName(sc1)
-    expect(sched.empty?).to be(false)
-    sched = sched.get
-    expect(sched.is_a?(cl1)).to be(true)
-
-    sch = model.getScheduleRulesetByName(sc2)
-    expect(sch.empty?).to be(false)
-    sch = sch.get
-    expect(sch.is_a?(cl2)).to be(true)
-
-    # Valid case.
-    minmax = cls1.scheduleConstantMinMax(sched)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min]).to be_within(TOL).of(139.88)
-    expect(minmax[:min]).to be_within(TOL).of(139.88)
-    expect(cls1.status.zero?).to be(true)
-    expect(cls1.logs.empty?).to be(true)
-
-    # Invalid parameter.
-    minmax = cls1.scheduleConstantMinMax(nil)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(cls1.debug?).to be(true)
-    expect(cls1.logs.size).to eq(1)
-    expect(cls1.logs.first[:message]).to eq(m1)
-
-    expect(cls1.clean!).to eq(DBG)
-
-    # Invalid parameter.
-    minmax = cls1.scheduleConstantMinMax(model)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(cls1.debug?).to be(true)
-    expect(cls1.logs.size).to eq(1)
-    expect(cls1.logs.first[:message]).to eq(m1)
-
-    expect(cls1.clean!).to eq(DBG)
-
-    # Invalid parameter (wrong schedule type)
-    minmax = cls1.scheduleConstantMinMax(sch)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(cls1.debug?).to be(true)
-    expect(cls1.logs.size).to eq(1)
-    expect(cls1.logs.first[:message]).to eq(m2)
-  end
-
-  it "checks scheduleCompactMinMax (from within module instances)" do
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    expect(mod1.clean!).to eq(DBG)
-
-    spt = 22
-    sc2 = "Building HVAC Operation"
-    cl1 = OpenStudio::Model::ScheduleCompact
-    cl2 = OpenStudio::Model::Schedule
-
-    m1 = "Invalid 'sched' arg #1 (OSut::scheduleCompactMinMax)"
-    m2 = "'#{sc2}' #{cl2}? expecting #{cl1} (OSut::scheduleCompactMinMax)"
-
-    sched = OpenStudio::Model::ScheduleCompact.new(model, spt)
-    expect(sched.is_a?(OpenStudio::Model::ScheduleCompact)).to be(true)
-    sched.setName("compact schedule")
-
-    sch = model.getScheduleByName(sc2)
-    expect(sch.empty?).to be(false)
-    sch = sch.get
-
-    # Valid case.
-    minmax = mod1.scheduleCompactMinMax(sched)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min]).to be_within(TOL).of(spt)
-    expect(minmax[:min]).to be_within(TOL).of(spt)
-    expect(mod1.status.zero?).to be(true)
-    expect(mod1.logs.empty?).to be(true)
-
-    # Invalid parameter.
-    minmax = mod1.scheduleCompactMinMax(nil)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
-
-    expect(mod1.clean!).to eq(DBG)
-
-    # Invalid parameter.
-    minmax = mod1.scheduleCompactMinMax(model)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
-
-    expect(mod1.clean!).to eq(DBG)
-
-    # Invalid parameter (wrong schedule type)
-    minmax = mod1.scheduleCompactMinMax(sch)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m2)
-  end
-
-  it "checks min/max heat/cool scheduled setpoints (as a module method)" do
-    module M
-      extend OSut
-    end
-
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    expect(M.clean!).to eq(DBG)
-
-    m1 = "OSut::maxHeatScheduledSetpoint"
-    m2 = "OSut::minCoolScheduledSetpoint"
-    z1 = "Level 0 Ceiling Plenum Zone"
-    z2 = "Single zone"
-
-    model.getThermalZones.each do |z|
-      res = M.maxHeatScheduledSetpoint(z)
-      expect(res.is_a?(Hash)).to be(true)
-      expect(res.key?(:spt)).to be(true)
-      expect(res.key?(:dual)).to be(true)
-      expect(res[:spt].nil?).to be(true)            if z.nameString == z1
-      expect(res[:spt]).to be_within(TOL).of(22.11) if z.nameString == z2
-      expect(res[:dual]).to eq(false)               if z.nameString == z1
-      expect(res[:dual]).to eq(true)                if z.nameString == z2
-      expect(M.status.zero?).to be(true)
-
-      res = M.minCoolScheduledSetpoint(z)
-      expect(res.is_a?(Hash)).to be(true)
-      expect(res.key?(:spt)).to be(true)
-      expect(res.key?(:dual)).to be(true)
-      expect(res[:spt].nil?).to be(true)            if z.nameString == z1
-      expect(res[:spt]).to be_within(TOL).of(22.78) if z.nameString == z2
-      expect(res[:dual]).to eq(false)               if z.nameString == z1
-      expect(res[:dual]).to eq(true)                if z.nameString == z2
-      expect(M.status.zero?).to be(true)
-    end
-
-    res = M.maxHeatScheduledSetpoint(nil)                      # bad argument
-    expect(res.is_a?(Hash)).to be(true)
-    expect(res.key?(:spt)).to be(true)
-    expect(res.key?(:dual)).to be(true)
-    expect(res[:spt].nil?).to be(true)
-    expect(res[:dual]).to eq(false)
-    expect(M.debug?).to be(true)
-    expect(M.logs.size).to eq(1)
-    expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
-    expect(M.clean!).to eq(DBG)
-
-    res = M.minCoolScheduledSetpoint(nil)                      # bad argument
-    expect(res.is_a?(Hash)).to be(true)
-    expect(res.key?(:spt)).to be(true)
-    expect(res.key?(:dual)).to be(true)
-    expect(res[:spt].nil?).to be(true)
-    expect(res[:dual]).to eq(false)
-    expect(M.debug?).to be(true)
-    expect(M.logs.size).to eq(1)
-    expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
-    expect(M.clean!).to eq(DBG)
-
-    res = M.maxHeatScheduledSetpoint(model)                    # bad argument
-    expect(res.is_a?(Hash)).to be(true)
-    expect(res.key?(:spt)).to be(true)
-    expect(res.key?(:dual)).to be(true)
-    expect(res[:spt].nil?).to be(true)
-    expect(res[:dual]).to eq(false)
-    expect(M.debug?).to be(true)
-    expect(M.logs.size).to eq(1)
-    expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
-    expect(M.clean!).to eq(DBG)
-
-    res = M.minCoolScheduledSetpoint(model)                    # bad argument
-    expect(res.is_a?(Hash)).to be(true)
-    expect(res.key?(:spt)).to be(true)
-    expect(res.key?(:dual)).to be(true)
-    expect(res[:spt].nil?).to be(true)
-    expect(res[:dual]).to eq(false)
-    expect(M.debug?).to be(true)
-    expect(M.logs.size).to eq(1)
-    expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
-    expect(M.clean!).to eq(DBG)
-  end
-
-  it "checks if zones have heating/cooling temperature setpoints" do
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    cl1 = OpenStudio::Model::Model
-    cl2 = NilClass
-    m1 = "'model' #{cl2}? expecting #{cl1} (OSut::heatingTemperatureSetpoints?)"
-    m2 = "'model' #{cl2}? expecting #{cl1} (OSut::coolingTemperatureSetpoints?)"
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.heatingTemperatureSetpoints?(model)).to be(true)
-    expect(mod1.status.zero?).to be(true)
-
-    expect(mod1.coolingTemperatureSetpoints?(model)).to be(true)
-    expect(mod1.status.zero?).to be(true)
-
-    expect(mod1.heatingTemperatureSetpoints?(nil)).to be(false)   # bad argument
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.coolingTemperatureSetpoints?(nil)).to be(false)   # bad argument
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m2)
-  end
-
-  it "checks for HVAC air loops" do
-    mdl = OpenStudio::Model::Model.new
-    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
-    v = version.join.to_i
-
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    cl1 = OpenStudio::Model::Model
-    cl2 = NilClass
-    m = "'model' #{cl2}? expecting #{cl1} (OSut::airLoopsHVAC?)"
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.airLoopsHVAC?(model)).to be(true)
-    expect(mod1.status.zero?).to be(true)
-
-    expect(mod1.airLoopsHVAC?(nil)).to be(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m)
-
-
-    if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
-      file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
-      path = OpenStudio::Path.new(file)
-      model = translator.loadModel(path)
-      expect(model.empty?).to be(false)
-      model = model.get
-
-      expect(mod1.clean!).to eq(DBG)
-      expect(mod1.airLoopsHVAC?(model)).to be(false)
-      expect(mod1.status.zero?).to be(true)
-
-      expect(mod1.airLoopsHVAC?(nil)).to be(false)
-      expect(mod1.debug?).to be(true)
-      expect(mod1.logs.size).to eq(1)
-      expect(mod1.logs.first[:message]).to eq(m)
-    end
-  end
-
-  it "checks for plenums" do
-    mdl = OpenStudio::Model::Model.new
-    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
-    v = version.join.to_i
-
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    m  = "OSut::plenum?"
-    m1 = "Invalid 'space' arg #1 (#{m})"
-    sp = "Level 0 Ceiling Plenum"
-
-    expect(mod1.clean!).to eq(DBG)
-    loops = mod1.airLoopsHVAC?(model)
-    expect(loops).to be(true)
-    expect(mod1.status.zero?).to be(true)
-    setpoints = mod1.heatingTemperatureSetpoints?(model)
-    expect(setpoints).to be(true)
-    expect(mod1.status.zero?).to be(true)
-
-    model.getSpaces.each do |space|
-      id = space.nameString
-      expect(mod1.plenum?(space, loops, setpoints)).to be(false)     if id == sp
-      expect(mod1.plenum?(space, loops, setpoints)).to be(false) unless id == sp
-    end
-
-    expect(mod1.status.zero?).to be(true)
-    expect(mod1.plenum?(nil, loops, setpoints)).to be(false)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
-
-
-    if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
-      file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
-      path = OpenStudio::Path.new(file)
-      model = translator.loadModel(path)
-      expect(model.empty?).to be(false)
-      model = model.get
-      expect(mod1.clean!).to eq(DBG)
-      loops = mod1.airLoopsHVAC?(model)
-      expect(loops).to be(false)
-      expect(mod1.status.zero?).to be(true)
-      setpoints = mod1.heatingTemperatureSetpoints?(model)
-      expect(setpoints).to be(true)
-      expect(mod1.status.zero?).to be(true)
-
-      model.getSpaces.each do |space|
-        expect(mod1.plenum?(space, loops, setpoints)).to be(false)
-      end
-
-      expect(mod1.status.zero?).to be(true)
-    end
-
-
-    file = File.join(__dir__, "files/osms/in/smalloffice.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    expect(mod1.clean!).to eq(DBG)
-    loops = mod1.airLoopsHVAC?(model)
-    expect(loops).to be(true)
-    expect(mod1.status.zero?).to be(true)
-    setpoints = mod1.heatingTemperatureSetpoints?(model)
-    expect(setpoints).to be(true)
-    expect(mod1.status.zero?).to be(true)
-
-    model.getSpaces.each do |space|
-      id = space.nameString
-      expect(space.thermalZone.empty?).to be(false)
-      zone = space.thermalZone.get
-
-      heat_spt = mod1.maxHeatScheduledSetpoint(zone)
-      cool_spt = mod1.minCoolScheduledSetpoint(zone)
-      expect(heat_spt.is_a?(Hash)).to be(true)
-      expect(cool_spt.is_a?(Hash)).to be(true)
-      expect(heat_spt.key?(:spt)).to be(true)
-      expect(cool_spt.key?(:spt)).to be(true)
-      expect(heat_spt.key?(:dual)).to be(true)
-      expect(cool_spt.key?(:dual)).to be(true)
-      expect(heat_spt[:spt].nil?).to be(true)                   if id == "Attic"
-      expect(cool_spt[:spt].nil?).to be(true)                   if id == "Attic"
-      expect(heat_spt[:dual]).to be(false)                      if id == "Attic"
-      expect(cool_spt[:dual]).to be(false)                      if id == "Attic"
-      expect(zone.thermostat.empty?)                            if id == "Attic"
-      expect(space.partofTotalFloorArea).to be(true)        unless id == "Attic"
-      expect(space.partofTotalFloorArea).to be(false)           if id == "Attic"
-      expect(mod1.plenum?(space, loops, setpoints)).to be(false)
-    end
-
-    expect(mod1.status.zero?).to be(true)
-  end
-
-  it "checks availability schedule generation" do
-    mdl = OpenStudio::Model::Model.new
-    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
-    v = version.join.to_i
-    
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    year = model.yearDescription
-    expect(year.empty?).to be(false)
-    year = year.get
-
-    am01 = OpenStudio::Time.new(0, 1)
-    pm11 = OpenStudio::Time.new(0,23)
-
-    jan01 = year.makeDate(OpenStudio::MonthOfYear.new("Jan"),  1)
-    apr30 = year.makeDate(OpenStudio::MonthOfYear.new("Apr"), 30)
-    may01 = year.makeDate(OpenStudio::MonthOfYear.new("May"),  1)
-    oct31 = year.makeDate(OpenStudio::MonthOfYear.new("Oct"), 31)
-    nov01 = year.makeDate(OpenStudio::MonthOfYear.new("Nov"),  1)
-    dec31 = year.makeDate(OpenStudio::MonthOfYear.new("Dec"), 31)
-    expect(oct31.is_a?(OpenStudio::Date)).to be(true)
-
-    expect(mod1.clean!).to eq(DBG)
-
-    sch = mod1.availabilitySchedule(model)                        # ON (default)
-    expect(sch.is_a?(OpenStudio::Model::ScheduleRuleset)).to be(true)
-    expect(sch.nameString).to eq("ON Availability SchedRuleset")
-    limits = sch.scheduleTypeLimits
-    expect(limits.empty?).to be(false)
-    limits = limits.get
-    expect(limits.nameString).to eq("HVAC Operation ScheduleTypeLimits")
-    default = sch.defaultDaySchedule
-    expect(default.nameString).to eq("ON Availability dftDaySched")
-    expect(default.times.empty?).to be(false)
-    expect(default.values.empty?).to be(false)
-    expect(default.times.size).to eq(1)
-    expect(default.values.size).to eq(1)
-    expect(default.getValue(am01).to_i).to eq(1)
-    expect(default.getValue(pm11).to_i).to eq(1)
-    expect(sch.isWinterDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isSummerDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isHolidayScheduleDefaulted).to be(true)
-    expect(sch.isCustomDay1ScheduleDefaulted).to be(true) unless v < 330
-    expect(sch.isCustomDay2ScheduleDefaulted).to be(true) unless v < 330
-    expect(sch.summerDesignDaySchedule).to eq(default)
-    expect(sch.winterDesignDaySchedule).to eq(default)
-    expect(sch.holidaySchedule).to eq(default)
-    expect(sch.customDay1Schedule).to eq(default) unless v < 330
-    expect(sch.customDay2Schedule).to eq(default) unless v < 330
-    expect(sch.scheduleRules.empty?).to be(true)
-
-    sch = mod1.availabilitySchedule(model, "Off")
-    expect(sch.is_a?(OpenStudio::Model::ScheduleRuleset)).to be(true)
-    expect(sch.nameString).to eq("OFF Availability SchedRuleset")
-    limits = sch.scheduleTypeLimits
-    expect(limits.empty?).to be(false)
-    limits = limits.get
-    expect(limits.nameString).to eq("HVAC Operation ScheduleTypeLimits")
-    default = sch.defaultDaySchedule
-    expect(default.nameString).to eq("OFF Availability dftDaySched")
-    expect(default.times.empty?).to be(false)
-    expect(default.values.empty?).to be(false)
-    expect(default.times.size).to eq(1)
-    expect(default.values.size).to eq(1)
-    expect(default.getValue(am01).to_i).to eq(0)
-    expect(default.getValue(pm11).to_i).to eq(0)
-    expect(sch.isWinterDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isSummerDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isHolidayScheduleDefaulted).to be(true)
-    expect(sch.isCustomDay1ScheduleDefaulted).to be(true) unless v < 330
-    expect(sch.isCustomDay2ScheduleDefaulted).to be(true) unless v < 330
-    expect(sch.summerDesignDaySchedule).to eq(default)
-    expect(sch.winterDesignDaySchedule).to eq(default)
-    expect(sch.holidaySchedule).to eq(default)
-    expect(sch.customDay1Schedule).to eq(default) unless v < 330
-    expect(sch.customDay2Schedule).to eq(default) unless v < 330
-    expect(sch.scheduleRules.empty?).to be(true)
-
-    sch = mod1.availabilitySchedule(model, "Winter")
-    expect(sch.is_a?(OpenStudio::Model::ScheduleRuleset)).to be(true)
-    expect(sch.nameString).to eq("WINTER Availability SchedRuleset")
-    limits = sch.scheduleTypeLimits
-    expect(limits.empty?).to be(false)
-    limits = limits.get
-    expect(limits.nameString).to eq("HVAC Operation ScheduleTypeLimits")
-    default = sch.defaultDaySchedule
-    expect(default.nameString).to eq("WINTER Availability dftDaySched")
-    expect(default.times.empty?).to be(false)
-    expect(default.values.empty?).to be(false)
-    expect(default.times.size).to eq(1)
-    expect(default.values.size).to eq(1)
-    expect(default.getValue(am01).to_i).to eq(1)
-    expect(default.getValue(pm11).to_i).to eq(1)
-    expect(sch.isWinterDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isSummerDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isHolidayScheduleDefaulted).to be(true)
-    expect(sch.isCustomDay1ScheduleDefaulted).to be(true) unless v < 330
-    expect(sch.isCustomDay2ScheduleDefaulted).to be(true) unless v < 330
-    expect(sch.summerDesignDaySchedule).to eq(default)
-    expect(sch.winterDesignDaySchedule).to eq(default)
-    expect(sch.holidaySchedule).to eq(default)
-    expect(sch.customDay1Schedule).to eq(default) unless v < 330
-    expect(sch.customDay2Schedule).to eq(default) unless v < 330
-    expect(sch.scheduleRules.size).to eq(1)
-
-    sch.getDaySchedules(jan01, apr30).each do |day_schedule|
-      expect(day_schedule.times.empty?).to be(false)
-      expect(day_schedule.values.empty?).to be(false)
-      expect(day_schedule.times.size).to eq(1)
-      expect(day_schedule.values.size).to eq(1)
-      expect(day_schedule.getValue(am01).to_i).to eq(1)
-      expect(day_schedule.getValue(pm11).to_i).to eq(1)
-    end
-
-    sch.getDaySchedules(may01, oct31).each do |day_schedule|
-      expect(day_schedule.times.empty?).to be(false)
-      expect(day_schedule.values.empty?).to be(false)
-      expect(day_schedule.times.size).to eq(1)
-      expect(day_schedule.values.size).to eq(1)
-      expect(day_schedule.getValue(am01).to_i).to eq(0)
-      expect(day_schedule.getValue(pm11).to_i).to eq(0)
-    end
-
-    sch.getDaySchedules(nov01, dec31).each do |day_schedule|
-      expect(day_schedule.times.empty?).to be(false)
-      expect(day_schedule.values.empty?).to be(false)
-      expect(day_schedule.times.size).to eq(1)
-      expect(day_schedule.values.size).to eq(1)
-      expect(day_schedule.getValue(am01).to_i).to eq(1)
-      expect(day_schedule.getValue(pm11).to_i).to eq(1)
-    end
-
-    another = mod1.availabilitySchedule(model, "Winter")
-    expect(another.nameString).to eq(sch.nameString)
-
-    sch = mod1.availabilitySchedule(model, "Summer")
-    expect(sch.is_a?(OpenStudio::Model::ScheduleRuleset)).to be(true)
-    expect(sch.nameString).to eq("SUMMER Availability SchedRuleset")
-    limits = sch.scheduleTypeLimits
-    expect(limits.empty?).to be(false)
-    limits = limits.get
-    expect(limits.nameString).to eq("HVAC Operation ScheduleTypeLimits")
-    default = sch.defaultDaySchedule
-    expect(default.nameString).to eq("SUMMER Availability dftDaySched")
-    expect(default.times.empty?).to be(false)
-    expect(default.values.empty?).to be(false)
-    expect(default.times.size).to eq(1)
-    expect(default.values.size).to eq(1)
-    expect(default.getValue(am01).to_i).to eq(0)
-    expect(default.getValue(pm11).to_i).to eq(0)
-    expect(sch.isWinterDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isSummerDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isHolidayScheduleDefaulted).to be(true)
-    expect(sch.isCustomDay1ScheduleDefaulted).to be(true) unless v < 330
-    expect(sch.isCustomDay2ScheduleDefaulted).to be(true) unless v < 330
-    expect(sch.summerDesignDaySchedule).to eq(default)
-    expect(sch.winterDesignDaySchedule).to eq(default)
-    expect(sch.holidaySchedule).to eq(default)
-    expect(sch.customDay1Schedule).to eq(default) unless v < 330
-    expect(sch.customDay2Schedule).to eq(default) unless v < 330
-    expect(sch.scheduleRules.size).to eq(1)
-
-    sch.getDaySchedules(jan01, apr30).each do |day_schedule|
-      expect(day_schedule.times.empty?).to be(false)
-      expect(day_schedule.values.empty?).to be(false)
-      expect(day_schedule.times.size).to eq(1)
-      expect(day_schedule.values.size).to eq(1)
-      expect(day_schedule.getValue(am01).to_i).to eq(0)
-      expect(day_schedule.getValue(pm11).to_i).to eq(0)
-    end
-
-    sch.getDaySchedules(may01, oct31).each do |day_schedule|
-      expect(day_schedule.times.empty?).to be(false)
-      expect(day_schedule.values.empty?).to be(false)
-      expect(day_schedule.times.size).to eq(1)
-      expect(day_schedule.values.size).to eq(1)
-      expect(day_schedule.getValue(am01).to_i).to eq(1)
-      expect(day_schedule.getValue(pm11).to_i).to eq(1)
-    end
-
-    sch.getDaySchedules(nov01, dec31).each do |day_schedule|
-      expect(day_schedule.times.empty?).to be(false)
-      expect(day_schedule.values.empty?).to be(false)
-      expect(day_schedule.times.size).to eq(1)
-      expect(day_schedule.values.size).to eq(1)
-      expect(day_schedule.getValue(am01).to_i).to eq(0)
-      expect(day_schedule.getValue(pm11).to_i).to eq(0)
-    end
-  end
-
-  it "checks construction thickness" do
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    m  = "OSut::thickness"
-    m1 = "holds non-StandardOpaqueMaterial(s) (#{m})"
-    expect(cls1.clean!).to eq(DBG)
-
-    model.getConstructions.each do |c|
-      next if c.to_LayeredConstruction.empty?
-      c = c.to_LayeredConstruction.get
-      id = c.nameString
-
-      # OSut 'thickness' method can only process layered constructions
-      # built up with standard opaque layers, which exclude the model's
-      #   - "Air Wall"-based construction
-      #   - "Double pane"-based construction
-      # The method returns '0' in such cases, while logging ERROR messages
-      # (OSut extends OSlg logger).
-      th = cls1.thickness(c)
-      expect(th).to be_within(TOL).of(0) if id.include?("Air Wall")
-      expect(th).to be_within(TOL).of(0) if id.include?("Double pane")
-      next if id.include?("Air Wall")
-      next if id.include?("Double pane")
-      expect(th > 0).to be(true)
-    end
-
-    expect(cls1.status).to eq(ERR)
-    cls1.logs.each { |l| expect(l[:message].include?(m1)).to be(true) }
-
-    # OSut, and by extension OSlg, are intended to be accessed "globally"
-    # once instantiated within a class or module. Here, class instance cls2
-    # accesses the same OSut module methods/attributes as cls1.
-    expect(cls2.status).to eq(ERR)
-    cls2.clean!
-    expect(cls1.status.zero?).to eq(true)
-    expect(cls1.logs.empty?).to be(true)
-
-    model.getConstructions.each do |c|
-      next if c.to_LayeredConstruction.empty?
-      c = c.to_LayeredConstruction.get
-      id = c.nameString
-
-      # No ERROR logging if skipping over invalid arguments to 'thickness'.
-      next if id.include?("Air Wall")
-      next if id.include?("Double pane")
-      th = cls2.thickness(c)
-      expect(th > 0).to be(true)
-    end
-
-    expect(cls2.status.zero?).to be(true)
-    expect(cls2.logs.empty?).to be(true)
-    expect(cls1.status.zero?).to eq(true)
-    expect(cls1.logs.empty?).to be(true)
-  end
-
-  it "checks if a set holds a construction" do
-    mdl = OpenStudio::Model::Model.new
-    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
-    v = version.join.to_i
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-
-    if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
-      file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
-      path = OpenStudio::Path.new(file)
-      model = translator.loadModel(path)
-      expect(model.empty?).to be(false)
-      model = model.get
-
-      expect(mod1.clean!).to eq(DBG)
-
-      t1  = "roofceiling"
-      t2  = "wall"
-      cl1 = OpenStudio::Model::DefaultConstructionSet
-      cl2 = OpenStudio::Model::LayeredConstruction
-      n1  = "CBECS Before-1980 ClimateZone 8 (smoff) ConstSet"
-      n2  = "CBECS Before-1980 ExtRoof IEAD ClimateZone 8"
-      m1  = "'#{n2}' #{cl2}? expecting #{cl1} (OSut::holdsConstruction?)"
-      m5  = "Invalid 'surface type' arg #5 (OSut::holdsConstruction?)"
-      m6  = "Invalid 'set' arg #1 (OSut::holdsConstruction?)"
-
-      set = model.getDefaultConstructionSetByName(n1)
-      expect(set.empty?).to be(false)
-      set = set.get
-
-      c = model.getLayeredConstructionByName(n2)
-      expect(c.empty?).to be(false)
-      c = c.get
-
-      # TRUE case: 'set' holds 'c' (exterior roofceiling construction)
-      expect(mod1.holdsConstruction?(set, c, false, true, t1)).to be(true)
-      expect(mod1.logs.empty?).to be(true)
-
-      # FALSE case: not ground construction
-      expect(mod1.holdsConstruction?(set, c, true, true, t1)).to be(false)
-      expect(mod1.logs.empty?).to be(true)
-
-      # INVALID case: arg #5 : nil (instead of surface type string)
-      expect(mod1.holdsConstruction?(set, c, true, true, nil)).to be(false)
-      expect(mod1.debug?).to be(true)
-      expect(mod1.logs.size).to eq(1)
-      expect(mod1.logs.first[:message]).to eq(m5)
-      expect(mod1.clean!).to eq(DBG)
-
-      # INVALID case: arg #5 : empty surface type string
-      expect(mod1.holdsConstruction?(set, c, true, true, "")).to be(false)
-      expect(mod1.debug?).to be(true)
-      expect(mod1.logs.size).to eq(1)
-      expect(mod1.logs.first[:message]).to eq(m5)
-      expect(mod1.clean!).to eq(DBG)
-
-      # INVALID case: arg #5 : c construction (instead of surface type string)
-      expect(mod1.holdsConstruction?(set, c, true, true, c)).to be(false)
-      expect(mod1.debug?).to be(true)
-      expect(mod1.logs.size).to eq(1)
-      expect(mod1.logs.first[:message]).to eq(m5)
-      expect(mod1.clean!).to eq(DBG)
-
-      # INVALID case: arg #1 : c construction (instead of surface type string)
-      expect(mod1.holdsConstruction?(c, c, true, true, c)).to be(false)
-      expect(mod1.debug?).to be(true)
-      expect(mod1.logs.size).to eq(1)
-      expect(mod1.logs.first[:message]).to eq(m1)
-      expect(mod1.clean!).to eq(DBG)
-
-      # INVALID case: arg #1 : model (instead of surface type string)
-      expect(mod1.holdsConstruction?(model, c, true, true, t1)).to be(false)
-      expect(mod1.debug?).to be(true)
-      expect(mod1.logs.size).to eq(1)
-      expect(mod1.logs.first[:message]).to eq(m6)
-      expect(mod1.clean!).to eq(DBG)
-    end
-  end
-
-  it "retrieves a surface default construction set" do
-    mdl = OpenStudio::Model::Model.new
-    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
-    v = version.join.to_i
-
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-
-    if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
-      file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
-      path = OpenStudio::Path.new(file)
-      model = translator.loadModel(path)
-      expect(model.empty?).to be(false)
-      model = model.get
-
-      m = "construction not defaulted (defaultConstructionSet)"
-      mod1.clean!
-
-      model.getSurfaces.each do |s|
-        set = mod1.defaultConstructionSet(model, s)
-        expect(set.nil?).to be(false)
-        expect(mod1.status.zero?).to be(true)
-        expect(mod1.logs.empty?).to be(true)
-      end
-
-      translator = OpenStudio::OSVersion::VersionTranslator.new
-      file = File.join(__dir__, "files/osms/in/seb.osm")
-      path = OpenStudio::Path.new(file)
-      model = translator.loadModel(path)
-      expect(model.empty?).to be(false)
-      model = model.get
-
-      mod1.clean!
-
-      model.getSurfaces.each do |s|
-        set = mod1.defaultConstructionSet(model, s)
-        expect(set.nil?).to be(true)
-        expect(mod1.status).to eq(ERR)
-
-        mod1.logs.each {|l| expect(l[:message].include?(m)) }
-      end
-    end
-  end
-
-  it "checks glazing airfilms" do
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    m  = "OSut::glazingAirFilmRSi"
-    m1 = "Invalid 'usi' arg #1 (#{m})"
-    m2 = "'usi' String? expecting Numeric (#{m})"
-    m3 = "'usi' NilClass? expecting Numeric (#{m})"
-    expect(mod1.clean!).to eq(DBG)
-
-    model.getConstructions.each do |c|
-      next unless c.isFenestration
-      expect(c.uFactor.empty?).to be(false)
-      expect(c.uFactor.get.is_a?(Numeric)).to be(true)
-      expect(mod1.glazingAirFilmRSi(c.uFactor.get)).to be_within(TOL).of(0.17)
-      expect(mod1.status.zero?).to be(true)
-    end
-
-    expect(mod1.glazingAirFilmRSi(9.0)).to be_within(TOL).of(0.1216)
-    expect(mod1.warn?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.glazingAirFilmRSi("")).to be_within(TOL).of(0.1216)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m2)
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.glazingAirFilmRSi(nil)).to be_within(TOL).of(0.1216)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m3)
-  end
-
-  it "checks rsi calculations" do
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    m  = "OSut::rsi"
-    m1 = "Invalid 'lc' arg #1 (#{m})"
-    m2 = "Negative 'film' (#{m})"
-    m3 = "'film' NilClass? expecting Numeric (#{m})"
-    m4 = "Negative 'temp K' (#{m})"
-    m5 = "'temp K' NilClass? expecting Numeric (#{m})"
-    expect(mod1.clean!).to eq(DBG)
-
-    model.getSurfaces.each do |s|
-      next unless s.isPartOfEnvelope
-      lc = s.construction
-      expect(lc.empty?).to be(false)
-      lc = lc.get.to_LayeredConstruction
-      expect(lc.empty?).to be(false)
-      lc = lc.get
-
-      if s.isGroundSurface                      # 4x slabs on grade in SEB model
-        expect(s.filmResistance).to be_within(TOL).of(0.160)
-        expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.448)
-        expect(mod1.status.zero?).to be(true)
-      else
-        if s.surfaceType == "Wall"
-          expect(s.filmResistance).to be_within(TOL).of(0.150)
-          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(2.616)
-          expect(mod1.status.zero?).to be(true)
-        else                                                       # RoofCeiling
-          expect(s.filmResistance).to be_within(TOL).of(0.136)
-          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(5.631)
-          expect(mod1.status.zero?).to be(true)
-        end
-      end
-    end
-
-    expect(mod1.rsi("", 0.150)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.rsi(nil, 0.150)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
-
-    lc = model.getLayeredConstructionByName("SLAB-ON-GRADE-FLOOR")
-    expect(lc.empty?).to be(false)
-    lc = lc.get
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.rsi(lc, -1)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m2)
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.rsi(lc, nil)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m3)
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.rsi(lc, 0.150, -300)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m4)
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.rsi(lc, 0.150, nil)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m5)
-  end
-
-  it "identifies an (opaque) insulating layer within a layered construction" do
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    m  = "OSut::insulatingLayer"
-    m1 = "Invalid 'lc' arg #1 (#{m})"
-    expect(mod1.clean!).to eq(DBG)
-
-    model.getLayeredConstructions.each do |lc|
-      lyr = mod1.insulatingLayer(lc)
-      expect(lyr.is_a?(Hash)).to be(true)
-      expect(lyr.key?(:index)).to be(true)
-      expect(lyr.key?(:type)).to be(true)
-      expect(lyr.key?(:r)).to be(true)
-
-      if lc.isFenestration
-        expect(mod1.status.zero?).to be(true)
-        expect(lyr[:index].nil?).to be(true)
-        expect(lyr[:type].nil?).to be(true)
-        expect(lyr[:r].zero?).to be(true)
-        next
-      end
-
-      unless lyr[:type] == :standard || lyr[:type] == :massless   # air wall mat
-        expect(mod1.status.zero?).to be(true)
-        expect(lyr[:index].nil?).to be(true)
-        expect(lyr[:type].nil?).to be(true)
-        expect(lyr[:r].zero?).to be(true)
-        next
-      end
-
-      expect(lyr[:index] < lc.numLayers).to be(true)
-
-      case lc.nameString
-      when "EXTERIOR-ROOF"
-        expect(lyr[:index]).to eq(2)
-        expect(lyr[:r]).to be_within(TOL).of(5.08)
-      when "EXTERIOR-WALL"
-        expect(lyr[:index]).to eq(2)
-        expect(lyr[:r]).to be_within(TOL).of(1.47)
-      when "Default interior ceiling"
-        expect(lyr[:index]).to eq(0)
-        expect(lyr[:r]).to be_within(TOL).of(0.12)
-      when "INTERIOR-WALL"
-        expect(lyr[:index]).to eq(1)
-        expect(lyr[:r]).to be_within(TOL).of(0.24)
-      else
-        expect(lyr[:index]).to eq(0)
-        expect(lyr[:r]).to be_within(TOL).of(0.29)
-      end
-    end
-
-    lyr = mod1.insulatingLayer(nil)
-    expect(mod1.debug?).to be(true)
-    expect(lyr[:index].nil?).to be(true)
-    expect(lyr[:type].nil?).to be(true)
-    expect(lyr[:r].zero?).to be(true)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
-
-    expect(mod1.clean!).to eq(DBG)
-    lyr = mod1.insulatingLayer("")
-    expect(mod1.debug?).to be(true)
-    expect(lyr[:index].nil?).to be(true)
-    expect(lyr[:type].nil?).to be(true)
-    expect(lyr[:r].zero?).to be(true)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
-
-    expect(mod1.clean!).to eq(DBG)
-    lyr = mod1.insulatingLayer(model)
-    expect(mod1.debug?).to be(true)
-    expect(lyr[:index].nil?).to be(true)
-    expect(lyr[:type].nil?).to be(true)
-    expect(lyr[:r].zero?).to be(true)
-    expect(mod1.debug?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
-  end
+  # it "checks scheduleRulesetMinMax (from within class instances)" do
+  #   expect(cls1.level).to eq(INF)
+  #   expect(cls1.reset(DBG)).to eq(DBG)
+  #   expect(cls1.level).to eq(DBG)
+  #   expect(cls1.clean!).to eq(DBG)
+  #
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #   file = File.join(__dir__, "files/osms/in/seb.osm")
+  #   path = OpenStudio::Path.new(file)
+  #   model = translator.loadModel(path)
+  #   expect(model.empty?).to be(false)
+  #   model = model.get
+  #
+  #   sc1 = "Space Thermostat Cooling Setpoint"
+  #   sc2 = "Schedule Constant 1"
+  #   cl1 = OpenStudio::Model::ScheduleRuleset
+  #   cl2 = OpenStudio::Model::ScheduleConstant
+  #   m1  = "Invalid 'sched' arg #1 (OSut::scheduleRulesetMinMax)"
+  #   m2  = "'#{sc2}' #{cl2}? expecting #{cl1} (OSut::scheduleRulesetMinMax)"
+  #
+  #   sched = model.getScheduleRulesetByName(sc1)
+  #   expect(sched.empty?).to be(false)
+  #   sched = sched.get
+  #   expect(sched.is_a?(cl1)).to be(true)
+  #
+  #   sch = model.getScheduleConstantByName(sc2)
+  #   expect(sch.empty?).to be(false)
+  #   sch = sch.get
+  #   expect(sch.is_a?(cl2)).to be(true)
+  #
+  #   # Valid case.
+  #   minmax = cls1.scheduleRulesetMinMax(sched)
+  #   expect(minmax.is_a?(Hash)).to be(true)
+  #   expect(minmax.key?(:min)).to be(true)
+  #   expect(minmax.key?(:max)).to be(true)
+  #   expect(minmax[:min]).to be_within(TOL).of(23.89)
+  #   expect(minmax[:min]).to be_within(TOL).of(23.89)
+  #   expect(cls1.status.zero?).to be(true)
+  #   expect(cls1.logs.empty?).to be(true)
+  #
+  #   # Invalid parameter.
+  #   minmax = cls1.scheduleRulesetMinMax(nil)
+  #   expect(minmax.is_a?(Hash)).to be(true)
+  #   expect(minmax.key?(:min)).to be(true)
+  #   expect(minmax.key?(:max)).to be(true)
+  #   expect(minmax[:min].nil?).to be(true)
+  #   expect(minmax[:max].nil?).to be(true)
+  #   expect(cls1.debug?).to be(true)
+  #   expect(cls1.logs.size).to eq(1)
+  #   expect(cls1.logs.first[:message]).to eq(m1)
+  #
+  #   expect(cls1.clean!).to eq(DBG)
+  #
+  #   # Invalid parameter.
+  #   minmax = cls1.scheduleRulesetMinMax(model)
+  #   expect(minmax.is_a?(Hash)).to be(true)
+  #   expect(minmax.key?(:min)).to be(true)
+  #   expect(minmax.key?(:max)).to be(true)
+  #   expect(minmax[:min].nil?).to be(true)
+  #   expect(minmax[:max].nil?).to be(true)
+  #   expect(cls1.debug?).to be(true)
+  #   expect(cls1.logs.size).to eq(1)
+  #   expect(cls1.logs.first[:message]).to eq(m1)
+  #
+  #   expect(cls1.clean!).to eq(DBG)
+  #
+  #   # Invalid parameter (wrong schedule type)
+  #   minmax = cls1.scheduleRulesetMinMax(sch)
+  #   expect(minmax.is_a?(Hash)).to be(true)
+  #   expect(minmax.key?(:min)).to be(true)
+  #   expect(minmax.key?(:max)).to be(true)
+  #   expect(minmax[:min].nil?).to be(true)
+  #   expect(minmax[:max].nil?).to be(true)
+  #   expect(cls1.debug?).to be(true)
+  #   expect(cls1.logs.size).to eq(1)
+  #   expect(cls1.logs.first[:message]).to eq(m2)
+  # end
+  #
+  # it "checks scheduleConstantMinMax" do
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #   file = File.join(__dir__, "files/osms/in/seb.osm")
+  #   path = OpenStudio::Path.new(file)
+  #   model = translator.loadModel(path)
+  #   expect(model.empty?).to be(false)
+  #   model = model.get
+  #
+  #   expect(cls1.clean!).to eq(DBG)
+  #
+  #   sc1 = "Schedule Constant 1"
+  #   sc2 = "Space Thermostat Cooling Setpoint"
+  #   cl1 = OpenStudio::Model::ScheduleConstant
+  #   cl2 = OpenStudio::Model::ScheduleRuleset
+  #   m1  = "Invalid 'sched' arg #1 (OSut::scheduleConstantMinMax)"
+  #   m2  = "'#{sc2}' #{cl2}? expecting #{cl1} (OSut::scheduleConstantMinMax)"
+  #
+  #   sched = model.getScheduleConstantByName(sc1)
+  #   expect(sched.empty?).to be(false)
+  #   sched = sched.get
+  #   expect(sched.is_a?(cl1)).to be(true)
+  #
+  #   sch = model.getScheduleRulesetByName(sc2)
+  #   expect(sch.empty?).to be(false)
+  #   sch = sch.get
+  #   expect(sch.is_a?(cl2)).to be(true)
+  #
+  #   # Valid case.
+  #   minmax = cls1.scheduleConstantMinMax(sched)
+  #   expect(minmax.is_a?(Hash)).to be(true)
+  #   expect(minmax.key?(:min)).to be(true)
+  #   expect(minmax.key?(:max)).to be(true)
+  #   expect(minmax[:min]).to be_within(TOL).of(139.88)
+  #   expect(minmax[:min]).to be_within(TOL).of(139.88)
+  #   expect(cls1.status.zero?).to be(true)
+  #   expect(cls1.logs.empty?).to be(true)
+  #
+  #   # Invalid parameter.
+  #   minmax = cls1.scheduleConstantMinMax(nil)
+  #   expect(minmax.is_a?(Hash)).to be(true)
+  #   expect(minmax.key?(:min)).to be(true)
+  #   expect(minmax.key?(:max)).to be(true)
+  #   expect(minmax[:min].nil?).to be(true)
+  #   expect(minmax[:max].nil?).to be(true)
+  #   expect(cls1.debug?).to be(true)
+  #   expect(cls1.logs.size).to eq(1)
+  #   expect(cls1.logs.first[:message]).to eq(m1)
+  #
+  #   expect(cls1.clean!).to eq(DBG)
+  #
+  #   # Invalid parameter.
+  #   minmax = cls1.scheduleConstantMinMax(model)
+  #   expect(minmax.is_a?(Hash)).to be(true)
+  #   expect(minmax.key?(:min)).to be(true)
+  #   expect(minmax.key?(:max)).to be(true)
+  #   expect(minmax[:min].nil?).to be(true)
+  #   expect(minmax[:max].nil?).to be(true)
+  #   expect(cls1.debug?).to be(true)
+  #   expect(cls1.logs.size).to eq(1)
+  #   expect(cls1.logs.first[:message]).to eq(m1)
+  #
+  #   expect(cls1.clean!).to eq(DBG)
+  #
+  #   # Invalid parameter (wrong schedule type)
+  #   minmax = cls1.scheduleConstantMinMax(sch)
+  #   expect(minmax.is_a?(Hash)).to be(true)
+  #   expect(minmax.key?(:min)).to be(true)
+  #   expect(minmax.key?(:max)).to be(true)
+  #   expect(minmax[:min].nil?).to be(true)
+  #   expect(minmax[:max].nil?).to be(true)
+  #   expect(cls1.debug?).to be(true)
+  #   expect(cls1.logs.size).to eq(1)
+  #   expect(cls1.logs.first[:message]).to eq(m2)
+  # end
+  #
+  # it "checks scheduleCompactMinMax (from within module instances)" do
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #   file = File.join(__dir__, "files/osms/in/seb.osm")
+  #   path = OpenStudio::Path.new(file)
+  #   model = translator.loadModel(path)
+  #   expect(model.empty?).to be(false)
+  #   model = model.get
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #
+  #   spt = 22
+  #   sc2 = "Building HVAC Operation"
+  #   cl1 = OpenStudio::Model::ScheduleCompact
+  #   cl2 = OpenStudio::Model::Schedule
+  #
+  #   m1 = "Invalid 'sched' arg #1 (OSut::scheduleCompactMinMax)"
+  #   m2 = "'#{sc2}' #{cl2}? expecting #{cl1} (OSut::scheduleCompactMinMax)"
+  #
+  #   sched = OpenStudio::Model::ScheduleCompact.new(model, spt)
+  #   expect(sched.is_a?(OpenStudio::Model::ScheduleCompact)).to be(true)
+  #   sched.setName("compact schedule")
+  #
+  #   sch = model.getScheduleByName(sc2)
+  #   expect(sch.empty?).to be(false)
+  #   sch = sch.get
+  #
+  #   # Valid case.
+  #   minmax = mod1.scheduleCompactMinMax(sched)
+  #   expect(minmax.is_a?(Hash)).to be(true)
+  #   expect(minmax.key?(:min)).to be(true)
+  #   expect(minmax.key?(:max)).to be(true)
+  #   expect(minmax[:min]).to be_within(TOL).of(spt)
+  #   expect(minmax[:min]).to be_within(TOL).of(spt)
+  #   expect(mod1.status.zero?).to be(true)
+  #   expect(mod1.logs.empty?).to be(true)
+  #
+  #   # Invalid parameter.
+  #   minmax = mod1.scheduleCompactMinMax(nil)
+  #   expect(minmax.is_a?(Hash)).to be(true)
+  #   expect(minmax.key?(:min)).to be(true)
+  #   expect(minmax.key?(:max)).to be(true)
+  #   expect(minmax[:min].nil?).to be(true)
+  #   expect(minmax[:max].nil?).to be(true)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m1)
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #
+  #   # Invalid parameter.
+  #   minmax = mod1.scheduleCompactMinMax(model)
+  #   expect(minmax.is_a?(Hash)).to be(true)
+  #   expect(minmax.key?(:min)).to be(true)
+  #   expect(minmax.key?(:max)).to be(true)
+  #   expect(minmax[:min].nil?).to be(true)
+  #   expect(minmax[:max].nil?).to be(true)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m1)
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #
+  #   # Invalid parameter (wrong schedule type)
+  #   minmax = mod1.scheduleCompactMinMax(sch)
+  #   expect(minmax.is_a?(Hash)).to be(true)
+  #   expect(minmax.key?(:min)).to be(true)
+  #   expect(minmax.key?(:max)).to be(true)
+  #   expect(minmax[:min].nil?).to be(true)
+  #   expect(minmax[:max].nil?).to be(true)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m2)
+  # end
+  #
+  # it "checks min/max heat/cool scheduled setpoints (as a module method)" do
+  #   module M
+  #     extend OSut
+  #   end
+  #
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #   file = File.join(__dir__, "files/osms/in/seb.osm")
+  #   path = OpenStudio::Path.new(file)
+  #   model = translator.loadModel(path)
+  #   expect(model.empty?).to be(false)
+  #   model = model.get
+  #
+  #   expect(M.clean!).to eq(DBG)
+  #
+  #   m1 = "OSut::maxHeatScheduledSetpoint"
+  #   m2 = "OSut::minCoolScheduledSetpoint"
+  #   z1 = "Level 0 Ceiling Plenum Zone"
+  #   z2 = "Single zone"
+  #
+  #   model.getThermalZones.each do |z|
+  #     res = M.maxHeatScheduledSetpoint(z)
+  #     expect(res.is_a?(Hash)).to be(true)
+  #     expect(res.key?(:spt)).to be(true)
+  #     expect(res.key?(:dual)).to be(true)
+  #     expect(res[:spt].nil?).to be(true)            if z.nameString == z1
+  #     expect(res[:spt]).to be_within(TOL).of(22.11) if z.nameString == z2
+  #     expect(res[:dual]).to eq(false)               if z.nameString == z1
+  #     expect(res[:dual]).to eq(true)                if z.nameString == z2
+  #     expect(M.status.zero?).to be(true)
+  #
+  #     res = M.minCoolScheduledSetpoint(z)
+  #     expect(res.is_a?(Hash)).to be(true)
+  #     expect(res.key?(:spt)).to be(true)
+  #     expect(res.key?(:dual)).to be(true)
+  #     expect(res[:spt].nil?).to be(true)            if z.nameString == z1
+  #     expect(res[:spt]).to be_within(TOL).of(22.78) if z.nameString == z2
+  #     expect(res[:dual]).to eq(false)               if z.nameString == z1
+  #     expect(res[:dual]).to eq(true)                if z.nameString == z2
+  #     expect(M.status.zero?).to be(true)
+  #   end
+  #
+  #   res = M.maxHeatScheduledSetpoint(nil)                      # bad argument
+  #   expect(res.is_a?(Hash)).to be(true)
+  #   expect(res.key?(:spt)).to be(true)
+  #   expect(res.key?(:dual)).to be(true)
+  #   expect(res[:spt].nil?).to be(true)
+  #   expect(res[:dual]).to eq(false)
+  #   expect(M.debug?).to be(true)
+  #   expect(M.logs.size).to eq(1)
+  #   expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
+  #   expect(M.clean!).to eq(DBG)
+  #
+  #   res = M.minCoolScheduledSetpoint(nil)                      # bad argument
+  #   expect(res.is_a?(Hash)).to be(true)
+  #   expect(res.key?(:spt)).to be(true)
+  #   expect(res.key?(:dual)).to be(true)
+  #   expect(res[:spt].nil?).to be(true)
+  #   expect(res[:dual]).to eq(false)
+  #   expect(M.debug?).to be(true)
+  #   expect(M.logs.size).to eq(1)
+  #   expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
+  #   expect(M.clean!).to eq(DBG)
+  #
+  #   res = M.maxHeatScheduledSetpoint(model)                    # bad argument
+  #   expect(res.is_a?(Hash)).to be(true)
+  #   expect(res.key?(:spt)).to be(true)
+  #   expect(res.key?(:dual)).to be(true)
+  #   expect(res[:spt].nil?).to be(true)
+  #   expect(res[:dual]).to eq(false)
+  #   expect(M.debug?).to be(true)
+  #   expect(M.logs.size).to eq(1)
+  #   expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
+  #   expect(M.clean!).to eq(DBG)
+  #
+  #   res = M.minCoolScheduledSetpoint(model)                    # bad argument
+  #   expect(res.is_a?(Hash)).to be(true)
+  #   expect(res.key?(:spt)).to be(true)
+  #   expect(res.key?(:dual)).to be(true)
+  #   expect(res[:spt].nil?).to be(true)
+  #   expect(res[:dual]).to eq(false)
+  #   expect(M.debug?).to be(true)
+  #   expect(M.logs.size).to eq(1)
+  #   expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
+  #   expect(M.clean!).to eq(DBG)
+  # end
+  #
+  # it "checks if zones have heating/cooling temperature setpoints" do
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #   file = File.join(__dir__, "files/osms/in/seb.osm")
+  #   path = OpenStudio::Path.new(file)
+  #   model = translator.loadModel(path)
+  #   expect(model.empty?).to be(false)
+  #   model = model.get
+  #
+  #   cl1 = OpenStudio::Model::Model
+  #   cl2 = NilClass
+  #   m1 = "'model' #{cl2}? expecting #{cl1} (OSut::heatingTemperatureSetpoints?)"
+  #   m2 = "'model' #{cl2}? expecting #{cl1} (OSut::coolingTemperatureSetpoints?)"
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   expect(mod1.heatingTemperatureSetpoints?(model)).to be(true)
+  #   expect(mod1.status.zero?).to be(true)
+  #
+  #   expect(mod1.coolingTemperatureSetpoints?(model)).to be(true)
+  #   expect(mod1.status.zero?).to be(true)
+  #
+  #   expect(mod1.heatingTemperatureSetpoints?(nil)).to be(false)   # bad argument
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m1)
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   expect(mod1.coolingTemperatureSetpoints?(nil)).to be(false)   # bad argument
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m2)
+  # end
+  #
+  # it "checks for HVAC air loops" do
+  #   mdl = OpenStudio::Model::Model.new
+  #   version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
+  #   v = version.join.to_i
+  #
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #   file = File.join(__dir__, "files/osms/in/seb.osm")
+  #   path = OpenStudio::Path.new(file)
+  #   model = translator.loadModel(path)
+  #   expect(model.empty?).to be(false)
+  #   model = model.get
+  #
+  #   cl1 = OpenStudio::Model::Model
+  #   cl2 = NilClass
+  #   m = "'model' #{cl2}? expecting #{cl1} (OSut::airLoopsHVAC?)"
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   expect(mod1.airLoopsHVAC?(model)).to be(true)
+  #   expect(mod1.status.zero?).to be(true)
+  #
+  #   expect(mod1.airLoopsHVAC?(nil)).to be(false)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m)
+  #
+  #
+  #   if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
+  #     file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+  #     path = OpenStudio::Path.new(file)
+  #     model = translator.loadModel(path)
+  #     expect(model.empty?).to be(false)
+  #     model = model.get
+  #
+  #     expect(mod1.clean!).to eq(DBG)
+  #     expect(mod1.airLoopsHVAC?(model)).to be(false)
+  #     expect(mod1.status.zero?).to be(true)
+  #
+  #     expect(mod1.airLoopsHVAC?(nil)).to be(false)
+  #     expect(mod1.debug?).to be(true)
+  #     expect(mod1.logs.size).to eq(1)
+  #     expect(mod1.logs.first[:message]).to eq(m)
+  #   end
+  # end
+  #
+  # it "checks for plenums" do
+  #   mdl = OpenStudio::Model::Model.new
+  #   version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
+  #   v = version.join.to_i
+  #
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #   file = File.join(__dir__, "files/osms/in/seb.osm")
+  #   path = OpenStudio::Path.new(file)
+  #   model = translator.loadModel(path)
+  #   expect(model.empty?).to be(false)
+  #   model = model.get
+  #
+  #   m  = "OSut::plenum?"
+  #   m1 = "Invalid 'space' arg #1 (#{m})"
+  #   sp = "Level 0 Ceiling Plenum"
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   loops = mod1.airLoopsHVAC?(model)
+  #   expect(loops).to be(true)
+  #   expect(mod1.status.zero?).to be(true)
+  #   setpoints = mod1.heatingTemperatureSetpoints?(model)
+  #   expect(setpoints).to be(true)
+  #   expect(mod1.status.zero?).to be(true)
+  #
+  #   model.getSpaces.each do |space|
+  #     id = space.nameString
+  #     expect(mod1.plenum?(space, loops, setpoints)).to be(false)     if id == sp
+  #     expect(mod1.plenum?(space, loops, setpoints)).to be(false) unless id == sp
+  #   end
+  #
+  #   expect(mod1.status.zero?).to be(true)
+  #   expect(mod1.plenum?(nil, loops, setpoints)).to be(false)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m1)
+  #
+  #
+  #   if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
+  #     file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+  #     path = OpenStudio::Path.new(file)
+  #     model = translator.loadModel(path)
+  #     expect(model.empty?).to be(false)
+  #     model = model.get
+  #     expect(mod1.clean!).to eq(DBG)
+  #     loops = mod1.airLoopsHVAC?(model)
+  #     expect(loops).to be(false)
+  #     expect(mod1.status.zero?).to be(true)
+  #     setpoints = mod1.heatingTemperatureSetpoints?(model)
+  #     expect(setpoints).to be(true)
+  #     expect(mod1.status.zero?).to be(true)
+  #
+  #     model.getSpaces.each do |space|
+  #       expect(mod1.plenum?(space, loops, setpoints)).to be(false)
+  #     end
+  #
+  #     expect(mod1.status.zero?).to be(true)
+  #   end
+  #
+  #
+  #   file = File.join(__dir__, "files/osms/in/smalloffice.osm")
+  #   path = OpenStudio::Path.new(file)
+  #   model = translator.loadModel(path)
+  #   expect(model.empty?).to be(false)
+  #   model = model.get
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   loops = mod1.airLoopsHVAC?(model)
+  #   expect(loops).to be(true)
+  #   expect(mod1.status.zero?).to be(true)
+  #   setpoints = mod1.heatingTemperatureSetpoints?(model)
+  #   expect(setpoints).to be(true)
+  #   expect(mod1.status.zero?).to be(true)
+  #
+  #   model.getSpaces.each do |space|
+  #     id = space.nameString
+  #     expect(space.thermalZone.empty?).to be(false)
+  #     zone = space.thermalZone.get
+  #
+  #     heat_spt = mod1.maxHeatScheduledSetpoint(zone)
+  #     cool_spt = mod1.minCoolScheduledSetpoint(zone)
+  #     expect(heat_spt.is_a?(Hash)).to be(true)
+  #     expect(cool_spt.is_a?(Hash)).to be(true)
+  #     expect(heat_spt.key?(:spt)).to be(true)
+  #     expect(cool_spt.key?(:spt)).to be(true)
+  #     expect(heat_spt.key?(:dual)).to be(true)
+  #     expect(cool_spt.key?(:dual)).to be(true)
+  #     expect(heat_spt[:spt].nil?).to be(true)                   if id == "Attic"
+  #     expect(cool_spt[:spt].nil?).to be(true)                   if id == "Attic"
+  #     expect(heat_spt[:dual]).to be(false)                      if id == "Attic"
+  #     expect(cool_spt[:dual]).to be(false)                      if id == "Attic"
+  #     expect(zone.thermostat.empty?)                            if id == "Attic"
+  #     expect(space.partofTotalFloorArea).to be(true)        unless id == "Attic"
+  #     expect(space.partofTotalFloorArea).to be(false)           if id == "Attic"
+  #     expect(mod1.plenum?(space, loops, setpoints)).to be(false)
+  #   end
+  #
+  #   expect(mod1.status.zero?).to be(true)
+  # end
+  #
+  # it "checks availability schedule generation" do
+  #   mdl = OpenStudio::Model::Model.new
+  #   version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
+  #   v = version.join.to_i
+  #
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #   file = File.join(__dir__, "files/osms/in/seb.osm")
+  #   path = OpenStudio::Path.new(file)
+  #   model = translator.loadModel(path)
+  #   expect(model.empty?).to be(false)
+  #   model = model.get
+  #
+  #   year = model.yearDescription
+  #   expect(year.empty?).to be(false)
+  #   year = year.get
+  #
+  #   am01 = OpenStudio::Time.new(0, 1)
+  #   pm11 = OpenStudio::Time.new(0,23)
+  #
+  #   jan01 = year.makeDate(OpenStudio::MonthOfYear.new("Jan"),  1)
+  #   apr30 = year.makeDate(OpenStudio::MonthOfYear.new("Apr"), 30)
+  #   may01 = year.makeDate(OpenStudio::MonthOfYear.new("May"),  1)
+  #   oct31 = year.makeDate(OpenStudio::MonthOfYear.new("Oct"), 31)
+  #   nov01 = year.makeDate(OpenStudio::MonthOfYear.new("Nov"),  1)
+  #   dec31 = year.makeDate(OpenStudio::MonthOfYear.new("Dec"), 31)
+  #   expect(oct31.is_a?(OpenStudio::Date)).to be(true)
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #
+  #   sch = mod1.availabilitySchedule(model)                        # ON (default)
+  #   expect(sch.is_a?(OpenStudio::Model::ScheduleRuleset)).to be(true)
+  #   expect(sch.nameString).to eq("ON Availability SchedRuleset")
+  #   limits = sch.scheduleTypeLimits
+  #   expect(limits.empty?).to be(false)
+  #   limits = limits.get
+  #   expect(limits.nameString).to eq("HVAC Operation ScheduleTypeLimits")
+  #   default = sch.defaultDaySchedule
+  #   expect(default.nameString).to eq("ON Availability dftDaySched")
+  #   expect(default.times.empty?).to be(false)
+  #   expect(default.values.empty?).to be(false)
+  #   expect(default.times.size).to eq(1)
+  #   expect(default.values.size).to eq(1)
+  #   expect(default.getValue(am01).to_i).to eq(1)
+  #   expect(default.getValue(pm11).to_i).to eq(1)
+  #   expect(sch.isWinterDesignDayScheduleDefaulted).to be(true)
+  #   expect(sch.isSummerDesignDayScheduleDefaulted).to be(true)
+  #   expect(sch.isHolidayScheduleDefaulted).to be(true)
+  #   expect(sch.isCustomDay1ScheduleDefaulted).to be(true) unless v < 330
+  #   expect(sch.isCustomDay2ScheduleDefaulted).to be(true) unless v < 330
+  #   expect(sch.summerDesignDaySchedule).to eq(default)
+  #   expect(sch.winterDesignDaySchedule).to eq(default)
+  #   expect(sch.holidaySchedule).to eq(default)
+  #   expect(sch.customDay1Schedule).to eq(default) unless v < 330
+  #   expect(sch.customDay2Schedule).to eq(default) unless v < 330
+  #   expect(sch.scheduleRules.empty?).to be(true)
+  #
+  #   sch = mod1.availabilitySchedule(model, "Off")
+  #   expect(sch.is_a?(OpenStudio::Model::ScheduleRuleset)).to be(true)
+  #   expect(sch.nameString).to eq("OFF Availability SchedRuleset")
+  #   limits = sch.scheduleTypeLimits
+  #   expect(limits.empty?).to be(false)
+  #   limits = limits.get
+  #   expect(limits.nameString).to eq("HVAC Operation ScheduleTypeLimits")
+  #   default = sch.defaultDaySchedule
+  #   expect(default.nameString).to eq("OFF Availability dftDaySched")
+  #   expect(default.times.empty?).to be(false)
+  #   expect(default.values.empty?).to be(false)
+  #   expect(default.times.size).to eq(1)
+  #   expect(default.values.size).to eq(1)
+  #   expect(default.getValue(am01).to_i).to eq(0)
+  #   expect(default.getValue(pm11).to_i).to eq(0)
+  #   expect(sch.isWinterDesignDayScheduleDefaulted).to be(true)
+  #   expect(sch.isSummerDesignDayScheduleDefaulted).to be(true)
+  #   expect(sch.isHolidayScheduleDefaulted).to be(true)
+  #   expect(sch.isCustomDay1ScheduleDefaulted).to be(true) unless v < 330
+  #   expect(sch.isCustomDay2ScheduleDefaulted).to be(true) unless v < 330
+  #   expect(sch.summerDesignDaySchedule).to eq(default)
+  #   expect(sch.winterDesignDaySchedule).to eq(default)
+  #   expect(sch.holidaySchedule).to eq(default)
+  #   expect(sch.customDay1Schedule).to eq(default) unless v < 330
+  #   expect(sch.customDay2Schedule).to eq(default) unless v < 330
+  #   expect(sch.scheduleRules.empty?).to be(true)
+  #
+  #   sch = mod1.availabilitySchedule(model, "Winter")
+  #   expect(sch.is_a?(OpenStudio::Model::ScheduleRuleset)).to be(true)
+  #   expect(sch.nameString).to eq("WINTER Availability SchedRuleset")
+  #   limits = sch.scheduleTypeLimits
+  #   expect(limits.empty?).to be(false)
+  #   limits = limits.get
+  #   expect(limits.nameString).to eq("HVAC Operation ScheduleTypeLimits")
+  #   default = sch.defaultDaySchedule
+  #   expect(default.nameString).to eq("WINTER Availability dftDaySched")
+  #   expect(default.times.empty?).to be(false)
+  #   expect(default.values.empty?).to be(false)
+  #   expect(default.times.size).to eq(1)
+  #   expect(default.values.size).to eq(1)
+  #   expect(default.getValue(am01).to_i).to eq(1)
+  #   expect(default.getValue(pm11).to_i).to eq(1)
+  #   expect(sch.isWinterDesignDayScheduleDefaulted).to be(true)
+  #   expect(sch.isSummerDesignDayScheduleDefaulted).to be(true)
+  #   expect(sch.isHolidayScheduleDefaulted).to be(true)
+  #   expect(sch.isCustomDay1ScheduleDefaulted).to be(true) unless v < 330
+  #   expect(sch.isCustomDay2ScheduleDefaulted).to be(true) unless v < 330
+  #   expect(sch.summerDesignDaySchedule).to eq(default)
+  #   expect(sch.winterDesignDaySchedule).to eq(default)
+  #   expect(sch.holidaySchedule).to eq(default)
+  #   expect(sch.customDay1Schedule).to eq(default) unless v < 330
+  #   expect(sch.customDay2Schedule).to eq(default) unless v < 330
+  #   expect(sch.scheduleRules.size).to eq(1)
+  #
+  #   sch.getDaySchedules(jan01, apr30).each do |day_schedule|
+  #     expect(day_schedule.times.empty?).to be(false)
+  #     expect(day_schedule.values.empty?).to be(false)
+  #     expect(day_schedule.times.size).to eq(1)
+  #     expect(day_schedule.values.size).to eq(1)
+  #     expect(day_schedule.getValue(am01).to_i).to eq(1)
+  #     expect(day_schedule.getValue(pm11).to_i).to eq(1)
+  #   end
+  #
+  #   sch.getDaySchedules(may01, oct31).each do |day_schedule|
+  #     expect(day_schedule.times.empty?).to be(false)
+  #     expect(day_schedule.values.empty?).to be(false)
+  #     expect(day_schedule.times.size).to eq(1)
+  #     expect(day_schedule.values.size).to eq(1)
+  #     expect(day_schedule.getValue(am01).to_i).to eq(0)
+  #     expect(day_schedule.getValue(pm11).to_i).to eq(0)
+  #   end
+  #
+  #   sch.getDaySchedules(nov01, dec31).each do |day_schedule|
+  #     expect(day_schedule.times.empty?).to be(false)
+  #     expect(day_schedule.values.empty?).to be(false)
+  #     expect(day_schedule.times.size).to eq(1)
+  #     expect(day_schedule.values.size).to eq(1)
+  #     expect(day_schedule.getValue(am01).to_i).to eq(1)
+  #     expect(day_schedule.getValue(pm11).to_i).to eq(1)
+  #   end
+  #
+  #   another = mod1.availabilitySchedule(model, "Winter")
+  #   expect(another.nameString).to eq(sch.nameString)
+  #
+  #   sch = mod1.availabilitySchedule(model, "Summer")
+  #   expect(sch.is_a?(OpenStudio::Model::ScheduleRuleset)).to be(true)
+  #   expect(sch.nameString).to eq("SUMMER Availability SchedRuleset")
+  #   limits = sch.scheduleTypeLimits
+  #   expect(limits.empty?).to be(false)
+  #   limits = limits.get
+  #   expect(limits.nameString).to eq("HVAC Operation ScheduleTypeLimits")
+  #   default = sch.defaultDaySchedule
+  #   expect(default.nameString).to eq("SUMMER Availability dftDaySched")
+  #   expect(default.times.empty?).to be(false)
+  #   expect(default.values.empty?).to be(false)
+  #   expect(default.times.size).to eq(1)
+  #   expect(default.values.size).to eq(1)
+  #   expect(default.getValue(am01).to_i).to eq(0)
+  #   expect(default.getValue(pm11).to_i).to eq(0)
+  #   expect(sch.isWinterDesignDayScheduleDefaulted).to be(true)
+  #   expect(sch.isSummerDesignDayScheduleDefaulted).to be(true)
+  #   expect(sch.isHolidayScheduleDefaulted).to be(true)
+  #   expect(sch.isCustomDay1ScheduleDefaulted).to be(true) unless v < 330
+  #   expect(sch.isCustomDay2ScheduleDefaulted).to be(true) unless v < 330
+  #   expect(sch.summerDesignDaySchedule).to eq(default)
+  #   expect(sch.winterDesignDaySchedule).to eq(default)
+  #   expect(sch.holidaySchedule).to eq(default)
+  #   expect(sch.customDay1Schedule).to eq(default) unless v < 330
+  #   expect(sch.customDay2Schedule).to eq(default) unless v < 330
+  #   expect(sch.scheduleRules.size).to eq(1)
+  #
+  #   sch.getDaySchedules(jan01, apr30).each do |day_schedule|
+  #     expect(day_schedule.times.empty?).to be(false)
+  #     expect(day_schedule.values.empty?).to be(false)
+  #     expect(day_schedule.times.size).to eq(1)
+  #     expect(day_schedule.values.size).to eq(1)
+  #     expect(day_schedule.getValue(am01).to_i).to eq(0)
+  #     expect(day_schedule.getValue(pm11).to_i).to eq(0)
+  #   end
+  #
+  #   sch.getDaySchedules(may01, oct31).each do |day_schedule|
+  #     expect(day_schedule.times.empty?).to be(false)
+  #     expect(day_schedule.values.empty?).to be(false)
+  #     expect(day_schedule.times.size).to eq(1)
+  #     expect(day_schedule.values.size).to eq(1)
+  #     expect(day_schedule.getValue(am01).to_i).to eq(1)
+  #     expect(day_schedule.getValue(pm11).to_i).to eq(1)
+  #   end
+  #
+  #   sch.getDaySchedules(nov01, dec31).each do |day_schedule|
+  #     expect(day_schedule.times.empty?).to be(false)
+  #     expect(day_schedule.values.empty?).to be(false)
+  #     expect(day_schedule.times.size).to eq(1)
+  #     expect(day_schedule.values.size).to eq(1)
+  #     expect(day_schedule.getValue(am01).to_i).to eq(0)
+  #     expect(day_schedule.getValue(pm11).to_i).to eq(0)
+  #   end
+  # end
+  #
+  # it "checks construction thickness" do
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #   file = File.join(__dir__, "files/osms/in/seb.osm")
+  #   path = OpenStudio::Path.new(file)
+  #   model = translator.loadModel(path)
+  #   expect(model.empty?).to be(false)
+  #   model = model.get
+  #
+  #   m  = "OSut::thickness"
+  #   m1 = "holds non-StandardOpaqueMaterial(s) (#{m})"
+  #   expect(cls1.clean!).to eq(DBG)
+  #
+  #   model.getConstructions.each do |c|
+  #     next if c.to_LayeredConstruction.empty?
+  #     c = c.to_LayeredConstruction.get
+  #     id = c.nameString
+  #
+  #     # OSut 'thickness' method can only process layered constructions
+  #     # built up with standard opaque layers, which exclude the model's
+  #     #   - "Air Wall"-based construction
+  #     #   - "Double pane"-based construction
+  #     # The method returns '0' in such cases, while logging ERROR messages
+  #     # (OSut extends OSlg logger).
+  #     th = cls1.thickness(c)
+  #     expect(th).to be_within(TOL).of(0) if id.include?("Air Wall")
+  #     expect(th).to be_within(TOL).of(0) if id.include?("Double pane")
+  #     next if id.include?("Air Wall")
+  #     next if id.include?("Double pane")
+  #     expect(th > 0).to be(true)
+  #   end
+  #
+  #   expect(cls1.status).to eq(ERR)
+  #   cls1.logs.each { |l| expect(l[:message].include?(m1)).to be(true) }
+  #
+  #   # OSut, and by extension OSlg, are intended to be accessed "globally"
+  #   # once instantiated within a class or module. Here, class instance cls2
+  #   # accesses the same OSut module methods/attributes as cls1.
+  #   expect(cls2.status).to eq(ERR)
+  #   cls2.clean!
+  #   expect(cls1.status.zero?).to eq(true)
+  #   expect(cls1.logs.empty?).to be(true)
+  #
+  #   model.getConstructions.each do |c|
+  #     next if c.to_LayeredConstruction.empty?
+  #     c = c.to_LayeredConstruction.get
+  #     id = c.nameString
+  #
+  #     # No ERROR logging if skipping over invalid arguments to 'thickness'.
+  #     next if id.include?("Air Wall")
+  #     next if id.include?("Double pane")
+  #     th = cls2.thickness(c)
+  #     expect(th > 0).to be(true)
+  #   end
+  #
+  #   expect(cls2.status.zero?).to be(true)
+  #   expect(cls2.logs.empty?).to be(true)
+  #   expect(cls1.status.zero?).to eq(true)
+  #   expect(cls1.logs.empty?).to be(true)
+  # end
+  #
+  # it "checks if a set holds a construction" do
+  #   mdl = OpenStudio::Model::Model.new
+  #   version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
+  #   v = version.join.to_i
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #
+  #   if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
+  #     file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+  #     path = OpenStudio::Path.new(file)
+  #     model = translator.loadModel(path)
+  #     expect(model.empty?).to be(false)
+  #     model = model.get
+  #
+  #     expect(mod1.clean!).to eq(DBG)
+  #
+  #     t1  = "roofceiling"
+  #     t2  = "wall"
+  #     cl1 = OpenStudio::Model::DefaultConstructionSet
+  #     cl2 = OpenStudio::Model::LayeredConstruction
+  #     n1  = "CBECS Before-1980 ClimateZone 8 (smoff) ConstSet"
+  #     n2  = "CBECS Before-1980 ExtRoof IEAD ClimateZone 8"
+  #     m1  = "'#{n2}' #{cl2}? expecting #{cl1} (OSut::holdsConstruction?)"
+  #     m5  = "Invalid 'surface type' arg #5 (OSut::holdsConstruction?)"
+  #     m6  = "Invalid 'set' arg #1 (OSut::holdsConstruction?)"
+  #
+  #     set = model.getDefaultConstructionSetByName(n1)
+  #     expect(set.empty?).to be(false)
+  #     set = set.get
+  #
+  #     c = model.getLayeredConstructionByName(n2)
+  #     expect(c.empty?).to be(false)
+  #     c = c.get
+  #
+  #     # TRUE case: 'set' holds 'c' (exterior roofceiling construction)
+  #     expect(mod1.holdsConstruction?(set, c, false, true, t1)).to be(true)
+  #     expect(mod1.logs.empty?).to be(true)
+  #
+  #     # FALSE case: not ground construction
+  #     expect(mod1.holdsConstruction?(set, c, true, true, t1)).to be(false)
+  #     expect(mod1.logs.empty?).to be(true)
+  #
+  #     # INVALID case: arg #5 : nil (instead of surface type string)
+  #     expect(mod1.holdsConstruction?(set, c, true, true, nil)).to be(false)
+  #     expect(mod1.debug?).to be(true)
+  #     expect(mod1.logs.size).to eq(1)
+  #     expect(mod1.logs.first[:message]).to eq(m5)
+  #     expect(mod1.clean!).to eq(DBG)
+  #
+  #     # INVALID case: arg #5 : empty surface type string
+  #     expect(mod1.holdsConstruction?(set, c, true, true, "")).to be(false)
+  #     expect(mod1.debug?).to be(true)
+  #     expect(mod1.logs.size).to eq(1)
+  #     expect(mod1.logs.first[:message]).to eq(m5)
+  #     expect(mod1.clean!).to eq(DBG)
+  #
+  #     # INVALID case: arg #5 : c construction (instead of surface type string)
+  #     expect(mod1.holdsConstruction?(set, c, true, true, c)).to be(false)
+  #     expect(mod1.debug?).to be(true)
+  #     expect(mod1.logs.size).to eq(1)
+  #     expect(mod1.logs.first[:message]).to eq(m5)
+  #     expect(mod1.clean!).to eq(DBG)
+  #
+  #     # INVALID case: arg #1 : c construction (instead of surface type string)
+  #     expect(mod1.holdsConstruction?(c, c, true, true, c)).to be(false)
+  #     expect(mod1.debug?).to be(true)
+  #     expect(mod1.logs.size).to eq(1)
+  #     expect(mod1.logs.first[:message]).to eq(m1)
+  #     expect(mod1.clean!).to eq(DBG)
+  #
+  #     # INVALID case: arg #1 : model (instead of surface type string)
+  #     expect(mod1.holdsConstruction?(model, c, true, true, t1)).to be(false)
+  #     expect(mod1.debug?).to be(true)
+  #     expect(mod1.logs.size).to eq(1)
+  #     expect(mod1.logs.first[:message]).to eq(m6)
+  #     expect(mod1.clean!).to eq(DBG)
+  #   end
+  # end
+  #
+  # it "retrieves a surface default construction set" do
+  #   mdl = OpenStudio::Model::Model.new
+  #   version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
+  #   v = version.join.to_i
+  #
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #
+  #   if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
+  #     file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+  #     path = OpenStudio::Path.new(file)
+  #     model = translator.loadModel(path)
+  #     expect(model.empty?).to be(false)
+  #     model = model.get
+  #
+  #     m = "construction not defaulted (defaultConstructionSet)"
+  #     mod1.clean!
+  #
+  #     model.getSurfaces.each do |s|
+  #       set = mod1.defaultConstructionSet(model, s)
+  #       expect(set.nil?).to be(false)
+  #       expect(mod1.status.zero?).to be(true)
+  #       expect(mod1.logs.empty?).to be(true)
+  #     end
+  #
+  #     translator = OpenStudio::OSVersion::VersionTranslator.new
+  #     file = File.join(__dir__, "files/osms/in/seb.osm")
+  #     path = OpenStudio::Path.new(file)
+  #     model = translator.loadModel(path)
+  #     expect(model.empty?).to be(false)
+  #     model = model.get
+  #
+  #     mod1.clean!
+  #
+  #     model.getSurfaces.each do |s|
+  #       set = mod1.defaultConstructionSet(model, s)
+  #       expect(set.nil?).to be(true)
+  #       expect(mod1.status).to eq(ERR)
+  #
+  #       mod1.logs.each {|l| expect(l[:message].include?(m)) }
+  #     end
+  #   end
+  # end
+  #
+  # it "checks glazing airfilms" do
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #   file = File.join(__dir__, "files/osms/in/seb.osm")
+  #   path = OpenStudio::Path.new(file)
+  #   model = translator.loadModel(path)
+  #   expect(model.empty?).to be(false)
+  #   model = model.get
+  #
+  #   m  = "OSut::glazingAirFilmRSi"
+  #   m1 = "Invalid 'usi' arg #1 (#{m})"
+  #   m2 = "'usi' String? expecting Numeric (#{m})"
+  #   m3 = "'usi' NilClass? expecting Numeric (#{m})"
+  #   expect(mod1.clean!).to eq(DBG)
+  #
+  #   model.getConstructions.each do |c|
+  #     next unless c.isFenestration
+  #     expect(c.uFactor.empty?).to be(false)
+  #     expect(c.uFactor.get.is_a?(Numeric)).to be(true)
+  #     expect(mod1.glazingAirFilmRSi(c.uFactor.get)).to be_within(TOL).of(0.17)
+  #     expect(mod1.status.zero?).to be(true)
+  #   end
+  #
+  #   expect(mod1.glazingAirFilmRSi(9.0)).to be_within(TOL).of(0.1216)
+  #   expect(mod1.warn?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m1)
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   expect(mod1.glazingAirFilmRSi("")).to be_within(TOL).of(0.1216)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m2)
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   expect(mod1.glazingAirFilmRSi(nil)).to be_within(TOL).of(0.1216)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m3)
+  # end
+  #
+  # it "checks rsi calculations" do
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #   file = File.join(__dir__, "files/osms/in/seb.osm")
+  #   path = OpenStudio::Path.new(file)
+  #   model = translator.loadModel(path)
+  #   expect(model.empty?).to be(false)
+  #   model = model.get
+  #
+  #   m  = "OSut::rsi"
+  #   m1 = "Invalid 'lc' arg #1 (#{m})"
+  #   m2 = "Negative 'film' (#{m})"
+  #   m3 = "'film' NilClass? expecting Numeric (#{m})"
+  #   m4 = "Negative 'temp K' (#{m})"
+  #   m5 = "'temp K' NilClass? expecting Numeric (#{m})"
+  #   expect(mod1.clean!).to eq(DBG)
+  #
+  #   model.getSurfaces.each do |s|
+  #     next unless s.isPartOfEnvelope
+  #     lc = s.construction
+  #     expect(lc.empty?).to be(false)
+  #     lc = lc.get.to_LayeredConstruction
+  #     expect(lc.empty?).to be(false)
+  #     lc = lc.get
+  #
+  #     if s.isGroundSurface                      # 4x slabs on grade in SEB model
+  #       expect(s.filmResistance).to be_within(TOL).of(0.160)
+  #       expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.448)
+  #       expect(mod1.status.zero?).to be(true)
+  #     else
+  #       if s.surfaceType == "Wall"
+  #         expect(s.filmResistance).to be_within(TOL).of(0.150)
+  #         expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(2.616)
+  #         expect(mod1.status.zero?).to be(true)
+  #       else                                                       # RoofCeiling
+  #         expect(s.filmResistance).to be_within(TOL).of(0.136)
+  #         expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(5.631)
+  #         expect(mod1.status.zero?).to be(true)
+  #       end
+  #     end
+  #   end
+  #
+  #   expect(mod1.rsi("", 0.150)).to be_within(TOL).of(0)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m1)
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   expect(mod1.rsi(nil, 0.150)).to be_within(TOL).of(0)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m1)
+  #
+  #   lc = model.getLayeredConstructionByName("SLAB-ON-GRADE-FLOOR")
+  #   expect(lc.empty?).to be(false)
+  #   lc = lc.get
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   expect(mod1.rsi(lc, -1)).to be_within(TOL).of(0)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m2)
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   expect(mod1.rsi(lc, nil)).to be_within(TOL).of(0)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m3)
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   expect(mod1.rsi(lc, 0.150, -300)).to be_within(TOL).of(0)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m4)
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   expect(mod1.rsi(lc, 0.150, nil)).to be_within(TOL).of(0)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m5)
+  # end
+  #
+  # it "identifies an (opaque) insulating layer within a layered construction" do
+  #   translator = OpenStudio::OSVersion::VersionTranslator.new
+  #   file = File.join(__dir__, "files/osms/in/seb.osm")
+  #   path = OpenStudio::Path.new(file)
+  #   model = translator.loadModel(path)
+  #   expect(model.empty?).to be(false)
+  #   model = model.get
+  #
+  #   m  = "OSut::insulatingLayer"
+  #   m1 = "Invalid 'lc' arg #1 (#{m})"
+  #   expect(mod1.clean!).to eq(DBG)
+  #
+  #   model.getLayeredConstructions.each do |lc|
+  #     lyr = mod1.insulatingLayer(lc)
+  #     expect(lyr.is_a?(Hash)).to be(true)
+  #     expect(lyr.key?(:index)).to be(true)
+  #     expect(lyr.key?(:type)).to be(true)
+  #     expect(lyr.key?(:r)).to be(true)
+  #
+  #     if lc.isFenestration
+  #       expect(mod1.status.zero?).to be(true)
+  #       expect(lyr[:index].nil?).to be(true)
+  #       expect(lyr[:type].nil?).to be(true)
+  #       expect(lyr[:r].zero?).to be(true)
+  #       next
+  #     end
+  #
+  #     unless lyr[:type] == :standard || lyr[:type] == :massless   # air wall mat
+  #       expect(mod1.status.zero?).to be(true)
+  #       expect(lyr[:index].nil?).to be(true)
+  #       expect(lyr[:type].nil?).to be(true)
+  #       expect(lyr[:r].zero?).to be(true)
+  #       next
+  #     end
+  #
+  #     expect(lyr[:index] < lc.numLayers).to be(true)
+  #
+  #     case lc.nameString
+  #     when "EXTERIOR-ROOF"
+  #       expect(lyr[:index]).to eq(2)
+  #       expect(lyr[:r]).to be_within(TOL).of(5.08)
+  #     when "EXTERIOR-WALL"
+  #       expect(lyr[:index]).to eq(2)
+  #       expect(lyr[:r]).to be_within(TOL).of(1.47)
+  #     when "Default interior ceiling"
+  #       expect(lyr[:index]).to eq(0)
+  #       expect(lyr[:r]).to be_within(TOL).of(0.12)
+  #     when "INTERIOR-WALL"
+  #       expect(lyr[:index]).to eq(1)
+  #       expect(lyr[:r]).to be_within(TOL).of(0.24)
+  #     else
+  #       expect(lyr[:index]).to eq(0)
+  #       expect(lyr[:r]).to be_within(TOL).of(0.29)
+  #     end
+  #   end
+  #
+  #   lyr = mod1.insulatingLayer(nil)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(lyr[:index].nil?).to be(true)
+  #   expect(lyr[:type].nil?).to be(true)
+  #   expect(lyr[:r].zero?).to be(true)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m1)
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   lyr = mod1.insulatingLayer("")
+  #   expect(mod1.debug?).to be(true)
+  #   expect(lyr[:index].nil?).to be(true)
+  #   expect(lyr[:type].nil?).to be(true)
+  #   expect(lyr[:r].zero?).to be(true)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m1)
+  #
+  #   expect(mod1.clean!).to eq(DBG)
+  #   lyr = mod1.insulatingLayer(model)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(lyr[:index].nil?).to be(true)
+  #   expect(lyr[:type].nil?).to be(true)
+  #   expect(lyr[:r].zero?).to be(true)
+  #   expect(mod1.debug?).to be(true)
+  #   expect(mod1.logs.size).to eq(1)
+  #   expect(mod1.logs.first[:message]).to eq(m1)
+  # end
 
   it "checks model transformation" do
     expect(mod1.reset(DBG)).to eq(DBG)
@@ -1297,5 +1297,252 @@ RSpec.describe OSut do
     expect(mod1.fits?(wall.vertices, glazing.vertices)).to be(true)
     expect(mod1.overlaps?(wall.vertices, glazing.vertices)).to be(true)
     expect(mod1.status.zero?).to be(true)
+  end
+
+  it "checks subsurface insertions on tilted surfaces" do
+    # Examples of how to harness OpenStudio's Boost geometry methods to safely
+    # insert subsurfaces along rotated/tilted/slanted host/parent/base
+    # surfaces. First step, modify SEB.osm model.
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    file = File.join(__dir__, "files/osms/in/seb.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    openarea = model.getSpaceByName("Open area 1")
+    expect(openarea.empty?).to be(false)
+    openarea = openarea.get
+    expect(openarea.isEnclosedVolume).to be(true)
+    expect(openarea.isVolumeDefaulted).to be(true)
+    expect(openarea.isVolumeAutocalculated).to be(true)
+
+    w5 = model.getSurfaceByName("Openarea 1 Wall 5")
+    expect(w5.empty?).to be(false)
+    w5 = w5.get
+    w5_space = w5.space
+    expect(w5_space.empty?).to be(false)
+    w5_space = w5_space.get
+    expect(w5_space).to eq(openarea)
+    expect(w5.vertices.size).to eq(4)
+
+    # Delete w5, and replace with 1x slanted roof + 3x walls (1x tilted).
+    # Keep w5 coordinates in memory (before deleting), as anchor points for the
+    # 4x new surfaces.
+    w5_0 = w5.vertices[0]
+    w5_1 = w5.vertices[1]
+    w5_2 = w5.vertices[2]
+    w5_3 = w5.vertices[3]
+
+    w5.remove
+
+    # 2x new points.
+    roof_left  = OpenStudio::Point3d.new( 0.2166, 12.7865, 2.3528)
+    roof_right = OpenStudio::Point3d.new(-5.4769, 11.2626, 2.3528)
+    length     = (roof_left - roof_right).length
+
+    # New slanted roof.
+    vec  = OpenStudio::Point3dVector.new
+    vec << w5_0
+    vec << roof_left
+    vec << roof_right
+    vec << w5_3
+    roof = OpenStudio::Model::Surface.new(vec, model)
+    roof.setName("Openarea slanted roof")
+    expect(roof.setSurfaceType("RoofCeiling")).to be(true)
+    expect(roof.setSpace(openarea)).to be(true)
+
+    # New, inverse-tilted wall (i.e. cantilevered), under new slanted roof.
+    vec  = OpenStudio::Point3dVector.new
+    vec << roof_left
+    vec << w5_1
+    vec << w5_2
+    vec << roof_right
+    tilt_wall = OpenStudio::Model::Surface.new(vec, model)
+    tilt_wall.setName("Openarea tilted wall")
+    expect(tilt_wall.setSurfaceType("Wall")).to be(true)
+    expect(tilt_wall.setSpace(openarea)).to be(true)
+
+    # New, left side wall.
+    vec  = OpenStudio::Point3dVector.new
+    vec << w5_0
+    vec << w5_1
+    vec << roof_left
+    left_wall = OpenStudio::Model::Surface.new(vec, model)
+    left_wall.setName("Openarea left side wall")
+    expect(left_wall.setSpace(openarea)).to be(true)
+
+    # New, right side wall.
+    vec  = OpenStudio::Point3dVector.new
+    vec << w5_3
+    vec << roof_right
+    vec << w5_2
+    right_wall = OpenStudio::Model::Surface.new(vec, model)
+    right_wall.setName("Openarea right side wall")
+    expect(right_wall.setSpace(openarea)).to be(true)
+
+    expect(openarea.isEnclosedVolume).to be(true)
+    expect(openarea.isVolumeDefaulted).to be(true)
+    expect(openarea.isVolumeAutocalculated).to be(true)
+
+    file = File.join(__dir__, "files/osms/out/seb_mod.osm")
+    model.save(file, true)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Fetch transform if tilted wall vertices were to "align", i.e.:
+    #   - rotated/tilted
+    #   - then flattened along XY plane
+    #   - all Z-axis coordinates == ~0
+    #   - vertices with the lowest X-axis values are aligned along X-axis (0)
+    #   - vertices with the lowest Z-axis values ares aligned along Y-axis (0)
+    #   - Z-axis values are represented as Y-axis values
+    tr = OpenStudio::Transformation.alignFace(tilt_wall.vertices)
+    aligned_tilt_wall = tr.inverse * tilt_wall.vertices
+    expect(aligned_tilt_wall.is_a?(Array)).to be(true)
+
+    # Find centerline along "aligned" X-axis, and upper Y-axis limit.
+    min_x = 0
+    max_x = 0
+    max_y = 0
+
+    aligned_tilt_wall.each do |vec|
+      min_x = vec.x if vec.x < min_x
+      max_x = vec.x if vec.x > max_x
+      max_y = vec.y if vec.y > max_y
+    end
+
+    centerline = (max_x - min_x) / 2
+    expect(centerline * 2).to be_within(TOL).of(length)
+
+    # Subsurface dimensions (e.g. window/skylight).
+    width  = 0.5
+    height = 1.0
+
+    # Add 3x new, tilted windows along the tilted wall upper horizontal edge
+    # (i.e. max_Y), then realign with original tilted wall. Insert using 5mm
+    # buffer, IF inserted along any host/parent/base surface edge, e.g. door
+    # sill. Boost-based alignement/realignment does introduce small errors, and
+    # EnergyPlus may raise warnings of overlaps between host/base/parent
+    # surface and any of its new subsurface(s). Why 5mm (vs 25mm)? Keeping
+    # buffer under 10mm, see: https://rd2.github.io/tbd/pages/subs.html.
+    y = max_y - 0.005
+
+    x    = centerline - width / 2 # center window
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(x,         y,          0)
+    vec << OpenStudio::Point3d.new(x,         y - height, 0)
+    vec << OpenStudio::Point3d.new(x + width, y - height, 0)
+    vec << OpenStudio::Point3d.new(x + width, y,          0)
+
+    tilt_window1 = OpenStudio::Model::SubSurface.new(tr * vec, model)
+    tilt_window1.setName("Tilted window (center)")
+    expect(tilt_window1.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(tilt_window1.setSurface(tilt_wall)).to be(true)
+
+    x    = centerline - 3*width/2 - 0.15 # window to the left of the first one
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(x,         y,          0)
+    vec << OpenStudio::Point3d.new(x,         y - height, 0)
+    vec << OpenStudio::Point3d.new(x + width, y - height, 0)
+    vec << OpenStudio::Point3d.new(x + width, y,          0)
+
+    tilt_window2 = OpenStudio::Model::SubSurface.new(tr * vec, model)
+    tilt_window2.setName("Tilted window (left)")
+    expect(tilt_window2.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(tilt_window2.setSurface(tilt_wall)).to be(true)
+
+    x    = centerline + width/2 + 0.15 # window to the right of the first one
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(x,         y,          0)
+    vec << OpenStudio::Point3d.new(x,         y - height, 0)
+    vec << OpenStudio::Point3d.new(x + width, y - height, 0)
+    vec << OpenStudio::Point3d.new(x + width, y,          0)
+
+    tilt_window3 = OpenStudio::Model::SubSurface.new(tr * vec, model)
+    tilt_window3.setName("Tilted window (right)")
+    expect(tilt_window3.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(tilt_window3.setSurface(tilt_wall)).to be(true)
+
+    # file = File.join(__dir__, "files/osms/out/seb_fen.osm")
+    # model.save(file, true)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Repeat for 3x skylights. Fetch transform if slanted roof vertices were
+    # also to "align". Recover the (default) window construction.
+    expect(tilt_window1.isConstructionDefaulted).to be(true)
+    construction = tilt_window1.construction
+    expect(construction.empty?).to be(false)
+    construction = construction.get
+
+    tr = OpenStudio::Transformation.alignFace(roof.vertices)
+    aligned_roof = tr.inverse * roof.vertices
+    expect(aligned_roof.is_a?(Array)).to be(true)
+
+    # Find centerline along "aligned" X-axis, and lower Y-axis limit.
+    min_x = 0
+    max_x = 0
+    min_y = 0
+
+    aligned_tilt_wall.each do |vec|
+      min_x = vec.x if vec.x < min_x
+      max_x = vec.x if vec.x > max_x
+      min_y = vec.y if vec.y < min_y
+    end
+
+    centerline = (max_x - min_x) / 2
+    expect(centerline * 2).to be_within(TOL).of(length)
+
+    # Add 3x new, slanted skylights aligned along upper horizontal edge of roof
+    # (i.e. min_Y), then realign with original roof.
+    y = min_y + 0.005
+
+    x    = centerline - width / 2 # center skylight
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(x,         y + height, 0)
+    vec << OpenStudio::Point3d.new(x,         y,          0)
+    vec << OpenStudio::Point3d.new(x + width, y,          0)
+    vec << OpenStudio::Point3d.new(x + width, y + height, 0)
+
+    skylight1 = OpenStudio::Model::SubSurface.new(tr * vec, model)
+    skylight1.setName("Skylight (center)")
+    expect(skylight1.setSubSurfaceType("Skylight")).to be(true)
+    expect(skylight1.setConstruction(construction)).to be(true)
+    expect(skylight1.setSurface(roof)).to be(true)
+
+    x    = centerline - 3*width/2 - 0.15 # skylight to the left of center
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(x,         y + height, 0)
+    vec << OpenStudio::Point3d.new(x,         y         , 0)
+    vec << OpenStudio::Point3d.new(x + width, y         , 0)
+    vec << OpenStudio::Point3d.new(x + width, y + height, 0)
+
+    skylight2 = OpenStudio::Model::SubSurface.new(tr * vec, model)
+    skylight2.setName("Skylight (left)")
+    expect(skylight2.setSubSurfaceType("Skylight")).to be(true)
+    expect(skylight2.setConstruction(construction)).to be(true)
+    expect(skylight2.setSurface(roof)).to be(true)
+
+    x    = centerline + width/2 + 0.15 # skylight to the right of center
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(x,         y + height, 0)
+    vec << OpenStudio::Point3d.new(x,         y         , 0)
+    vec << OpenStudio::Point3d.new(x + width, y         , 0)
+    vec << OpenStudio::Point3d.new(x + width, y + height, 0)
+
+    skylight3 = OpenStudio::Model::SubSurface.new(tr * vec, model)
+    skylight3.setName("Skylight (right)")
+    expect(skylight3.setSubSurfaceType("Skylight")).to be(true)
+    expect(skylight3.setConstruction(construction)).to be(true)
+    expect(skylight3.setSurface(roof)).to be(true)
+
+    file = File.join(__dir__, "files/osms/out/seb_sky.osm")
+    model.save(file, true)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Now test the same result when relying on OSut::addSub
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
   end
 end

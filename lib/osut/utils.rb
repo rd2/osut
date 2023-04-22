@@ -1460,7 +1460,7 @@ module OSut
   # @return [OpenStudio::Point3dVector] offset points if successful
   # @return [OpenStudio::Point3dVector] original points if invalid input
   def offset(p1 = [], w = 0, v = 0)
-    mth   = "TBD::#{__callee__}"
+    mth   = "OSut::#{__callee__}"
     cl    = OpenStudio::Point3d
     vrsn  = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
 
@@ -1499,7 +1499,7 @@ module OSut
 
       pz = OpenStudio::Point3dVector.new
       offset.each { |o| pz << OpenStudio::Point3d.new(o.x, o.y, o.z ) }
-      
+
       return pz
     else                                                  # brute force approach
       pz     = {}
@@ -1682,6 +1682,80 @@ module OSut
 
       return vec
     end
+  end
+
+  ##
+  # Validate whether an OpenStudio planar surface is safe to process.
+  #
+  # @param surface [OpenStudio::Model::PlanarSurface] a surface
+  #
+  # @return [Bool] true if valid surface
+  def valid(surface = nil)
+    mth = "TBD::#{__callee__}"
+    cl = OpenStudio::Model::PlanarSurface
+
+    return mismatch("surface", surface, cl, mth, DBG, false) unless s.is_a?(cl)
+
+    id   = surface.nameString
+    size = surface.vertices.size
+    last = size - 1
+
+    log(ERR, "#{id} #{size} vertices? need +3 (#{mth})")       unless size > 2
+    return false                                               unless size > 2
+
+    [0, last].each do |i|
+      v1 = surface.vertices[i]
+      v2 = surface.vertices[i + 1]                             unless i == last
+      v2 = surface.vertices.first                                  if i == last
+      vector = v2 - v1
+      bad = vector.length < TOL
+
+      # As is, this comparison also catches collinear vertices (< 10mm apart)
+      # along an edge. Should avoid red-flagging such cases. TO DO.
+      log(ERR, "#{id}: < #{TOL}m (#{mth})")                              if bad
+      return false                                                       if bad
+    end
+
+    # Add as many extra tests as needed ...
+    true
+  end
+
+  ##
+  # Add sub surfaces (e.g. windows, doors, skylights) to surface.
+  #
+  # @param model [OpenStudio::Model::Model] a model
+  # @param surface [OpenStudio::Model::Surface] a surface
+  # @param subs [Array] sub surface attributes
+  #
+  # @return [Bool] true if successful (check for logged messages if failures)
+  def addSubs(model: nil, surface: nil, subs: [])
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Model::Model
+    cl2 = OpenStudio::Model::Surface
+    cl3 = Array
+    cl3 = Hash
+
+    return mismatch("model", model, cl1, mth)         unless model.is_a?(cl1)
+    return mismatch("surface", surface, cl2, mth)     unless surface.is_a?(cl2)
+    return mismatch("subs", subs, cl3, mth)           unless subs.is_a?(cl3)
+    return false                                      unless valid(surface)
+
+    subs.each do |sub|
+      return mismatch("sub", sub, cl4, mth)           unless sub.is_a?(cl4)
+
+      # Each "sub" (Hash) may hold any of the following keys:
+      sub[:width     ] = 1.0   unless sub.key?(:width     )
+      sub[:height    ] = 1.0   unless sub.key?(:height    )
+      sub[:head      ] = 2.032 unless sub.key?(:head      )
+      sub[:multiplier] = 1     unless sub.key?(:multiplier)
+      sub[:centerline] = 1.0   unless sub.key?(:centerline)
+      sub[:offset    ] = 3.0   unless sub.key?(:offset    )
+      sub[:ratio     ] = 40    unless sub.key?(:ratio     )
+    end
+
+    # TO DO ...
+
+    true
   end
 
   ##
