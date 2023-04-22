@@ -1315,9 +1315,9 @@ RSpec.describe OSut do
     openarea = model.getSpaceByName("Open area 1")
     expect(openarea.empty?).to be(false)
     openarea = openarea.get
-    expect(openarea.isEnclosedVolume).to be(true)       unless v < 3.5
-    expect(openarea.isVolumeDefaulted).to be(true)      unless v < 3.5
-    expect(openarea.isVolumeAutocalculated).to be(true) unless v < 3.5
+    expect(openarea.isEnclosedVolume).to be(true)       unless v < 350
+    expect(openarea.isVolumeDefaulted).to be(true)      unless v < 350
+    expect(openarea.isVolumeAutocalculated).to be(true) unless v < 350
 
     w5 = model.getSurfaceByName("Openarea 1 Wall 5")
     expect(w5.empty?).to be(false)
@@ -1383,9 +1383,9 @@ RSpec.describe OSut do
     right_wall.setName("Openarea right side wall")
     expect(right_wall.setSpace(openarea)).to be(true)
 
-    expect(openarea.isEnclosedVolume).to be(true)       unless v < 3.5
-    expect(openarea.isVolumeDefaulted).to be(true)      unless v < 3.5
-    expect(openarea.isVolumeAutocalculated).to be(true) unless v < 3.5
+    expect(openarea.isEnclosedVolume).to be(true)       unless v < 350
+    expect(openarea.isVolumeDefaulted).to be(true)      unless v < 350
+    expect(openarea.isVolumeAutocalculated).to be(true) unless v < 350
 
     file = File.join(__dir__, "files/osms/out/seb_mod.osm")
     model.save(file, true)
