@@ -1541,17 +1541,68 @@ RSpec.describe OSut do
     model.save(file, true)
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # Now test the same result when relying on OSut::addSub
+    # Now test the same result when relying on OSut::addSub.
+    file = File.join(__dir__, "files/osms/out/seb_mod.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    roof = model.getSurfaceByName("Openarea slanted roof")
+    expect(roof.empty?).to be(false)
+    roof = roof.get
+
+    tilt_wall = model.getSurfaceByName("Openarea tilted wall")
+    expect(tilt_wall.empty?).to be(false)
+    tilt_wall = tilt_wall.get
+
     expect(mod1.reset(DBG)).to eq(DBG)
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
 
-    subs = []
-    subs << {height: 0.2, width: 0.2}
-    puts mod1.addSubs(model, right_wall, subs, false)
-    puts mod1.logs
+    # subs = []
+    # subs << {height: 0.2, width: 0.2}
+    # expect(mod1.addSubs(model, right_wall, subs, false)).to be(true)
+    # expect(mod1.status.zero?).to be(true)
+    # expect(mod1.logs.size.zero?).to be(true)
+    #
+    # file = File.join(__dir__, "files/osms/out/seb_right.osm")
+    # model.save(file, true)
+    head   = max_y - 0.005
+    offset = width + 0.15
 
-    file = File.join(__dir__, "files/osms/out/seb_right.osm")
+    # Add array of 3x windows to tilted wall.
+    sub = {}
+    sub[:id    ] = "Tilted window"
+    sub[:height] = height
+    sub[:width ] = width
+    sub[:head  ] = head
+    sub[:count ] = 3
+    sub[:offset] = offset
+    # sub[:type  ] = "Wall" # defaults to "Wall" if not specified.
+    expect(mod1.addSubs(model, tilt_wall, [sub], false)).to be(true)
+    expect(mod1.status.zero?).to be(true)
+    expect(mod1.logs.size.zero?).to be(true)
+
+    tilted = model.getSubSurfaceByName("Tilted window:0")
+    expect(tilted.empty?).to be(false)
+    tilted = tilted.get
+    construction = tilted.construction
+    expect(construction.empty?).to be(false)
+    construction = construction.get
+    sub[:assembly] = construction
+
+    sub.delete(:head)
+    expect(sub.key?(:head)).to be(false)
+    sub[:sill] = 0.0 # will be reset to 5mm
+    sub[:type] = "Skylight"
+    expect(mod1.addSubs(model, roof, [sub], false)).to be(true)
+    expect(mod1.warn?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    message = "' sill height to 0.005 m (OSut::addSubs)"
+    expect(mod1.logs.first[:message].include?(message)).to be(true)
+
+    file = File.join(__dir__, "files/osms/out/seb_final.osm")
     model.save(file, true)
   end
 end

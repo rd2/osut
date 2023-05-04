@@ -1793,7 +1793,7 @@ module OSut
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Assign default values to certain sub keys (if missing), +more validation.
-    subs.each do |sub|
+    subs.each_with_index do |sub, index|
       return mismatch("sub", sub, cl4, mth, DBG, no) unless sub.is_a?(cl4)
 
       # Required key:value pairs (either set by the user or defaulted).
@@ -1813,7 +1813,7 @@ module OSut
       # sub[:offset    ] # if array
       # sub[:centreline] # left or right of base surface centreline
 
-      sub[:id] = "#{nom} sub" if sub[:id].empty?
+      sub[:id] = "#{nom}|#{index}" if sub[:id].empty?
       id       = sub[:id]
 
       # If sub surface type is invalid, log/reset. Additional corrections may
@@ -1872,6 +1872,8 @@ module OSut
     #   - sub[:width     ] # e.g. 1.200 m
     #   - sub[:offset    ] # centreline-to-centreline between subs (if array)
     #   - sub[:centreline] # left/right of base surface centreline, e.g. -0.2 m
+    #
+    # If successful, this will generate sub surfaces and add them to the model.
     subs.each do |sub|
       # Set-up unique sub parameters:
       #   - Frame & Divider "width"
@@ -1893,7 +1895,7 @@ module OSut
       min_ljamb  = buffer
       max_ljamb  = max_x - (buffers + glass)
       min_rjamb  = buffers + glass
-      max_rjamb  = max_y - buffer
+      max_rjamb  = max_x - buffer
       max_height = max_y - buffers
       max_width  = max_x - buffers
 
@@ -1920,7 +1922,8 @@ module OSut
       # Log/reset "head" height if beyond min/max.
       if sub.key?(:head)
         unless sub[:head].between?(min_head, max_head)
-          sub[:head] = typ_head
+          sub[:head] = max_head if sub[:head] > max_head
+          sub[:head] = min_head if sub[:head] < min_head
           log(WRN, "Reset '#{id}' head height to #{sub[:head]} m (#{mth})")
         end
       end
@@ -1928,7 +1931,8 @@ module OSut
       # Log/reset "sill" height if beyond min/max.
       if sub.key?(:sill)
         unless sub[:sill].between?(min_sill, max_sill)
-          sub[:sill] = typ_sill
+          sub[:sill] = max_sill if sub[:sill] > max_sill
+          sub[:sill] = min_sill if sub[:sill] < min_sill
           log(WRN, "Reset '#{id}' sill height to #{sub[:sill]} m (#{mth})")
         end
       end
@@ -2143,6 +2147,10 @@ module OSut
 
         # Too wide?
         if x0 < min_ljamb || xf > max_rjamb
+          puts x0
+          puts min_ljamb
+          puts xf
+          puts max_rjamb
           sub[:ratio     ] = 0 if sub.key?(:ratio)
           sub[:count     ] = 0
           sub[:multiplier] = 0
