@@ -2147,10 +2147,6 @@ module OSut
 
         # Too wide?
         if x0 < min_ljamb || xf > max_rjamb
-          puts x0
-          puts min_ljamb
-          puts xf
-          puts max_rjamb
           sub[:ratio     ] = 0 if sub.key?(:ratio)
           sub[:count     ] = 0
           sub[:multiplier] = 0
@@ -2162,7 +2158,7 @@ module OSut
       end
 
       # Initialize left-side X-axis coordinate of only/first sub.
-      pos   = x0
+      pos = x0
 
       # Generate sub(s).
       sub[:count].times do |i|
@@ -2199,7 +2195,7 @@ module OSut
         sb.setConstruction(sub[:assembly])               if sub[:assembly]
         ok = sb.allowWindowPropertyFrameAndDivider
         sb.setWindowPropertyFrameAndDivider(sub[:frame]) if sub[:frame] && ok
-        sb.setMultiplier(sub[:multiplier])           unless sub[:multiplier] < 1
+        sb.setMultiplier(sub[:multiplier])               if sub[:multiplier] > 1
         sb.setSurface(s)
 
         # Reset "pos" if array.
