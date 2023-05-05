@@ -7,6 +7,8 @@ RSpec.describe OSut do
   WRN  = OSut::WARN
   ERR  = OSut::ERR
   FTL  = OSut::FATAL
+  HEAD = OSut::HEAD
+  SILL = OSut::SILL
 
   let(:cls1) { Class.new  { extend OSut } }
   let(:cls2) { Class.new  { extend OSut } }
@@ -1299,7 +1301,7 @@ RSpec.describe OSut do
     expect(mod1.status.zero?).to be(true)
   end
 
-  it "checks subsurface insertions on tilted surfaces" do
+  it "checks subsurface insertions on (seb) tilted surfaces" do
     # Examples of how to harness OpenStudio's Boost geometry methods to safely
     # insert subsurfaces along rotated/tilted/slanted host/parent/base
     # surfaces. First step, modify SEB.osm model.
@@ -1537,7 +1539,7 @@ RSpec.describe OSut do
     expect(skylight3.setConstruction(construction)).to be(true)
     expect(skylight3.setSurface(roof)).to be(true)
 
-    file = File.join(__dir__, "files/osms/out/seb_sky.osm")
+    file = File.join(__dir__, "files/osms/out/seb_ext1.osm")
     model.save(file, true)
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
@@ -1568,6 +1570,7 @@ RSpec.describe OSut do
     #
     # file = File.join(__dir__, "files/osms/out/seb_right.osm")
     # model.save(file, true)
+
     head   = max_y - 0.005
     offset = width + 0.15
 
@@ -1579,8 +1582,8 @@ RSpec.describe OSut do
     sub[:head  ] = head
     sub[:count ] = 3
     sub[:offset] = offset
-    # sub[:type  ] = "Wall" # defaults to "Wall" if not specified.
-    expect(mod1.addSubs(model, tilt_wall, [sub], false)).to be(true)
+    # sub[:type  ] = "FixedWindow" # defaulted if not specified.
+    expect(mod1.addSubs(model, tilt_wall, [sub])).to be(true)
     expect(mod1.status.zero?).to be(true)
     expect(mod1.logs.size.zero?).to be(true)
 
@@ -1596,13 +1599,89 @@ RSpec.describe OSut do
     expect(sub.key?(:head)).to be(false)
     sub[:sill] = 0.0 # will be reset to 5mm
     sub[:type] = "Skylight"
-    expect(mod1.addSubs(model, roof, [sub], false)).to be(true)
+    expect(mod1.addSubs(model, roof, [sub])).to be(true)
     expect(mod1.warn?).to be(true)
     expect(mod1.logs.size).to eq(1)
     message = "' sill height to 0.005 m (OSut::addSubs)"
     expect(mod1.logs.first[:message].include?(message)).to be(true)
 
-    file = File.join(__dir__, "files/osms/out/seb_final.osm")
+    file = File.join(__dir__, "files/osms/out/seb_ext2.osm")
     model.save(file, true)
+  end
+
+  it "checks wwr insertions (seb)" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
+    wwr = 0.10
+
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    v = OpenStudio.openStudioVersion.split(".").join.to_i
+    file = File.join(__dir__, "files/osms/out/seb_ext2.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    # Fetch "Openarea Wall 3".
+    wall3 = model.getSurfaceByName("Openarea 1 Wall 3")
+    expect(wall3.empty?).to be(false)
+    wall3 = wall3.get
+    area = wall3.grossArea * wwr
+
+    # Fetch transform if wall3 vertices were to 'align', i.e.:
+    tr = OpenStudio::Transformation.alignFace(wall3.vertices)
+    a_wall3 = tr.inverse * wall3.vertices
+    ymax = a_wall3.map(&:y).max
+    xmax = a_wall3.map(&:x).max
+    xmid = xmax / 2 # centreline
+
+    # Fetch 'head'/'sill' heights of nearby "Sub Surface 1".
+    sub1 = model.getSubSurfaceByName("Sub Surface 1")
+    expect(sub1.empty?).to be(false)
+    sub1 = sub1.get
+
+    # Add 2x window strips, each representing a 10% WWR of wall3 (20% total)
+    #   - 1x constrained to sub1 'head' & 'sill'
+    #   - 1x contrained only to 2nd 'sill' height
+    wwr1         = {}
+    wwr1[:id   ] = "OA1 W3 wwr1|10"
+    wwr1[:ratio] = 0.1
+    wwr1[:head ] = sub1.vertices.map(&:z).max
+    wwr1[:sill ] = sub1.vertices.map(&:z).min
+
+    wwr2         = {}
+    wwr2[:id   ] = "OA1 W3 wwr2|10"
+    wwr2[:ratio] = 0.1
+    wwr2[:sill ] = wwr1[:head] + 0.1
+
+    sbz = [wwr1, wwr2]
+    expect(mod1.addSubs(model, wall3, sbz)).to be(true)
+    expect(mod1.status.zero?).to be(true)
+    expect(mod1.logs.size.zero?).to be(true)
+
+    sbz = wall3.subSurfaces
+    expect(sbz.size).to eq(2)
+
+    sbz.each do |sb|
+      expect(sb.grossArea).to be_within(TOL).of(area)
+      sb_sill = sb.vertices.map(&:z).min
+      sb_head = sb.vertices.map(&:z).max
+
+      if sb.nameString.include?("wwr1")
+        expect(sb_sill).to be_within(TOL).of(wwr1[:sill])
+        expect(sb_head).to be_within(TOL).of(wwr1[:head])
+      else
+        expect(sb_sill).to be_within(TOL).of(wwr2[:sill])
+        expect(sb_head).to be_within(TOL).of(HEAD) # defaulted
+      end
+    end
+
+    expect(wall3.windowToWallRatio).to be_within(TOL).of(wwr * 2)
+
+    file = File.join(__dir__, "files/osms/out/seb_ext3.osm")
+    model.save(file, true)
+
   end
 end

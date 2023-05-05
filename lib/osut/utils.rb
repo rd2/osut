@@ -41,6 +41,8 @@ module OSut
   ERR  = OSut::ERROR     #     flag invalid .osm inputs (then exit via 'return')
   FTL  = OSut::FATAL     #                            not currently used in OSut
   NS   = "nameString"    #                OpenStudio IdfObject nameString method
+  HEAD = 2.032           # standard 80" door
+  SILL = 0.762           # standard 30" window sill
 
   # This first set of utilities (~750 lines) help distinguishing spaces that
   # are directly vs indirectly CONDITIONED, vs SEMI-HEATED. The solution here
@@ -1900,8 +1902,8 @@ module OSut
       max_width  = max_x - buffers
 
       # Default sub surface "head" & "sill" height (unless user-specified).
-      typ_head = 2.032 # standard 80" door
-      typ_sill = 0.762 - buffer # standard 30" window sill
+      typ_head = HEAD # standard 80" door
+      typ_sill = SILL # standard 30" window sill
 
       if sub.key?(:ratio)
         typ_head = mid_y * (1 + sub[:ratio])     if sub[:ratio] > 0.75
@@ -2178,8 +2180,6 @@ module OSut
         # Log/skip if conflicts with existing subs (even if same array).
         s.subSurfaces.each do |sb|
           nome = sb.nameString
-          next if name = nome
-
           oops = overlaps?(vec, sb.vertices, name, nome)
           log(ERR, "Skip '#{name}': overlaps '#{nome}' (#{mth})") if oops
           ok = false                                              if oops
@@ -2187,7 +2187,6 @@ module OSut
         end
 
         break unless ok
-
 
         sb = OpenStudio::Model::SubSurface.new(vec, model)
         sb.setName(name)
