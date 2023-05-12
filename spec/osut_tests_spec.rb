@@ -166,7 +166,7 @@ RSpec.describe OSut do
     expect(cls1.logs.size).to eq(1)
     expect(cls1.logs.first[:message]).to eq(m2)
   end
-  
+
   it "checks scheduleCompactMinMax (from within module instances)" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
@@ -1747,6 +1747,7 @@ RSpec.describe OSut do
 
     sbz = [w1, w2, t1, t2]
     expect(mod1.addSubs(model, wall4, sbz)).to be(true)
+    puts mod1.logs
     expect(mod1.status.zero?).to be(true)
     expect(mod1.logs.size.zero?).to be(true)
 
