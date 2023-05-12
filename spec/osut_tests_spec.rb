@@ -1747,7 +1747,6 @@ RSpec.describe OSut do
 
     sbz = [w1, w2, t1, t2]
     expect(mod1.addSubs(model, wall4, sbz)).to be(true)
-    puts mod1.logs
     expect(mod1.status.zero?).to be(true)
     expect(mod1.logs.size.zero?).to be(true)
 
