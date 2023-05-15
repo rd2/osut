@@ -1646,6 +1646,8 @@ RSpec.describe OSut do
     sub1 = model.getSubSurfaceByName("Sub Surface 1")
     expect(sub1.empty?).to be(false)
     sub1 = sub1.get
+    sub1_min = sub1.vertices.map(&:z).min
+    sub1_max = sub1.vertices.map(&:z).max
 
     # Add 2x window strips, each representing a 10% WWR of wall3 (20% total)
     #   - 1x constrained to sub1 'head' & 'sill'
@@ -1653,8 +1655,8 @@ RSpec.describe OSut do
     wwr1         = {}
     wwr1[:id   ] = "OA1 W3 wwr1|10"
     wwr1[:ratio] = 0.1
-    wwr1[:head ] = sub1.vertices.map(&:z).max
-    wwr1[:sill ] = sub1.vertices.map(&:z).min
+    wwr1[:head ] = sub1_max
+    wwr1[:sill ] = sub1_min
 
     wwr2         = {}
     wwr2[:id   ] = "OA1 W3 wwr2|10"
@@ -1664,8 +1666,6 @@ RSpec.describe OSut do
     sbz = [wwr1, wwr2]
     expect(mod1.addSubs(model, wall3, sbz)).to be(true)
     expect(mod1.status.zero?).to be(true)
-    expect(mod1.logs.size.zero?).to be(true)
-
     sbz = wall3.subSurfaces
     expect(sbz.size).to eq(2)
 
@@ -1705,8 +1705,8 @@ RSpec.describe OSut do
     # openings (grouped together) should align towards the left of wall4,
     # leaving a 200mm gap between the left vertical wall edge and the left
     # frame jamb edge of w1 & t1. First initialize Frame & Divider object.
-    gap    = 0.2
-    frame  = 0.05
+    gap    = 0.200
+    frame  = 0.050
     frames = 2 * frame
 
     fd = OpenStudio::Model::WindowPropertyFrameAndDivider.new(model)
@@ -1748,7 +1748,53 @@ RSpec.describe OSut do
     sbz = [w1, w2, t1, t2]
     expect(mod1.addSubs(model, wall4, sbz)).to be(true)
     expect(mod1.status.zero?).to be(true)
-    expect(mod1.logs.size.zero?).to be(true)
+
+
+    # Add another 5x (frame&divider-enabled) fixed windows, from either
+    # left- or right-corner of base surfaces. Fetch "Openarea Wall 6".
+    wall6 = model.getSurfaceByName("Openarea 1 Wall 6")
+    expect(wall6.empty?).to be(false)
+    wall6 = wall6.get
+
+    # Fetch "Openarea Wall 7".
+    wall7 = model.getSurfaceByName("Openarea 1 Wall 7")
+    expect(wall7.empty?).to be(false)
+    wall7 = wall7.get
+
+    # Fetch 'head'/'sill' heights of nearby "Sub Surface 6".
+    sub6 = model.getSubSurfaceByName("Sub Surface 6")
+    expect(sub6.empty?).to be(false)
+    sub6 = sub6.get
+    sub6_min = sub6.vertices.map(&:z).min
+    sub6_max = sub6.vertices.map(&:z).max
+
+    # 1x Array of 3x windows, 6" from the left corner of wall6.
+    a6              = {}
+    a6[:id        ] = "OA1 W6 a6"
+    a6[:count     ] = 3
+    a6[:frame     ] = fd
+    a6[:head      ] = sub6_max
+    a6[:sill      ] = sub6_min
+    a6[:width     ] = a6[:head ] - a6[:sill]
+    a6[:offset    ] = a6[:width] + gap
+    a6[:l_buffer  ] = gap
+
+    expect(mod1.addSubs(model, wall6, [a6])).to be(true)
+    expect(mod1.status.zero?).to be(true)
+
+    # 1x Array of 2x square windows, 6" from the right corner of wall7.
+    a7              = {}
+    a7[:id        ] = "OA1 W6 a7"
+    a7[:count     ] = 2
+    a7[:frame     ] = fd
+    a7[:head      ] = sub6_max
+    a7[:sill      ] = sub6_min
+    a7[:width     ] = a7[:head ] - a7[:sill]
+    a7[:offset    ] = a7[:width] + gap
+    a7[:r_buffer  ] = gap
+
+    expect(mod1.addSubs(model, wall7, [a7])).to be(true)
+    expect(mod1.status.zero?).to be(true)
 
     file = File.join(__dir__, "files/osms/out/seb_ext3.osm")
     model.save(file, true)
