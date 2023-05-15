@@ -1768,7 +1768,7 @@ RSpec.describe OSut do
     sub6_min = sub6.vertices.map(&:z).min
     sub6_max = sub6.vertices.map(&:z).max
 
-    # 1x Array of 3x windows, 6" from the left corner of wall6.
+    # 1x Array of 3x windows, 8" from the left corner of wall6.
     a6              = {}
     a6[:id        ] = "OA1 W6 a6"
     a6[:count     ] = 3
@@ -1782,7 +1782,7 @@ RSpec.describe OSut do
     expect(mod1.addSubs(model, wall6, [a6])).to be(true)
     expect(mod1.status.zero?).to be(true)
 
-    # 1x Array of 2x square windows, 6" from the right corner of wall7.
+    # 1x Array of 2x square windows, 8" from the right corner of wall7.
     a7              = {}
     a7[:id        ] = "OA1 W6 a7"
     a7[:count     ] = 2
