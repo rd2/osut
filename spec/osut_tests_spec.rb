@@ -7,6 +7,8 @@ RSpec.describe OSut do
   WRN  = OSut::WARN
   ERR  = OSut::ERR
   FTL  = OSut::FATAL
+  HEAD = OSut::HEAD
+  SILL = OSut::SILL
 
   let(:cls1) { Class.new  { extend OSut } }
   let(:cls2) { Class.new  { extend OSut } }
@@ -504,7 +506,7 @@ RSpec.describe OSut do
     mdl = OpenStudio::Model::Model.new
     version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
     v = version.join.to_i
-    
+
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
@@ -1297,5 +1299,504 @@ RSpec.describe OSut do
     expect(mod1.fits?(wall.vertices, glazing.vertices)).to be(true)
     expect(mod1.overlaps?(wall.vertices, glazing.vertices)).to be(true)
     expect(mod1.status.zero?).to be(true)
+  end
+
+  it "checks subsurface insertions on (seb) tilted surfaces" do
+    # Examples of how to harness OpenStudio's Boost geometry methods to safely
+    # insert subsurfaces along rotated/tilted/slanted host/parent/base
+    # surfaces. First step, modify SEB.osm model.
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    v = OpenStudio.openStudioVersion.split(".").join.to_i
+    file = File.join(__dir__, "files/osms/in/seb.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    openarea = model.getSpaceByName("Open area 1")
+    expect(openarea.empty?).to be(false)
+    openarea = openarea.get
+    expect(openarea.isEnclosedVolume).to be(true)       unless v < 350
+    expect(openarea.isVolumeDefaulted).to be(true)      unless v < 350
+    expect(openarea.isVolumeAutocalculated).to be(true) unless v < 350
+
+    w5 = model.getSurfaceByName("Openarea 1 Wall 5")
+    expect(w5.empty?).to be(false)
+    w5 = w5.get
+    w5_space = w5.space
+    expect(w5_space.empty?).to be(false)
+    w5_space = w5_space.get
+    expect(w5_space).to eq(openarea)
+    expect(w5.vertices.size).to eq(4)
+
+    # Delete w5, and replace with 1x slanted roof + 3x walls (1x tilted).
+    # Keep w5 coordinates in memory (before deleting), as anchor points for the
+    # 4x new surfaces.
+    w5_0 = w5.vertices[0]
+    w5_1 = w5.vertices[1]
+    w5_2 = w5.vertices[2]
+    w5_3 = w5.vertices[3]
+
+    w5.remove
+
+    # 2x new points.
+    roof_left  = OpenStudio::Point3d.new( 0.2166, 12.7865, 2.3528)
+    roof_right = OpenStudio::Point3d.new(-5.4769, 11.2626, 2.3528)
+    length     = (roof_left - roof_right).length
+
+    # New slanted roof.
+    vec  = OpenStudio::Point3dVector.new
+    vec << w5_0
+    vec << roof_left
+    vec << roof_right
+    vec << w5_3
+    roof = OpenStudio::Model::Surface.new(vec, model)
+    roof.setName("Openarea slanted roof")
+    expect(roof.setSurfaceType("RoofCeiling")).to be(true)
+    expect(roof.setSpace(openarea)).to be(true)
+
+    # New, inverse-tilted wall (i.e. cantilevered), under new slanted roof.
+    vec  = OpenStudio::Point3dVector.new
+    vec << roof_left
+    vec << w5_1
+    vec << w5_2
+    vec << roof_right
+    tilt_wall = OpenStudio::Model::Surface.new(vec, model)
+    tilt_wall.setName("Openarea tilted wall")
+    expect(tilt_wall.setSurfaceType("Wall")).to be(true)
+    expect(tilt_wall.setSpace(openarea)).to be(true)
+
+    # New, left side wall.
+    vec  = OpenStudio::Point3dVector.new
+    vec << w5_0
+    vec << w5_1
+    vec << roof_left
+    left_wall = OpenStudio::Model::Surface.new(vec, model)
+    left_wall.setName("Openarea left side wall")
+    expect(left_wall.setSpace(openarea)).to be(true)
+
+    # New, right side wall.
+    vec  = OpenStudio::Point3dVector.new
+    vec << w5_3
+    vec << roof_right
+    vec << w5_2
+    right_wall = OpenStudio::Model::Surface.new(vec, model)
+    right_wall.setName("Openarea right side wall")
+    expect(right_wall.setSpace(openarea)).to be(true)
+
+    expect(openarea.isEnclosedVolume).to be(true)       unless v < 350
+    expect(openarea.isVolumeDefaulted).to be(true)      unless v < 350
+    expect(openarea.isVolumeAutocalculated).to be(true) unless v < 350
+
+    file = File.join(__dir__, "files/osms/out/seb_mod.osm")
+    model.save(file, true)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Fetch transform if tilted wall vertices were to "align", i.e.:
+    #   - rotated/tilted
+    #   - then flattened along XY plane
+    #   - all Z-axis coordinates == ~0
+    #   - vertices with the lowest X-axis values are aligned along X-axis (0)
+    #   - vertices with the lowest Z-axis values ares aligned along Y-axis (0)
+    #   - Z-axis values are represented as Y-axis values
+    tr = OpenStudio::Transformation.alignFace(tilt_wall.vertices)
+    aligned_tilt_wall = tr.inverse * tilt_wall.vertices
+    expect(aligned_tilt_wall.is_a?(Array)).to be(true)
+
+    # Find centerline along "aligned" X-axis, and upper Y-axis limit.
+    min_x = 0
+    max_x = 0
+    max_y = 0
+
+    aligned_tilt_wall.each do |vec|
+      min_x = vec.x if vec.x < min_x
+      max_x = vec.x if vec.x > max_x
+      max_y = vec.y if vec.y > max_y
+    end
+
+    centerline = (max_x - min_x) / 2
+    expect(centerline * 2).to be_within(TOL).of(length)
+
+    # Subsurface dimensions (e.g. window/skylight).
+    width  = 0.5
+    height = 1.0
+
+    # Add 3x new, tilted windows along the tilted wall upper horizontal edge
+    # (i.e. max_Y), then realign with original tilted wall. Insert using 5mm
+    # buffer, IF inserted along any host/parent/base surface edge, e.g. door
+    # sill. Boost-based alignement/realignment does introduce small errors, and
+    # EnergyPlus may raise warnings of overlaps between host/base/parent
+    # surface and any of its new subsurface(s). Why 5mm (vs 25mm)? Keeping
+    # buffer under 10mm, see: https://rd2.github.io/tbd/pages/subs.html.
+    y = max_y - 0.005
+
+    x    = centerline - width / 2 # center window
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(x,         y,          0)
+    vec << OpenStudio::Point3d.new(x,         y - height, 0)
+    vec << OpenStudio::Point3d.new(x + width, y - height, 0)
+    vec << OpenStudio::Point3d.new(x + width, y,          0)
+
+    tilt_window1 = OpenStudio::Model::SubSurface.new(tr * vec, model)
+    tilt_window1.setName("Tilted window (center)")
+    expect(tilt_window1.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(tilt_window1.setSurface(tilt_wall)).to be(true)
+
+    x    = centerline - 3*width/2 - 0.15 # window to the left of the first one
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(x,         y,          0)
+    vec << OpenStudio::Point3d.new(x,         y - height, 0)
+    vec << OpenStudio::Point3d.new(x + width, y - height, 0)
+    vec << OpenStudio::Point3d.new(x + width, y,          0)
+
+    tilt_window2 = OpenStudio::Model::SubSurface.new(tr * vec, model)
+    tilt_window2.setName("Tilted window (left)")
+    expect(tilt_window2.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(tilt_window2.setSurface(tilt_wall)).to be(true)
+
+    x    = centerline + width/2 + 0.15 # window to the right of the first one
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(x,         y,          0)
+    vec << OpenStudio::Point3d.new(x,         y - height, 0)
+    vec << OpenStudio::Point3d.new(x + width, y - height, 0)
+    vec << OpenStudio::Point3d.new(x + width, y,          0)
+
+    tilt_window3 = OpenStudio::Model::SubSurface.new(tr * vec, model)
+    tilt_window3.setName("Tilted window (right)")
+    expect(tilt_window3.setSubSurfaceType("FixedWindow")).to be(true)
+    expect(tilt_window3.setSurface(tilt_wall)).to be(true)
+
+    # file = File.join(__dir__, "files/osms/out/seb_fen.osm")
+    # model.save(file, true)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Repeat for 3x skylights. Fetch transform if slanted roof vertices were
+    # also to "align". Recover the (default) window construction.
+    expect(tilt_window1.isConstructionDefaulted).to be(true)
+    construction = tilt_window1.construction
+    expect(construction.empty?).to be(false)
+    construction = construction.get
+
+    tr = OpenStudio::Transformation.alignFace(roof.vertices)
+    aligned_roof = tr.inverse * roof.vertices
+    expect(aligned_roof.is_a?(Array)).to be(true)
+
+    # Find centerline along "aligned" X-axis, and lower Y-axis limit.
+    min_x = 0
+    max_x = 0
+    min_y = 0
+
+    aligned_tilt_wall.each do |vec|
+      min_x = vec.x if vec.x < min_x
+      max_x = vec.x if vec.x > max_x
+      min_y = vec.y if vec.y < min_y
+    end
+
+    centerline = (max_x - min_x) / 2
+    expect(centerline * 2).to be_within(TOL).of(length)
+
+    # Add 3x new, slanted skylights aligned along upper horizontal edge of roof
+    # (i.e. min_Y), then realign with original roof.
+    y = min_y + 0.005
+
+    x    = centerline - width / 2 # center skylight
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(x,         y + height, 0)
+    vec << OpenStudio::Point3d.new(x,         y,          0)
+    vec << OpenStudio::Point3d.new(x + width, y,          0)
+    vec << OpenStudio::Point3d.new(x + width, y + height, 0)
+
+    skylight1 = OpenStudio::Model::SubSurface.new(tr * vec, model)
+    skylight1.setName("Skylight (center)")
+    expect(skylight1.setSubSurfaceType("Skylight")).to be(true)
+    expect(skylight1.setConstruction(construction)).to be(true)
+    expect(skylight1.setSurface(roof)).to be(true)
+
+    x    = centerline - 3*width/2 - 0.15 # skylight to the left of center
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(x,         y + height, 0)
+    vec << OpenStudio::Point3d.new(x,         y         , 0)
+    vec << OpenStudio::Point3d.new(x + width, y         , 0)
+    vec << OpenStudio::Point3d.new(x + width, y + height, 0)
+
+    skylight2 = OpenStudio::Model::SubSurface.new(tr * vec, model)
+    skylight2.setName("Skylight (left)")
+    expect(skylight2.setSubSurfaceType("Skylight")).to be(true)
+    expect(skylight2.setConstruction(construction)).to be(true)
+    expect(skylight2.setSurface(roof)).to be(true)
+
+    x    = centerline + width/2 + 0.15 # skylight to the right of center
+    vec  = OpenStudio::Point3dVector.new
+    vec << OpenStudio::Point3d.new(x,         y + height, 0)
+    vec << OpenStudio::Point3d.new(x,         y         , 0)
+    vec << OpenStudio::Point3d.new(x + width, y         , 0)
+    vec << OpenStudio::Point3d.new(x + width, y + height, 0)
+
+    skylight3 = OpenStudio::Model::SubSurface.new(tr * vec, model)
+    skylight3.setName("Skylight (right)")
+    expect(skylight3.setSubSurfaceType("Skylight")).to be(true)
+    expect(skylight3.setConstruction(construction)).to be(true)
+    expect(skylight3.setSurface(roof)).to be(true)
+
+    file = File.join(__dir__, "files/osms/out/seb_ext1.osm")
+    model.save(file, true)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Now test the same result when relying on OSut::addSub.
+    file = File.join(__dir__, "files/osms/out/seb_mod.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    roof = model.getSurfaceByName("Openarea slanted roof")
+    expect(roof.empty?).to be(false)
+    roof = roof.get
+
+    tilt_wall = model.getSurfaceByName("Openarea tilted wall")
+    expect(tilt_wall.empty?).to be(false)
+    tilt_wall = tilt_wall.get
+
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
+    # subs = []
+    # subs << {height: 0.2, width: 0.2}
+    # expect(mod1.addSubs(model, right_wall, subs, false)).to be(true)
+    # expect(mod1.status.zero?).to be(true)
+    # expect(mod1.logs.size.zero?).to be(true)
+    #
+    # file = File.join(__dir__, "files/osms/out/seb_right.osm")
+    # model.save(file, true)
+
+    head   = max_y - 0.005
+    offset = width + 0.15
+
+    # Add array of 3x windows to tilted wall.
+    sub = {}
+    sub[:id    ] = "Tilted window"
+    sub[:height] = height
+    sub[:width ] = width
+    sub[:head  ] = head
+    sub[:count ] = 3
+    sub[:offset] = offset
+    # sub[:type  ] = "FixedWindow" # defaulted if not specified.
+    expect(mod1.addSubs(model, tilt_wall, [sub])).to be(true)
+    expect(mod1.status.zero?).to be(true)
+    expect(mod1.logs.size.zero?).to be(true)
+
+    tilted = model.getSubSurfaceByName("Tilted window:0")
+    expect(tilted.empty?).to be(false)
+    tilted = tilted.get
+    construction = tilted.construction
+    expect(construction.empty?).to be(false)
+    construction = construction.get
+    sub[:assembly] = construction
+
+    sub.delete(:head)
+    expect(sub.key?(:head)).to be(false)
+    sub[:sill] = 0.0 # will be reset to 5mm
+    sub[:type] = "Skylight"
+    expect(mod1.addSubs(model, roof, [sub])).to be(true)
+    expect(mod1.warn?).to be(true)
+    expect(mod1.logs.size).to eq(1)
+    message = "' sill height to 0.005 m (OSut::addSubs)"
+    expect(mod1.logs.first[:message].include?(message)).to be(true)
+
+    file = File.join(__dir__, "files/osms/out/seb_ext2.osm")
+    model.save(file, true)
+  end
+
+  it "checks wwr insertions (seb)" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
+    wwr = 0.10
+
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    v = OpenStudio.openStudioVersion.split(".").join.to_i
+    file = File.join(__dir__, "files/osms/out/seb_ext2.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    # Fetch "Openarea Wall 3".
+    wall3 = model.getSurfaceByName("Openarea 1 Wall 3")
+    expect(wall3.empty?).to be(false)
+    wall3 = wall3.get
+    area = wall3.grossArea * wwr
+
+    # Fetch "Openarea Wall 4".
+    wall4 = model.getSurfaceByName("Openarea 1 Wall 4")
+    expect(wall4.empty?).to be(false)
+    wall4 = wall4.get
+
+    # Fetch transform if wall3 vertices were to 'align'.
+    tr = OpenStudio::Transformation.alignFace(wall3.vertices)
+    a_wall3 = tr.inverse * wall3.vertices
+    ymax = a_wall3.map(&:y).max
+    xmax = a_wall3.map(&:x).max
+    xmid = xmax / 2 # centreline
+
+    # Fetch 'head'/'sill' heights of nearby "Sub Surface 1".
+    sub1 = model.getSubSurfaceByName("Sub Surface 1")
+    expect(sub1.empty?).to be(false)
+    sub1 = sub1.get
+    sub1_min = sub1.vertices.map(&:z).min
+    sub1_max = sub1.vertices.map(&:z).max
+
+    # Add 2x window strips, each representing a 10% WWR of wall3 (20% total)
+    #   - 1x constrained to sub1 'head' & 'sill'
+    #   - 1x contrained only to 2nd 'sill' height
+    wwr1         = {}
+    wwr1[:id   ] = "OA1 W3 wwr1|10"
+    wwr1[:ratio] = 0.1
+    wwr1[:head ] = sub1_max
+    wwr1[:sill ] = sub1_min
+
+    wwr2         = {}
+    wwr2[:id   ] = "OA1 W3 wwr2|10"
+    wwr2[:ratio] = 0.1
+    wwr2[:sill ] = wwr1[:head] + 0.1
+
+    sbz = [wwr1, wwr2]
+    expect(mod1.addSubs(model, wall3, sbz)).to be(true)
+    expect(mod1.status.zero?).to be(true)
+    sbz = wall3.subSurfaces
+    expect(sbz.size).to eq(2)
+
+    sbz.each do |sb|
+      expect(sb.grossArea).to be_within(TOL).of(area)
+      sb_sill  = sb.vertices.map(&:z).min
+      sb_head  = sb.vertices.map(&:z).max
+
+      if sb.nameString.include?("wwr1")
+        expect(sb_sill).to be_within(TOL).of(wwr1[:sill])
+        expect(sb_head).to be_within(TOL).of(wwr1[:head])
+        expect(sb_head).to_not be_within(TOL).of(HEAD)
+      else
+        expect(sb_sill).to be_within(TOL).of(wwr2[:sill])
+        expect(sb_head).to be_within(TOL).of(HEAD) # defaulted
+      end
+    end
+
+    expect(wall3.windowToWallRatio).to be_within(TOL).of(wwr * 2)
+
+    # Fetch transform if wall4 vertices were to 'align'.
+    tr = OpenStudio::Transformation.alignFace(wall4.vertices)
+    a_wall4 = tr.inverse * wall4.vertices
+    ymax = a_wall4.map(&:y).max
+    xmax = a_wall4.map(&:x).max
+    xmid = xmax / 2 # centreline
+
+    # Add 4x sub surfaces (with frame & dividers) to wall4:
+    #   1. w1: 0.8m-wide opening (head defaulted to HEAD, sill @0m)
+    #   2. w2: 0.4m-wide sidelite, to the immediate right of w2 (HEAD, sill@0)
+    #   3. t1: 0.8m-wide transom above w1 (0.4m in height)
+    #   4. t2: 0.5m-wide transom above w2 (0.4m in height)
+    #
+    # All 4x sub surfaces are intended to share frame edges (once frame &
+    # divider frame widths are taken into account). Postulating a 50mm frame,
+    # meaning 100mm between w1, w2, t1 vs t2 vertices. In addition, all 4x
+    # openings (grouped together) should align towards the left of wall4,
+    # leaving a 200mm gap between the left vertical wall edge and the left
+    # frame jamb edge of w1 & t1. First initialize Frame & Divider object.
+    gap    = 0.200
+    frame  = 0.050
+    frames = 2 * frame
+
+    fd = OpenStudio::Model::WindowPropertyFrameAndDivider.new(model)
+    expect(fd.setFrameWidth(frame)).to be(true)
+    expect(fd.setFrameConductance(2.500)).to be(true)
+
+    w1              = {}
+    w1[:id        ] = "OA1 W4 w1"
+    w1[:frame     ] = fd
+    w1[:width     ] = 0.8
+    w1[:head      ] = HEAD
+    w1[:sill      ] = 0.005 + frame # to avoid generating a warning
+    w1[:centreline] = -xmid + gap + frame + w1[:width]/2
+
+    w2              = {}
+    w2[:id        ] = "OA1 W4 w2"
+    w2[:frame     ] = fd
+    w2[:width     ] = w1[:width     ]/2
+    w2[:head      ] = w1[:head      ]
+    w2[:sill      ] = w1[:sill      ]
+    w2[:centreline] = w1[:centreline] + w1[:width]/2 + frames + w2[:width]/2
+
+    t1              = {}
+    t1[:id        ] = "OA1 W4 t1"
+    t1[:frame     ] = fd
+    t1[:width     ] = w1[:width     ]
+    t1[:height    ] = w2[:width     ]
+    t1[:sill      ] = w1[:head      ] + frames
+    t1[:centreline] = w1[:centreline]
+
+    t2              = {}
+    t2[:id        ] = "OA1 W4 t2"
+    t2[:frame     ] = fd
+    t2[:width     ] = w2[:width     ]
+    t2[:height    ] = t1[:height    ]
+    t2[:sill      ] = t1[:sill      ]
+    t2[:centreline] = w2[:centreline]
+
+    sbz = [w1, w2, t1, t2]
+    expect(mod1.addSubs(model, wall4, sbz)).to be(true)
+    expect(mod1.status.zero?).to be(true)
+
+
+    # Add another 5x (frame&divider-enabled) fixed windows, from either
+    # left- or right-corner of base surfaces. Fetch "Openarea Wall 6".
+    wall6 = model.getSurfaceByName("Openarea 1 Wall 6")
+    expect(wall6.empty?).to be(false)
+    wall6 = wall6.get
+
+    # Fetch "Openarea Wall 7".
+    wall7 = model.getSurfaceByName("Openarea 1 Wall 7")
+    expect(wall7.empty?).to be(false)
+    wall7 = wall7.get
+
+    # Fetch 'head'/'sill' heights of nearby "Sub Surface 6".
+    sub6 = model.getSubSurfaceByName("Sub Surface 6")
+    expect(sub6.empty?).to be(false)
+    sub6 = sub6.get
+    sub6_min = sub6.vertices.map(&:z).min
+    sub6_max = sub6.vertices.map(&:z).max
+
+    # 1x Array of 3x windows, 8" from the left corner of wall6.
+    a6              = {}
+    a6[:id        ] = "OA1 W6 a6"
+    a6[:count     ] = 3
+    a6[:frame     ] = fd
+    a6[:head      ] = sub6_max
+    a6[:sill      ] = sub6_min
+    a6[:width     ] = a6[:head ] - a6[:sill]
+    a6[:offset    ] = a6[:width] + gap
+    a6[:l_buffer  ] = gap
+
+    expect(mod1.addSubs(model, wall6, [a6])).to be(true)
+    expect(mod1.status.zero?).to be(true)
+
+    # 1x Array of 2x square windows, 8" from the right corner of wall7.
+    a7              = {}
+    a7[:id        ] = "OA1 W6 a7"
+    a7[:count     ] = 2
+    a7[:frame     ] = fd
+    a7[:head      ] = sub6_max
+    a7[:sill      ] = sub6_min
+    a7[:width     ] = a7[:head ] - a7[:sill]
+    a7[:offset    ] = a7[:width] + gap
+    a7[:r_buffer  ] = gap
+
+    expect(mod1.addSubs(model, wall7, [a7])).to be(true)
+    expect(mod1.status.zero?).to be(true)
+
+    file = File.join(__dir__, "files/osms/out/seb_ext3.osm")
+    model.save(file, true)
   end
 end
