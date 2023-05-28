@@ -916,6 +916,50 @@ RSpec.describe OSut do
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m3)
+
+    # PlanarSurface class method 'filmResistance' reports standard interior or
+    # exterior air film resistances (ref: ASHRAE Fundamentals), e.g.:
+    types = {}
+    types["StillAir_HorizontalSurface_HeatFlowsUpward"  ] = 0.107
+    types["StillAir_45DegreeSurface_HeatFlowsUpward"    ] = 0.109
+    types["StillAir_VerticalSurface"                    ] = 0.120
+    types["StillAir_45DegreeSurface_HeatFlowsDownward"  ] = 0.134
+    types["StillAir_HorizontalSurface_HeatFlowsDownward"] = 0.162
+    types["MovingAir_15mph"                             ] = 0.030
+    types["MovingAir_7p5mph"                            ] = 0.044
+    #   https://github.com/NREL/OpenStudio/blob/
+    #   1c6fe48c49987c16e95e90ee3bd088ad0649ab9c/src/model/
+    #   PlanarSurface.cpp#L854
+
+    OpenStudio::Model::FilmResistanceType.getValues.each do |i|
+      t1 = OpenStudio::Model::FilmResistanceType.new(i)
+      t2 = OpenStudio::Model::FilmResistanceType.new(types.keys.at(i))
+      r  = OpenStudio::Model::PlanarSurface.filmResistance(t1)
+      expect(t1).to eq(t2)
+      expect(r).to be_within(0.001).of(types.values.at(i))
+      next if i > 4
+
+      # PlanarSurface class method 'stillAirFilmResistance' offers a
+      # tilt-dependent interior air film resistance, e.g.:
+      deg = i * 45
+      rad = deg * Math::PI/180
+      rsi = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(rad)
+      # puts "#{i}: #{deg}: #{r}: #{rsi}"
+      # 0:   0: 0.107: 0.106
+      # 1:  45: 0.109: 0.109 # ... OK
+      # 2:  90: 0.120: 0.120 # ... OK
+      # 3: 135: 0.134: 0.137
+      # 4: 180: 0.162: 0.160
+      next if deg < 45 || deg > 90
+
+      expect(rsi).to be_within(0.001).of(r)
+      # The method is used for (opaque) Surfaces. The correlation/regression
+      # isn't perfect, yet appears fairly reliable for intermediate angles
+      # between ~0° and 90°.
+      #   https://github.com/NREL/OpenStudio/blob/
+      #   1c6fe48c49987c16e95e90ee3bd088ad0649ab9c/src/model/
+      #   PlanarSurface.cpp#L878
+    end
   end
 
   it "checks rsi calculations" do
