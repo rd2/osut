@@ -1242,7 +1242,7 @@ RSpec.describe OSut do
     expect(mod1.logs.first[:message]).to eq(m2)
   end
 
-  it "checks surface fits?' & overlaps?" do
+  it "checks surface fits? & overlaps?" do
     expect(mod1.reset(DBG)).to eq(DBG)
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
@@ -1402,10 +1402,16 @@ RSpec.describe OSut do
 
     # New, inverse-tilted wall (i.e. cantilevered), under new slanted roof.
     vec  = OpenStudio::Point3dVector.new
-    vec << roof_left
-    vec << w5_1
-    vec << w5_2
-    vec << roof_right
+    # vec << roof_left  # TOPLEFT
+    # vec << w5_1       # BOTTOMLEFT
+    # vec << w5_2       # BOTTOMRIGHT
+    # vec << roof_right # TOPRIGHT
+
+    # Test if starting instead from BOTTOMRIGHT (i.e. upside-down "U").
+    vec << w5_2       # BOTTOMRIGHT
+    vec << roof_right # TOPRIGHT
+    vec << roof_left  # TOPLEFT
+    vec << w5_1       # BOTTOMLEFT
     tilt_wall = OpenStudio::Model::Surface.new(vec, model)
     tilt_wall.setName("Openarea tilted wall")
     expect(tilt_wall.setSurfaceType("Wall")).to be(true)
@@ -1447,6 +1453,15 @@ RSpec.describe OSut do
     tr = OpenStudio::Transformation.alignFace(tilt_wall.vertices)
     aligned_tilt_wall = tr.inverse * tilt_wall.vertices
     expect(aligned_tilt_wall.is_a?(Array)).to be(true)
+    # puts aligned_tilt_wall
+    # [4.89, 0.00, 0.00] # if BOTTOMRIGHT, i.e. upside-down "U"
+    # [5.89, 3.09, 0.00]
+    # [0.00, 3.09, 0.00]
+    # [1.00, 0.00, 0.00]
+    # ... no change in results (once sub surfaces are added below), as 'addSubs'
+    # does not rely 'directly' on World or Relative XYZ coordinates of the base
+    # surface. It instead relies on base surface width/height (once 'aligned'),
+    # regardless of the user-defined sequence of vertices.
 
     # Find centerline along "aligned" X-axis, and upper Y-axis limit.
     min_x = 0
@@ -1841,6 +1856,58 @@ RSpec.describe OSut do
     expect(mod1.status.zero?).to be(true)
 
     file = File.join(__dir__, "files/osms/out/seb_ext3.osm")
+    model.save(file, true)
+  end
+
+  it "checks surface width & height" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    v = OpenStudio.openStudioVersion.split(".").join.to_i
+    file = File.join(__dir__, "files/osms/out/seb_ext2.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    tilted = model.getSurfaceByName("Openarea tilted wall")
+    expect(tilted.empty?).to be(false)
+    tilted = tilted.get
+    w1 = mod1.width(tilted)
+    h1 = mod1.height(tilted)
+    expect(w1).to be_within(TOL).of(5.89)
+    expect(h1).to be_within(TOL).of(3.09)
+
+    left = model.getSurfaceByName("Openarea left side wall")
+    expect(left.empty?).to be(false)
+    left = left.get
+    w2 = mod1.width(left)
+    h2 = mod1.height(left)
+    expect(w2).to be_within(TOL).of(2.24)
+    expect(h2).to be_within(TOL).of(3.35)
+
+    right = model.getSurfaceByName("Openarea right side wall")
+    expect(right.empty?).to be(false)
+    right = right.get
+    w3 = mod1.width(right)
+    h3 = mod1.height(right)
+    expect(w3).to be_within(TOL).of(w2)
+    expect(h3).to be_within(TOL).of(h2)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # What if wall vertex sequences were no longer TOPLEFT (e.g. TOPRIGHT)?
+    vec  = OpenStudio::Point3dVector.new
+    vec << tilted.vertices[3]
+    vec << tilted.vertices[0]
+    vec << tilted.vertices[1]
+    vec << tilted.vertices[2]
+    expect(tilted.setVertices(vec)).to be(true)
+    expect(mod1.width(tilted)).to be_within(TOL).of(w1)  # same result
+    expect(mod1.height(tilted)).to be_within(TOL).of(h1) # same result
+
+    file = File.join(__dir__, "files/osms/out/seb_ext4.osm")
     model.save(file, true)
   end
 end

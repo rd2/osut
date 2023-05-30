@@ -1726,6 +1726,37 @@ module OSut
   end
 
   ##
+  # Return 'width' of a planar surface.
+  #
+  # @param s [OpenStudio::Model::PlanarSurface] a planar surface
+  #
+  # @return [Double] planar surface (left-to-right) width; 0 if invalid inputs
+  def width(s = nil)
+    return 0 unless s.respond_to?(:grossArea)
+    return 0     if s.grossArea < TOL
+
+    tr = OpenStudio::Transformation.alignFace(s.vertices)
+
+    (tr.inverse * s.vertices).max_by(&:x).x
+  end
+
+  ##
+  # Return 'height' of a planar surface, viewed perpendicularly (vs space or
+  # building XYZ coordinates).
+  #
+  # @param s [OpenStudio::Model::PlanarSurface] a planar surface
+  #
+  # @return [Double] planar surface (top-to-bottom) height; 0 if invalid inputs
+  def height(s = nil)
+    return 0 unless s.respond_to?(:grossArea)
+    return 0     if s.grossArea < TOL
+
+    tr = OpenStudio::Transformation.alignFace(s.vertices)
+
+    (tr.inverse * s.vertices).max_by(&:y).y
+  end
+
+  ##
   # Add sub surfaces (e.g. windows, doors, skylights) to surface.
   #
   # @param model [OpenStudio::Model::Model] a model
@@ -1790,8 +1821,8 @@ module OSut
 
     # Aligned vertices of host surface, and fetch attributes.
     aligned = tr.inverse * s.vertices
-    max_x   = aligned.max_by(&:x).x
-    max_y   = aligned.max_by(&:y).y
+    max_x   = aligned.max_by(&:x).x # same as OSut.width(s)
+    max_y   = aligned.max_by(&:y).y # same as OSut.height(s)
     mid_x   = max_x / 2
     mid_y   = max_y / 2
 
