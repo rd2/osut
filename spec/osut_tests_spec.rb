@@ -14,9 +14,176 @@ RSpec.describe OSut do
   let(:cls2) { Class.new  { extend OSut } }
   let(:mod1) { Module.new { extend OSut } }
 
-  it "checks scheduleRulesetMinMax (from within class instances)" do
+  it "checks generated constructions" do
     expect(cls1.level).to eq(INF)
     expect(cls1.reset(DBG)).to eq(DBG)
+    expect(cls1.level).to eq(DBG)
+    expect(cls1.clean!).to eq(DBG)
+
+    model = OpenStudio::Model::Model.new
+
+    specs          = {}
+    specs[:type  ] = :wall
+    specs[:uo    ] = 0.210 # NECB2017
+    surface        = cls1.genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(4)
+    u = 1 / cls1.rsi(surface, 0.140)
+    expect(u).to be_within(TOL).of(specs[:uo])
+
+    specs[:type  ] = :roof
+    specs[:uo    ] = 1 / 5.46 # CCQ I1
+    surface        = cls1::genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(4)
+    u = 1 / cls1::rsi(surface, 0.140)
+    expect(u).to be_within(TOL).of(specs[:uo])
+
+    specs          = {}
+    specs[:type  ] = :roof
+    specs[:frame ] = :medium
+    specs[:finish] = :heavy
+    specs[:uo    ] = 1 / 5.46 # CCQ I1
+    surface        = cls1::genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(4)
+    u = 1 / cls1::rsi(surface, 0.140)
+    expect(u).to be_within(TOL).of(specs[:uo])
+
+    specs          = {}
+    specs[:type  ] = :floor
+    specs[:frame ] = :medium
+    specs[:uo    ] = 1 / 5.46 # CCQ I1
+    surface        = cls1::genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(4)
+    u = 1 / cls1::rsi(surface, 0.190)
+    expect(u).to be_within(TOL).of(specs[:uo])
+
+    specs          = {}
+    specs[:type  ] = :slab
+    specs[:frame ] = :none
+    specs[:finish] = :none
+    surface        = cls1::genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(2)
+
+    specs          = {}
+    specs[:type  ] = :slab
+    specs[:finish] = :none
+    specs[:uo    ] = 0.379 # NECB2020, ZC8
+    surface        = cls1::genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(3)
+    u = 1 / cls1::rsi(surface, 0.160)
+    expect(u).to be_within(TOL).of(specs[:uo])
+
+    specs          = {}
+    specs[:type  ] = :slab
+    specs[:uo    ] = 0.379 # NECB2020, ZC8
+    surface        = cls1::genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(4)
+    u = 1 / cls1::rsi(surface, 0.160)
+    expect(u).to be_within(TOL).of(specs[:uo])
+
+    specs          = {}
+    specs[:type  ] = :basement
+    specs[:clad  ] = :heavy
+    specs[:uo    ] = 1 / 2.64 # CCQ I1
+    surface        = cls1::genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(3)
+    u = 1 / cls1::rsi(surface, 0.120)
+    expect(u).to be_within(TOL).of(specs[:uo])
+
+    specs          = {}
+    specs[:type  ] = :basement
+    specs[:clad  ] = :none
+    specs[:finish] = :light
+    specs[:uo    ] = 1 / 2.64 # CCQ I1
+    surface        = cls1::genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(3)
+    u = 1 / cls1::rsi(surface, 0.120)
+    expect(u).to be_within(TOL).of(specs[:uo])
+
+    specs          = {}
+    specs[:type  ] = :door
+    specs[:frame ] = :medium # ... should be ignored
+    specs[:uo    ] = 1.8
+    surface        = cls1::genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(1)
+    u = 1 / cls1::rsi(surface, 0.150)
+    expect(u).to be_within(TOL).of(specs[:uo])
+
+    specs          = {}
+    specs[:type  ] = :door
+    specs[:uo    ] = 0.9 # CCQ I1
+    surface        = cls1::genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(1)
+    u = 1 / cls1::rsi(surface, 0.150)
+    expect(u).to be_within(TOL).of(specs[:uo])
+
+    specs          = {}
+    specs[:type  ] = :window
+    specs[:uo    ] = 2.0
+    surface        = cls1::genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(1)
+    u = 1 / cls1::rsi(surface) # not necessary to specify film
+    expect(u).to be_within(TOL).of(specs[:uo])
+
+    specs          = {}
+    specs[:type  ] = :window
+    specs[:uo    ] = 0.9 # CCQ I1
+    surface        = cls1::genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(1)
+    u = 1 / cls1::rsi(surface) # not necessary to specify film
+    expect(u).to be_within(TOL).of(specs[:uo])
+
+    specs          = {}
+    specs[:type  ] = :skylight
+    specs[:uo    ] = 2.8 # CCQ I1
+    surface        = cls1::genConstruction(model, specs)
+    expect(surface.nil?).to be(false)
+    expect(cls1.status.zero?).to be(true)
+    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface.layers.size).to eq(1)
+    u = 1 / cls1::rsi(surface) # not necessary to specify film
+    expect(u).to be_within(TOL).of(specs[:uo])
+  end
+
+  it "checks scheduleRulesetMinMax (from within class instances)" do
     expect(cls1.level).to eq(DBG)
     expect(cls1.clean!).to eq(DBG)
 

@@ -44,7 +44,496 @@ module OSut
   HEAD = 2.032           # standard 80" door
   SILL = 0.762           # standard 30" window sill
 
-  # This first set of utilities (~750 lines) help distinguishing spaces that
+  # Default (higher-level) construction parameters.
+  @@mass = [:none, :light, :medium, :heavy].freeze
+  @@film = {} # standard air films, m2.K/W
+  @@uo   = {} # default (~1980s) envelope Uo (W/m2.K), based on surface type
+  @@mats = {} # StandardOpaqueMaterials
+
+  @@film[:shading  ] = 0.000
+  @@film[:partition] = 0.000
+  @@film[:wall     ] = 0.150
+  @@film[:roof     ] = 0.140
+  @@film[:floor    ] = 0.190
+  @@film[:basement ] = 0.120
+  @@film[:slab     ] = 0.160
+  @@film[:door     ] = @@film[:wall]
+  @@film[:window   ] = @@film[:wall] # irrelevant if SimpleGlazingMaterial
+  @@film[:skylight ] = @@film[:roof] # irrelevant if SimpleGlazingMaterial
+
+  @@uo[:shading    ] = 0.000 # N/A
+  @@uo[:partition  ] = 0.000 # N/A
+  @@uo[:wall       ] = 0.384 # rated Ro ~14.8
+  @@uo[:roof       ] = 0.327 # rated Ro ~17.6
+  @@uo[:floor      ] = 0.317 # rated Ro ~17.9 (exposed floor)
+  @@uo[:basement   ] = 0.000 # uninsulated
+  @@uo[:slab       ] = 0.000 # uninsulated
+  @@uo[:door       ] = 1.800 # insulated, unglazed steel door (single layer)
+  @@uo[:window     ] = 2.800 # e.g. patio doors (simple glazing)
+  @@uo[:skylight   ] = 3.500 # all skylight technologies
+
+  # Default OpenStudio "StandardOpaqueMaterial" object parameters:
+  #   - roughness            (rgh) : "Smooth"
+  #   - thickness                  :    0.1 m
+  #   - thermal conductivity (k  ) :    0.1 W/m.K
+  #   - density              (rho) :    0.1 kg/m3
+  #   - specific heat        (cp ) : 1400.0 J/kg.K
+  #
+  #   https://s3.amazonaws.com/openstudio-sdk-documentation/cpp/
+  #   OpenStudio-3.6.1-doc/model/html/
+  #   classopenstudio_1_1model_1_1_standard_opaque_material.html
+  #
+  # Apart from surface roughness, rarely would these defaulted material
+  # properties be suitable - and are therefore explicitely set below. FYI:
+  #   - "Very Rough"    : stucco
+  #   - "Rough"	        : brick
+  #   - "Medium Rough"  : concrete
+  #   - "Medium Smooth" : clear pine
+  #   - "Smooth"        : smooth plaster
+  #   - "Very Smooth"   : glass
+  #
+  # Standard opaque materials, taken from a variety of sources (e.g. energy
+  # codes, NREL's BCL). Material identifiers are symbols, e.g.:
+  #   - :brick
+  #   - :sand
+  #   - :concrete
+  #
+  # Material properties remain largely constant between projects. What does
+  # tend to vary between projects are thicknesses. Actual OpenStudio opaque
+  # material objects can be (re)set in more than one way by class methods.
+  # OpenStudio object names are then suffixed with actual material thicknesses,
+  # in mm, e.g.:
+  #   - "concrete200" : 200mm concrete slab
+  #   - "drywall13"    : 1/2" gypsum board
+  #   - "drywall16"    : 5/8" gypsum board
+  #
+  # Surface absorptances are also defaulted in OpenStudio:
+  #   - thermal, long-wave   (thm) : 90%
+  #   - solar                (sol) : 70%
+  #   - visible              (vis) : 70%
+  #
+  # These can also be explicitly set, here (e.g. a redundant example):
+  @@mats[:sand     ]         = {}
+  @@mats[:sand     ][:rgh] = "Rough"
+  @@mats[:sand     ][:k  ] =    1.290
+  @@mats[:sand     ][:rho] = 2240.000
+  @@mats[:sand     ][:cp ] =  830.000
+  @@mats[:sand     ][:thm] =    0.900
+  @@mats[:sand     ][:sol] =    0.700
+  @@mats[:sand     ][:vis] =    0.700
+
+  @@mats[:concrete ]       = {}
+  @@mats[:concrete ][:rgh] = "MediumRough"
+  @@mats[:concrete ][:k  ] =    1.730
+  @@mats[:concrete ][:rho] = 2240.000
+  @@mats[:concrete ][:cp ] =  830.000
+
+  @@mats[:brick    ]       = {}
+  @@mats[:brick    ][:rgh] = "Rough"
+  @@mats[:brick    ][:k  ] =    0.675
+  @@mats[:brick    ][:rho] = 1600.000
+  @@mats[:brick    ][:cp ] =  790.000
+
+  @@mats[:cladding ]       = {} # e.g. lightweight cladding over furring
+  @@mats[:cladding ][:rgh] = "MediumSmooth"
+  @@mats[:cladding ][:k  ] =    0.115
+  @@mats[:cladding ][:rho] =  540.000
+  @@mats[:cladding ][:cp ] = 1200.000
+
+  @@mats[:sheathing]       = {} # e.g. plywood
+  @@mats[:sheathing][:k  ] =    0.160
+  @@mats[:sheathing][:rho] =  545.000
+  @@mats[:sheathing][:cp ] = 1210.000
+
+  @@mats[:polyiso  ]       = {}
+  @@mats[:polyiso  ][:k  ] =    0.025
+  @@mats[:polyiso  ][:rho] =   25.000
+  @@mats[:polyiso  ][:cp ] = 1590.000
+
+  @@mats[:cellulose]       = {}
+  @@mats[:cellulose][:rgh] = "VeryRough"
+  @@mats[:cellulose][:k  ] =    0.050
+  @@mats[:cellulose][:rho] =   80.000
+  @@mats[:cellulose][:cp ] =  835.000
+
+  @@mats[:mineral  ]       = {}
+  @@mats[:mineral  ][:k  ] =    0.050
+  @@mats[:mineral  ][:rho] =   19.000
+  @@mats[:mineral  ][:cp ] =  960.000
+
+  @@mats[:drywall  ]       = {}
+  @@mats[:drywall  ][:k  ] =    0.160
+  @@mats[:drywall  ][:rho] =  785.000
+  @@mats[:drywall  ][:cp ] = 1090.000
+
+  @@mats[:door     ]        = {}
+  @@mats[:door     ][:rgh] = "MediumSmooth"
+  @@mats[:door     ][:k  ] =    0.080 # = 1.8 * 0.045m
+  @@mats[:door     ][:rho] =  600.000
+  @@mats[:door     ][:cp ] = 1000.000
+
+  ##
+  # Generate a multilayered construction, based on specs. Also generates
+  # required OpenStudio materials as needed.
+  #
+  # @param model [OpenStudio::Model::Model] a model
+  # @param specs [Hash] a specification hash
+  #
+  # @return [OpenStudio::Model::Construction] a construction (nil if failure)
+  def genConstruction(model = nil, specs = {})
+    mth = "Mats::#{__callee__}"
+    cl1 = OpenStudio::Model::Model
+    cl2 = Hash
+
+    # Log/exit if invalid arguments.
+    return mismatch("model", model, cl1, mth)        unless model.is_a?(cl1)
+    return mismatch("specs", specs, cl2, mth)        unless specs.is_a?(cl2)
+
+    specs[:type]   = :wall                           unless specs.key?(:type)
+    ok             = @@uo.keys.include?(specs[:type])
+    return invalid("surface type", mth, 0)           unless ok
+
+    specs[:id  ]   = ""                              unless specs.key?(:id  )
+    id             = specs[:id]
+    ok             = id.respond_to?(:to_s)
+    id             = "Construction:#{specs[:type]}"  unless ok
+    id             = "Construction:#{specs[:type]}"      if id.empty?
+    specs[:uo  ]   = @@uo[ specs[:type] ]            unless specs.key?(:uo  )
+    u              = specs[:uo]
+    return mismatch("#{id} Uo", u, Numeric, mth)     unless u.is_a?(Numeric)
+    return invalid("#{id} Uo (> 5.678)", mth, 0)         if u > 5.678
+
+    # Optional specs. Log/reset if invalid.
+    specs[:clad  ] = :light             unless specs.key?(:clad  ) # exterior
+    specs[:frame ] = :light             unless specs.key?(:frame )
+    specs[:finish] = :light             unless specs.key?(:finish) # interior
+    specs[:clad  ] = :light             unless @@mass.include?(specs[:clad  ])
+    specs[:frame ] = :light             unless @@mass.include?(specs[:frame ])
+    specs[:finish] = :light             unless @@mass.include?(specs[:finish])
+    log(WRN, "Reset to light cladding") unless @@mass.include?(specs[:clad  ])
+    log(WRN, "Reset to light framing" ) unless @@mass.include?(specs[:frame ])
+    log(WRN, "Reset to light finish"  ) unless @@mass.include?(specs[:finish])
+    film           = @@film[ specs[:type] ]
+
+    # Layered assembly (max 4 layers):
+    #   - cladding
+    #   - intermediate sheathing
+    #   - composite insulating/framing
+    #   - interior finish
+    a = {clad: {}, sheath: {}, compo: {}, finish: {}, glazing: {}}
+
+    case specs[:type]
+    when :shading
+      mt = :sheathing
+      d  = 0.015
+      a[:compo][:mat] = @@mats[mt]
+      a[:compo][:d  ] = d
+      a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+    when :partition
+      d  = 0.015
+      mt = :drywall
+      a[:clad][:mat] = @@mats[mt]
+      a[:clad][:d  ] = d
+      a[:clad][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+      mt = :sheathing
+      a[:compo][:mat] = @@mats[mt]
+      a[:compo][:d  ] = d
+      a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+      mt = :drywall
+      a[:finish][:mat] = @@mats[mt]
+      a[:finish][:d  ] = d
+      a[:finish][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+    when :wall
+      unless specs[:clad] == :none
+        mt = :cladding
+        mt = :brick    if specs[:clad] == :medium
+        mt = :concrete if specs[:clad] == :heavy
+        d  = 0.100
+        d  = 0.015     if specs[:clad] == :light
+        a[:clad][:mat] = @@mats[mt]
+        a[:clad][:d  ] = d
+        a[:clad][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      end
+
+      mt = :drywall
+      mt = :polyiso   if specs[:frame] == :medium
+      mt = :mineral   if specs[:frame] == :heavy
+      d  = 0.100
+      d  = 0.015      if specs[:frame] == :light
+      a[:sheath][:mat] = @@mats[mt]
+      a[:sheath][:d  ] = d
+      a[:sheath][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+      mt = :concrete
+      mt = :mineral   if specs[:frame] == :light
+      d  = 0.100
+      d  = 0.200      if specs[:frame] == :heavy
+      a[:compo][:mat] = @@mats[mt]
+      a[:compo][:d  ] = d
+      a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+      unless specs[:finish] == :none
+        mt = :concrete
+        mt = :drywall   if specs[:finish] == :light
+        d  = 0.015
+        d  = 0.100      if specs[:finish] == :medium
+        d  = 0.200      if specs[:finish] == :heavy
+        a[:finish][:mat] = @@mats[mt]
+        a[:finish][:d  ] = d
+        a[:finish][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      end
+    when :roof
+      unless specs[:clad] == :none
+        mt = :concrete
+        mt = :cladding if specs[:clad] == :light
+        d  = 0.015
+        d  = 0.100     if specs[:clad] == :medium # e.g. terrace
+        d  = 0.200     if specs[:clad] == :heavy  # e.g. parking garage
+        a[:clad][:mat] = @@mats[mt]
+        a[:clad][:d  ] = d
+        a[:clad][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+        mt = :sheathing
+        d  = 0.015
+        a[:sheath][:mat] = @@mats[mt]
+        a[:sheath][:d  ] = d
+        a[:sheath][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      end
+
+      mt = :cellulose
+      mt = :polyiso   if specs[:frame] == :medium
+      mt = :mineral   if specs[:frame] == :heavy
+      d  = 0.100
+      a[:compo][:mat] = @@mats[mt]
+      a[:compo][:d  ] = d
+      a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+      unless specs[:finish] == :none
+        mt = :concrete
+        mt = :drywall   if specs[:finish] == :light
+        d  = 0.015
+        d  = 0.100      if specs[:finish] == :medium # proxy for steel decking
+        d  = 0.200      if specs[:finish] == :heavy
+        a[:finish][:mat] = @@mats[mt]
+        a[:finish][:d  ] = d
+        a[:finish][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      end
+    when :floor # exposed
+      unless specs[:clad] == :none
+        mt = :cladding
+        d  = 0.015
+        a[:clad][:mat] = @@mats[mt]
+        a[:clad][:d  ] = d
+        a[:clad][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+        mt = :sheathing
+        d  = 0.015
+        a[:sheath][:mat] = @@mats[mt]
+        a[:sheath][:d  ] = d
+        a[:sheath][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      end
+
+      mt = :cellulose
+      mt = :polyiso   if specs[:frame] == :medium
+      mt = :mineral   if specs[:frame] == :heavy
+      d  = 0.100 # possibly an insulating layer to reset
+      a[:compo][:mat] = @@mats[mt]
+      a[:compo][:d  ] = d
+      a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+      unless specs[:finish] == :none
+        mt = :concrete
+        mt = :sheathing if specs[:finish] == :light
+        d  = 0.015
+        d  = 0.100      if specs[:finish] == :medium
+        d  = 0.200      if specs[:finish] == :heavy
+        a[:finish][:mat] = @@mats[mt]
+        a[:finish][:d  ] = d
+        a[:finish][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      end
+    when :slab # basement slab or slab-on-grade
+      mt = :sand
+      d  = 0.100
+      a[:clad][:mat] = @@mats[mt]
+      a[:clad][:d  ] = d
+      a[:clad][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+      unless specs[:frame] == :none
+        mt = :polyiso
+        d  = 0.025
+        a[:sheath][:mat] = @@mats[mt]
+        a[:sheath][:d  ] = d
+        a[:sheath][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      end
+
+      mt = :concrete
+      d  = 0.100
+      d  = 0.200      if specs[:frame] == :heavy
+      a[:compo][:mat] = @@mats[mt]
+      a[:compo][:d  ] = d
+      a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+      unless specs[:finish] == :none
+        mt = :sheathing
+        d  = 0.015
+        a[:finish][:mat] = @@mats[mt]
+        a[:finish][:d  ] = d
+        a[:finish][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      end
+    when :basement # wall
+      unless specs[:clad] == :none
+        mt = :concrete
+        mt = :sheathing if specs[:clad] == :light
+        d  = 0.100
+        d  = 0.015      if specs[:clad] == :light
+        a[:clad][:mat] = @@mats[mt]
+        a[:clad][:d  ] = d
+        a[:clad][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+        mt = :polyiso
+        d  = 0.025
+        a[:sheath][:mat] = @@mats[mt]
+        a[:sheath][:d  ] = d
+        a[:sheath][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+        mt = :concrete
+        d  = 0.200
+        a[:compo][:mat] = @@mats[mt]
+        a[:compo][:d  ] = d
+        a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      else
+        mt = :concrete
+        d  = 0.200
+        a[:sheath][:mat] = @@mats[mt]
+        a[:sheath][:d  ] = d
+        a[:sheath][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+        unless specs[:finish] == :none
+          mt = :mineral
+          d  = 0.075
+          a[:compo][:mat] = @@mats[mt]
+          a[:compo][:d  ] = d
+          a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+
+          mt = :drywall
+          d  = 0.015
+          a[:finish][:mat] = @@mats[mt]
+          a[:finish][:d  ] = d
+          a[:finish][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        end
+      end
+    when :door # opaque
+      # 45mm insulated (composite) steel door.
+      mt = :door
+      d  = 0.045
+
+      a[:compo  ][:mat ] = @@mats[mt]
+      a[:compo  ][:d   ] = d
+      a[:compo  ][:id  ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+    when :window # e.g. patio doors (simple glazing)
+      # SimpleGlazingMaterial.
+      a[:glazing][:u   ]  = specs[:uo  ]
+      a[:glazing][:shgc]  = 0.450
+      a[:glazing][:shgc]  = specs[:shgc] if specs.key?(:shgc)
+      a[:glazing][:id  ]  = "window"
+      a[:glazing][:id  ] += ":U#{format('%.1f', a[:glazing][:u])}"
+      a[:glazing][:id  ] += ":SHGC#{format('%d', a[:glazing][:shgc]*100)}"
+    when :skylight
+      # SimpleGlazingMaterial.
+      a[:glazing][:u   ] = specs[:uo  ]
+      a[:glazing][:shgc] = 0.450
+      a[:glazing][:shgc] = specs[:shgc] if specs.key?(:shgc)
+      a[:glazing][:id  ]  = "skylight"
+      a[:glazing][:id  ] += ":U#{format('%.1f', a[:glazing][:u])}"
+      a[:glazing][:id  ] += ":SHGC#{format('%d', a[:glazing][:shgc]*100)}"
+    end
+
+    # Initiate layers.
+    glazed = true
+    glazed = false if a[:glazing].empty?
+    layers = OpenStudio::Model::OpaqueMaterialVector.new   unless glazed
+    layers = OpenStudio::Model::FenestrationMaterialVector.new if glazed
+
+    if glazed
+      u    = a[:glazing][:u   ]
+      shgc = a[:glazing][:shgc]
+      lyr  = model.getSimpleGlazingByName(a[:glazing][:id])
+
+      if lyr.empty?
+        lyr = OpenStudio::Model::SimpleGlazing.new(model, u, shgc)
+        lyr.setName(a[:glazing][:id])
+      else
+        lyr = lyr.get
+      end
+
+      layers << lyr
+    else
+      # Loop through each layer spec, and generate construction.
+      a.each do |i, l|
+        next if l.empty?
+
+        lyr = model.getStandardOpaqueMaterialByName(l[:id])
+
+        if lyr.empty?
+          lyr = OpenStudio::Model::StandardOpaqueMaterial.new(model)
+          lyr.setName(l[:id])
+          lyr.setThickness(l[:d])
+          lyr.setRoughness(         l[:mat][:rgh]) if l[:mat].key?(:rgh)
+          lyr.setConductivity(      l[:mat][:k  ]) if l[:mat].key?(:k  )
+          lyr.setDensity(           l[:mat][:rho]) if l[:mat].key?(:rho)
+          lyr.setSpecificHeat(      l[:mat][:cp ]) if l[:mat].key?(:cp )
+          lyr.setThermalAbsorptance(l[:mat][:thm]) if l[:mat].key?(:thm)
+          lyr.setSolarAbsorptance(  l[:mat][:sol]) if l[:mat].key?(:sol)
+          lyr.setVisibleAbsorptance(l[:mat][:vis]) if l[:mat].key?(:vis)
+        else
+          lyr = lyr.get
+        end
+
+        layers << lyr
+      end
+    end
+
+    c  = OpenStudio::Model::Construction.new(layers)
+    c.setName(id)
+
+    # Adjust insulating layer thickness or conductivity to match requested Uo.
+    unless glazed
+      ro = 0
+      ro = 1 / specs[:uo] - @@film[ specs[:type] ] if specs[:uo] > 0
+
+      if specs[:type] == :door # 1x layer, adjust conductivity
+        layer = c.getLayer(0).to_StandardOpaqueMaterial
+        return invalid("#{id} standard material?", mth, 0) if layer.empty?
+
+        layer = layer.get
+        k     = layer.thickness / ro
+        layer.setConductivity(k)
+      elsif ro > 0 # multiple layers, adjust insulating layer thickness
+        lyr = insulatingLayer(c)
+        return invalid("#{id} construction", mth, 0) if lyr[:index].nil?
+        return invalid("#{id} construction", mth, 0) if lyr[:type ].nil?
+        return invalid("#{id} construction", mth, 0) if lyr[:r    ].zero?
+
+        layer = c.getLayer(lyr[:index]).to_StandardOpaqueMaterial
+        return invalid("#{id} standard material", mth, 0) if layer.empty?
+
+        layer = layer.get
+        d     = layer.thickness
+        k     = layer.conductivity
+        d     = (ro - rsi(c) + lyr[:r]) * k
+        nom   = layer.nameString.gsub(/[^a-z]/i, "")
+        nom  += format("%03d", d*1000)[-3..-1]
+        layer.setName(nom)
+        layer.setThickness(d)
+      end
+    end
+
+    c
+  end
+
+  # This next set of utilities (~750 lines) help distinguishing spaces that
   # are directly vs indirectly CONDITIONED, vs SEMI-HEATED. The solution here
   # relies as much as possible on space conditioning categories found in
   # standards like ASHRAE 90.1 and energy codes like the Canadian NECB editions.
