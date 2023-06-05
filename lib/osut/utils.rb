@@ -1732,8 +1732,11 @@ module OSut
   #
   # @return [Double] planar surface (left-to-right) width; 0 if invalid inputs
   def width(s = nil)
-    return 0 unless s.respond_to?(:grossArea)
-    return 0     if s.grossArea < TOL
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::PlanarSurface
+
+    return mismatch("surface", s, cl, mth, DBG, 0) unless s.is_a?(cl)
+    return zero("surface area", mth, DBG, 0)           if s.grossArea < TOL
 
     tr = OpenStudio::Transformation.alignFace(s.vertices)
 
@@ -1748,12 +1751,102 @@ module OSut
   #
   # @return [Double] planar surface (top-to-bottom) height; 0 if invalid inputs
   def height(s = nil)
-    return 0 unless s.respond_to?(:grossArea)
-    return 0     if s.grossArea < TOL
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::PlanarSurface
+
+    return mismatch("surface", s, cl, mth, DBG, 0) unless s.is_a?(cl)
+    return zero("surface area", mth, DBG, 0)           if s.grossArea < TOL
 
     tr = OpenStudio::Transformation.alignFace(s.vertices)
 
     (tr.inverse * s.vertices).max_by(&:y).y
+  end
+
+  ##
+  # Generates an OpenStudio 3D point vector of a composite floor "slab", a
+  # 'union' of multiple rectangular, horizontal floor "plates". Each "plate" is
+  # a Hash holding 4x keys: :x & :y coordinates of the origin (i.e. bottom-left
+  # corner of each plate), and :dx & :dy (plate width and depth). Each plate
+  # must also either encompass or overlap (or share an adge with) any of the
+  # preceding plates in the array. The resulting vector (or "slab") is empty
+  # if input is invalid.
+  #
+  # @param pltz [Array] individual plate Hashes
+  # @param z [Double] Z-axis coordinate
+  #
+  # @return [OpenStudio::Point3dVector] new floor vertices; empty if fail
+  def genSlab(pltz = [], z = 0)
+    mth = "OSut::#{__callee__}"
+    slb = OpenStudio::Point3dVector.new
+    bkp = OpenStudio::Point3dVector.new
+    cl1 = Array
+    cl2 = Hash
+    cl3 = Numeric
+
+    # Input validation.
+    return mismatch("plates", pltz, cl1, mth, DBG, slb) unless pltz.is_a?(cl1)
+
+    pltz.each_with_index do |plt, i|
+      id = "plate # #{i+1} (index #{i})"
+
+      return mismatch(id, plt, cl1, mth, DBG, slb) unless plt.is_a?(cl2)
+      return hashkey( id, plt,  :x, mth, DBG, slb) unless plt.key?(:x )
+      return hashkey( id, plt,  :y, mth, DBG, slb) unless plt.key?(:y )
+      return hashkey( id, plt, :dx, mth, DBG, slb) unless plt.key?(:dx)
+      return hashkey( id, plt, :dy, mth, DBG, slb) unless plt.key?(:dy)
+
+      x  = plt[:x ]
+      y  = plt[:y ]
+      dx = plt[:dx]
+      dy = plt[:dy]
+
+      return mismatch("#{id} X",   x, cl3, mth, DBG, slb) unless  x.is_a?(cl3)
+      return mismatch("#{id} Y",   y, cl3, mth, DBG, slb) unless  y.is_a?(cl3)
+      return mismatch("#{id} dX", dx, cl3, mth, DBG, slb) unless dx.is_a?(cl3)
+      return mismatch("#{id} dY", dy, cl3, mth, DBG, slb) unless dy.is_a?(cl3)
+      return zero(    "#{id} dX",          mth, ERR, slb)     if dx.abs < TOL
+      return zero(    "#{id} dY",          mth, ERR, slb)     if dy.abs < TOL
+    end
+
+    # Join plates.
+    pltz.each_with_index do |plt, i|
+      id = "plate # #{i+1} (index #{i})"
+      x  = plt[:x ]
+      y  = plt[:y ]
+      dx = plt[:dx]
+      dy = plt[:dy]
+
+      # Adjust X if dX < 0.
+      x -= -dx if dx < 0
+      dx = -dx if dx < 0
+
+      # Adjust Y if dY < 0.
+      y -= -dy if dy < 0
+      dy = -dy if dy < 0
+
+      vtx  = []
+      vtx << OpenStudio::Point3d.new(x + dx, y + dy, 0)
+      vtx << OpenStudio::Point3d.new(x + dx, y,      0)
+      vtx << OpenStudio::Point3d.new(x,      y,      0)
+      vtx << OpenStudio::Point3d.new(x,      y + dy, 0)
+
+      if slb.empty?
+        slb = vtx
+      else
+        slab = OpenStudio.join(slb, vtx, TOL2)
+        slb  = slab.get                  unless slab.empty?
+        return invalid(id, mth, 0, ERR, bkp) if slab.empty?
+      end
+    end
+
+    # Once joined, re-adjust Z-axis coordinates.
+    unless z.zero?
+      vtx = OpenStudio::Point3dVector.new
+      slb.each { |pt| vtx << OpenStudio::Point3d.new(pt.x, pt.y, z) }
+      slb = vtx
+    end
+
+    slb
   end
 
   ##

@@ -1668,6 +1668,208 @@ RSpec.describe OSut do
     model.save(file, true)
   end
 
+  it "checks slab generation" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
+    version = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
+    model   = OpenStudio::Model::Model.new
+
+    x0 = 1
+    y0 = 2
+    z0 = 3
+    w1 = 4
+    w2 = w1 * 2
+    d1 = 5
+    d2 = d1 * 2
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # 1x valid 'floor' plate.
+    #        ____
+    #       |    |
+    #       |    |
+    #       |  1 |
+    #       |____|
+    #
+    plates = []
+    plates << {x: x0, y: y0, dx: w1, dy: d2} # bottom-left XY origin
+
+    slab = mod1.genSlab(plates, z0)
+    expect(mod1.status.zero?).to be(true)
+    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(slab.size).to eq(4)
+
+    surface = OpenStudio::Model::Surface.new(slab, model)
+    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface.vertices.size).to eq(4)
+
+    expect(surface.vertices[0].x).to be_within(TOL).of(x0 + w1)
+    expect(surface.vertices[0].y).to be_within(TOL).of(y0 + d2)
+    expect(surface.vertices[0].z).to be_within(TOL).of(z0)
+
+    expect(surface.vertices[1].x).to be_within(TOL).of(x0 + w1)
+    expect(surface.vertices[1].y).to be_within(TOL).of(y0)
+    expect(surface.vertices[1].z).to be_within(TOL).of(z0)
+
+    expect(surface.vertices[2].x).to be_within(TOL).of(x0)
+    expect(surface.vertices[2].y).to be_within(TOL).of(y0)
+    expect(surface.vertices[2].z).to be_within(TOL).of(z0)
+
+    expect(surface.vertices[3].x).to be_within(TOL).of(x0)
+    expect(surface.vertices[3].y).to be_within(TOL).of(y0 + d2)
+    expect(surface.vertices[3].z).to be_within(TOL).of(z0)
+
+    surface = OpenStudio::Model::Surface.new(slab, model)
+    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface.vertices.size).to eq(4)
+    expect(surface.grossArea).to be_within(TOL).of(2 * 20)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # 2x valid 'floor' plates.
+    #        ____ ____
+    #       |    |  2 |
+    #       |    |____|
+    #       |  1 |
+    #       |____|
+    #
+    plates = []
+    plates << {x: x0,      y: y0,      dx: w1, dy: d2}
+    plates << {x: x0 + w1, y: y0 + d1, dx: w1, dy: d1}
+
+    slab = mod1.genSlab(plates, z0)
+    expect(mod1.status.zero?).to be(true)
+    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(slab.size).to eq(6)
+
+    surface = OpenStudio::Model::Surface.new(slab, model)
+    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface.vertices.size).to eq(6)
+    expect(surface.grossArea).to be_within(TOL).of(3 * 20)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # 3x valid 'floor' plates.
+    #        ____ ____
+    #       |    |  2 |
+    #   ____|    |____|
+    #  |   3|  1 |
+    #  |____|____|
+    #
+    plates = []
+    plates << {x: x0,      y: y0,      dx: w1, dy: d2}
+    plates << {x: x0 + w1, y: y0 + d1, dx: w1, dy: d1}
+    plates << {x: x0 - w1, y: y0,      dx: w1, dy: d1} # X origin < 0
+
+    slab = mod1.genSlab(plates, z0)
+    expect(mod1.status.zero?).to be(true)
+    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(slab.size).to eq(8)
+
+    surface = OpenStudio::Model::Surface.new(slab, model)
+    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface.vertices.size).to eq(8)
+    expect(surface.grossArea).to be_within(TOL).of(4 * 20)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # 3x 'floor' plates + 1x unconnected 'plate'.
+    #        ____ ____   ____
+    #       |    |  2 | |  4 |
+    #   ____|    |____| |____|
+    #  |   3|  1 |
+    #  |____|____|
+    #
+    plates = []
+    plates << {x: x0,          y: y0,      dx: w1, dy: d2} # index 0, #1
+    plates << {x: x0 + w1,     y: y0 + d1, dx: w1, dy: d1} # index 1, #2
+    plates << {x: x0 - w1,     y: y0,      dx: w1, dy: d1} # index 2, #3
+    plates << {x: x0 + w2 + 1, y: y0 + d1, dx: w1, dy: d1} # index 3, #4
+
+    slab = mod1.genSlab(plates, z0)
+    expect(mod1.error?).to be(true)
+    msg = mod1.logs.first[:message]
+    expect(msg).to eq("Invalid 'plate # 4 (index 3)' (OSut::genSlab)")
+    expect(mod1.clean!).to eq(DBG)
+    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(slab.empty?).to be(true)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # 3x 'floor' plates + 1x overlapping 'plate'.
+    #        ____ ____
+    #       |    |  2 |__
+    #   ____|    |____| 4|
+    #  |   3|  1 |  |____|
+    #  |____|____|
+    #
+    plates = []
+    plates << {x: x0,          y: y0,      dx: w1, dy: d2}
+    plates << {x: x0 + w1,     y: y0 + d1, dx: w1, dy: d1}
+    plates << {x: x0 - w1,     y: y0,      dx: w1, dy: d1}
+    plates << {x: x0 + w2 - 1, y: y0 + 1,  dx: w1, dy: d1}
+
+    slab = mod1.genSlab(plates, z0)
+    puts mod1.logs
+    expect(mod1.status.zero?).to be(true)
+    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(slab.size).to eq(12)
+
+    surface = OpenStudio::Model::Surface.new(slab, model)
+    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface.vertices.size).to eq(12)
+    expect(surface.grossArea).to be_within(TOL).of(5 * 20 - 1)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Same as previous, yet overlapping 'plate' has a negative dX while X
+    # origin is set at right (not left) corner.
+    #        ____ ____
+    #       |    |  2 |__
+    #   ____|    |____| 4|
+    #  |   3|  1 |  |____|
+    #  |____|____|
+    #
+    plates = []
+    plates << {x: x0,              y: y0,      dx:  w1, dy: d2}
+    plates << {x: x0 + w1,         y: y0 + d1, dx:  w1, dy: d1}
+    plates << {x: x0 - w1,         y: y0,      dx:  w1, dy: d1}
+    plates << {x: x0 + 3 * w1 - 1, y: y0 + 1,  dx: -w1, dy: d1}
+
+    slab = mod1.genSlab(plates, z0)
+    puts mod1.logs
+    expect(mod1.status.zero?).to be(true)
+    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(slab.size).to eq(12)
+
+    surface = OpenStudio::Model::Surface.new(slab, model)
+    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface.vertices.size).to eq(12)
+    expect(surface.grossArea).to be_within(TOL).of(5 * 20 - 1)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Same as previous, yet overlapping 'plate' has both negative dX & dY,
+    # while XY origin is set at top-right (not bottom-left) corner.
+    #        ____ ____
+    #       |    |  2 |__
+    #   ____|    |____| 4|
+    #  |   3|  1 |  |____|
+    #  |____|____|
+    #
+    plates = []
+    plates << {x: x0,              y: y0,           dx:  w1, dy:  d2}
+    plates << {x: x0 + w1,         y: y0 + d1,      dx:  w1, dy:  d1}
+    plates << {x: x0 - w1,         y: y0,           dx:  w1, dy:  d1}
+    plates << {x: x0 + 3 * w1 - 1, y: y0 + 1 + d1,  dx: -w1, dy: -d1}
+
+    slab = mod1.genSlab(plates, z0)
+    puts mod1.logs
+    expect(mod1.status.zero?).to be(true)
+    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(slab.size).to eq(12)
+
+    surface = OpenStudio::Model::Surface.new(slab, model)
+    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface.vertices.size).to eq(12)
+    expect(surface.grossArea).to be_within(TOL).of(5 * 20 - 1)
+  end
+
   it "checks wwr insertions (seb)" do
     expect(mod1.reset(DBG)).to eq(DBG)
     expect(mod1.level).to eq(DBG)
