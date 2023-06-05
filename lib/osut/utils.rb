@@ -1763,6 +1763,60 @@ module OSut
   end
 
   ##
+  # Return array of space-specific OpenStudio::Model::Surface's that match
+  # criteria (e.g. exterior, north-east facing walls in hotel "lobby"). Note
+  # 'sides' rely on space coordinates (not absolute model coordinates). And
+  # 'sides' are exclusive, not inclusive (e.g. walls that are strictly
+  # north-facing or strictly east-facing would not be returned if 'sides' holds
+  # [:north, :east]).
+  #
+  # @param spaces [Array] targeted OpenStudio::Model::Space's
+  # @param boundary [String] OpenStudio outside boundary condition
+  # @param type [String] OpenStudio surface type
+  # @param sides [Arrayl] surface direction keys, e.g. [:north, :top, :bottom]
+  #
+  # @return [Array] matching OpenStudio::Model::Surface's (empty if fail)
+  def facets(spaces = [], boundary = "Outdoors", type = "Wall", sides = [])
+    faces    = []
+    list     = [:bottom, :top, :north, :east, :south, :west].freeze
+    boundary = boundary.downcase
+    type     = type.downcase
+    return [] unless spaces.respond_to?(:&)
+    return [] unless boundary.respond_to?(:to_s)
+    return [] unless type.respond_to?(:to_s)
+    return [] unless sides.respond_to?(:&)
+
+    spaces.each { |s| return [] unless s.respond_to?(:setSpaceType) }
+
+    # Skip empty sides.
+    return [] if sides.empty?
+
+    # Keep valid sides.
+    orientations = sides.select {|o| list.include?(o)}
+    return [] if orientations.empty?
+
+    spaces.each do |space|
+      space.surfaces.each do |s|
+        next unless s.outsideBoundaryCondition.downcase == boundary
+        next unless s.surfaceType.downcase == type
+
+        sidez = []
+        sidez << :top    if s.outwardNormal.z >  TOL
+        sidez << :bottom if s.outwardNormal.z < -TOL
+        sidez << :north  if s.outwardNormal.y >  TOL
+        sidez << :east   if s.outwardNormal.x >  TOL
+        sidez << :south  if s.outwardNormal.y < -TOL
+        sidez << :west   if s.outwardNormal.x < -TOL
+        ok = true
+        orientations.each { |o| ok = false unless sidez.include?(o) }
+        faces << s if ok
+      end
+    end
+
+    faces
+  end
+
+  ##
   # Generates an OpenStudio 3D point vector of a composite floor "slab", a
   # 'union' of multiple rectangular, horizontal floor "plates". Each "plate" is
   # a Hash holding 4x keys: :x & :y coordinates of the origin (i.e. bottom-left

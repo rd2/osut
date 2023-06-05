@@ -1673,8 +1673,7 @@ RSpec.describe OSut do
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
 
-    version = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
-    model   = OpenStudio::Model::Model.new
+    model = OpenStudio::Model::Model.new
 
     x0 = 1
     y0 = 2
@@ -2067,7 +2066,6 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
 
     translator = OpenStudio::OSVersion::VersionTranslator.new
-    v = OpenStudio.openStudioVersion.split(".").join.to_i
     file = File.join(__dir__, "files/osms/out/seb_ext2.osm")
     path = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
@@ -2111,5 +2109,53 @@ RSpec.describe OSut do
 
     file = File.join(__dir__, "files/osms/out/seb_ext4.osm")
     model.save(file, true)
+  end
+
+  it "checks facet retrieval" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    file = File.join(__dir__, "files/osms/out/seb_ext2.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+    spaces = model.getSpaces
+
+    # The solution is similar to:
+    #   OpenStudio::Model::Space::findSurfaces(minDegreesFromNorth,
+    #                                          maxDegreesFromNorth,
+    #                                          minDegreesTilt,
+    #                                          maxDegreesTilt,
+    #                                          tol)
+    #   https://s3.amazonaws.com/openstudio-sdk-documentation/cpp/
+    #   OpenStudio-3.6.1-doc/model/html/classopenstudio_1_1model_1_1_space.html
+    #   #a0cf3c265ac314c1c846ee4962e852a3e
+    #
+    # ... yet it offers filters such as surface type and boundary conditions.
+    northsouth = mod1.facets(spaces, "Outdoors", "Wall", [:north, :south])
+    expect(northsouth.size).to eq(0)
+
+    north = mod1.facets(spaces, "Outdoors", "Wall", [:north])
+    expect(north.size).to eq(14)
+
+    northeast = mod1.facets(spaces, "Outdoors", "Wall", [:north, :east])
+    expect(northeast.size).to eq(8)
+
+    floors = mod1.facets(spaces, "Ground", "Floor", [:bottom])
+    expect(floors.size).to eq(4)
+
+    roofs = mod1.facets(spaces, "Outdoors", "RoofCeiling", [:top])
+    expect(roofs.size).to eq(5)
+
+    slanted = mod1.facets(spaces, "Outdoors", "RoofCeiling", [:top, :north])
+    expect(slanted.size).to eq(1)
+    expect(slanted.first.nameString).to eq("Openarea slanted roof")
+
+    tilted = mod1.facets(spaces, "Outdoors", "Wall", [:bottom])
+    expect(tilted.size).to eq(1)
+    expect(tilted.first.nameString).to eq("Openarea tilted wall")
   end
 end
