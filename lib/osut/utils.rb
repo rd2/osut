@@ -534,10 +534,10 @@ module OSut
   end
 
   ##
-  # Generate a solar shade (e.g. roller, textile) to glazed sub surfaces,
+  # Generate a solar shade (e.g. roller, textile) for glazed sub surfaces,
   # controlled to minimize overheating in cooling months (Northern Hemisphere,
   # i.e. May to October), when outdoor dry bulb temperature is above 18°C and
-  # impinging solar radiation is above 100 W/m2).
+  # impinging solar radiation is above 100 W/m2). For SDK v3.2.1 and up.
   #
   # @param model [OpenStudio::Model::Model] a model
   # @param subs [OpenStudio::Model::SubSurfaceVector] list of sub surfaces
@@ -545,6 +545,7 @@ module OSut
   # @return [Bool] true if successful
   def genShade(model = nil, subs = OpenStudio::Model::SubSurfaceVector.new)
     mth = "Mats::#{__callee__}"
+    v   = OpenStudio.openStudioVersion.split(".").join.to_i
     cl1 = OpenStudio::Model::Model
     cl2 = OpenStudio::Model::SubSurfaceVector
     no  = false
@@ -553,6 +554,7 @@ module OSut
     return mismatch("model", model, cl1, mth, ERR, no) unless model.is_a?(cl1)
     return mismatch("subs ", subs,  cl2, mth, ERR, no) unless subs.is_a?(cl2)
     return empty(   "subs",              mth, WRN, no)     if subs.empty?
+    return no if v < 321
 
     # Shading availability period.
     onoff = model.getScheduleTypeLimitsByName("onoff")

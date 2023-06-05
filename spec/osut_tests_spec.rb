@@ -2322,6 +2322,7 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
 
     translator = OpenStudio::OSVersion::VersionTranslator.new
+    v = OpenStudio.openStudioVersion.split(".").join.to_i
     file = File.join(__dir__, "files/osms/out/seb_ext4.osm")
     path = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
@@ -2345,36 +2346,40 @@ RSpec.describe OSut do
     skylights.each { |sub| subs << sub }
     windows.each   { |sub| subs << sub }
 
-    type = "OnIfHighOutdoorAirTempAndHighSolarOnWindow"
-    expect(mod1.genShade(model, subs)).to be(true)
-    ctl = model.getShadingControls
-    expect(ctl.size).to eq(1)
-    ctl = ctl.first
-    expect(ctl.shadingType).to eq("InteriorShade")
-    expect(ctl.shadingControlType).to eq(type)
-    expect(ctl.isControlTypeValueNeedingSetpoint1).to be(true)
-    expect(ctl.isControlTypeValueNeedingSetpoint2).to be(true)
-    expect(ctl.isControlTypeValueAllowingSchedule).to be(true)
-    expect(ctl.isControlTypeValueRequiringSchedule).to be(false)
-    spt1 = ctl.setpoint
-    spt2 = ctl.setpoint2
-    expect(spt1.empty?).to be(false)
-    expect(spt2.empty?).to be(false)
-    spt1 = spt1.get
-    spt2 = spt2.get
-    expect(spt1).to be_within(TOL).of(18)
-    expect(spt2).to be_within(TOL).of(100)
-    expect(ctl.multipleSurfaceControlType).to eq("Group")
+    if v < 321
+      expect(mod1.genShade(model, subs)).to be(false)
+    else
+      expect(mod1.genShade(model, subs)).to be(true)
+      ctl = model.getShadingControls
+      expect(ctl.size).to eq(1)
+      ctl = ctl.first
+      expect(ctl.shadingType).to eq("InteriorShade")
+      type = "OnIfHighOutdoorAirTempAndHighSolarOnWindow"
+      expect(ctl.shadingControlType).to eq(type)
+      expect(ctl.isControlTypeValueNeedingSetpoint1).to be(true)
+      expect(ctl.isControlTypeValueNeedingSetpoint2).to be(true)
+      expect(ctl.isControlTypeValueAllowingSchedule).to be(true)
+      expect(ctl.isControlTypeValueRequiringSchedule).to be(false)
+      spt1 = ctl.setpoint
+      spt2 = ctl.setpoint2
+      expect(spt1.empty?).to be(false)
+      expect(spt2.empty?).to be(false)
+      spt1 = spt1.get
+      spt2 = spt2.get
+      expect(spt1).to be_within(TOL).of(18)
+      expect(spt2).to be_within(TOL).of(100)
+      expect(ctl.multipleSurfaceControlType).to eq("Group")
 
-    ctl.subSurfaces.each do |sub|
-      surface = sub.surface
-      expect(surface.empty?).to be(false)
-      surface = surface.get
-      ok = surface == slanted || surface == tilted
-      expect(ok).to be(true)
+      ctl.subSurfaces.each do |sub|
+        surface = sub.surface
+        expect(surface.empty?).to be(false)
+        surface = surface.get
+        ok = surface == slanted || surface == tilted
+        expect(ok).to be(true)
+      end
+
+      file = File.join(__dir__, "files/osms/out/seb_ext5.osm")
+      model.save(file, true)
     end
-
-    file = File.join(__dir__, "files/osms/out/seb_ext5.osm")
-    model.save(file, true)
   end
 end
