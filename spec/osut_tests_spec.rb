@@ -2316,13 +2316,65 @@ RSpec.describe OSut do
 
     roofs = mod1.facets(spaces, "Outdoors", "RoofCeiling", [:top])
     expect(roofs.size).to eq(5)
+  end
+
+  it "checks roller shades" do
+    expect(mod1.clean!).to eq(DBG)
+
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    file = File.join(__dir__, "files/osms/out/seb_ext4.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+    spaces = model.getSpaces
 
     slanted = mod1.facets(spaces, "Outdoors", "RoofCeiling", [:top, :north])
     expect(slanted.size).to eq(1)
-    expect(slanted.first.nameString).to eq("Openarea slanted roof")
+    slanted = slanted.first
+    expect(slanted.nameString).to eq("Openarea slanted roof")
+    skylights = slanted.subSurfaces
 
     tilted = mod1.facets(spaces, "Outdoors", "Wall", [:bottom])
     expect(tilted.size).to eq(1)
-    expect(tilted.first.nameString).to eq("Openarea tilted wall")
+    tilted = tilted.first
+    expect(tilted.nameString).to eq("Openarea tilted wall")
+    windows = tilted.subSurfaces
+
+    subs = OpenStudio::Model::SubSurfaceVector.new
+    skylights.each { |sub| subs << sub }
+    windows.each   { |sub| subs << sub }
+
+    type = "OnIfHighOutdoorAirTempAndHighSolarOnWindow"
+    expect(mod1.genShade(model, subs)).to be(true)
+    ctl = model.getShadingControls
+    expect(ctl.size).to eq(1)
+    ctl = ctl.first
+    expect(ctl.shadingType).to eq("InteriorShade")
+    expect(ctl.shadingControlType).to eq(type)
+    expect(ctl.isControlTypeValueNeedingSetpoint1).to be(true)
+    expect(ctl.isControlTypeValueNeedingSetpoint2).to be(true)
+    expect(ctl.isControlTypeValueAllowingSchedule).to be(true)
+    expect(ctl.isControlTypeValueRequiringSchedule).to be(false)
+    spt1 = ctl.setpoint
+    spt2 = ctl.setpoint2
+    expect(spt1.empty?).to be(false)
+    expect(spt2.empty?).to be(false)
+    spt1 = spt1.get
+    spt2 = spt2.get
+    expect(spt1).to be_within(TOL).of(18)
+    expect(spt2).to be_within(TOL).of(100)
+    expect(ctl.multipleSurfaceControlType).to eq("Group")
+
+    ctl.subSurfaces.each do |sub|
+      surface = sub.surface
+      expect(surface.empty?).to be(false)
+      surface = surface.get
+      ok = surface == slanted || surface == tilted
+      expect(ok).to be(true)
+    end
+
+    file = File.join(__dir__, "files/osms/out/seb_ext5.osm")
+    model.save(file, true)
   end
 end

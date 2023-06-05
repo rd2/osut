@@ -533,6 +533,84 @@ module OSut
     c
   end
 
+  ##
+  # Generate a solar shade (e.g. roller, textile) to glazed sub surfaces,
+  # controlled to minimize overheating in cooling months (Northern Hemisphere,
+  # i.e. May to October), when outdoor dry bulb temperature is above 18°C and
+  # impinging solar radiation is above 100 W/m2).
+  #
+  # @param model [OpenStudio::Model::Model] a model
+  # @param subs [OpenStudio::Model::SubSurfaceVector] list of sub surfaces
+  #
+  # @return [Bool] true if successful
+  def genShade(model = nil, subs = OpenStudio::Model::SubSurfaceVector.new)
+    mth = "Mats::#{__callee__}"
+    cl1 = OpenStudio::Model::Model
+    cl2 = OpenStudio::Model::SubSurfaceVector
+    no  = false
+
+    # Log/exit if invalid arguments.
+    return mismatch("model", model, cl1, mth, ERR, no) unless model.is_a?(cl1)
+    return mismatch("subs ", subs,  cl2, mth, ERR, no) unless subs.is_a?(cl2)
+    return empty(   "subs",              mth, WRN, no)     if subs.empty?
+
+    # Shading availability period.
+    onoff = model.getScheduleTypeLimitsByName("onoff")
+
+    if onoff.empty?
+      onoff = OpenStudio::Model::ScheduleTypeLimits.new(model)
+      onoff.setName("onoff")
+      onoff.setLowerLimitValue(0)
+      onoff.setUpperLimitValue(1)
+      onoff.setNumericType("Discrete")
+      onoff.setUnitType("Availability")
+    else
+      onoff = onoff.get
+    end
+
+    # Shading schedule.
+    may     = OpenStudio::MonthOfYear.new("May")
+    october = OpenStudio::MonthOfYear.new("Oct")
+    start   = OpenStudio::Date.new(may, 1)
+    finish  = OpenStudio::Date.new(october, 31)
+
+    shade_sch = OpenStudio::Model::ScheduleRuleset.new(model, 0)
+    shade_sch.setName("shade_sch")
+    shade_sch.setScheduleTypeLimits(onoff)
+    shade_sch.defaultDaySchedule.setName("shade_sch_dft")
+
+    shade_cooling_rule = OpenStudio::Model::ScheduleRule.new(shade_sch)
+    shade_cooling_rule.setName("shade_cooling_rule")
+    shade_cooling_rule.setStartDate(start)
+    shade_cooling_rule.setEndDate(finish)
+    shade_cooling_rule.setApplyAllDays(true)
+    shade_cooling_rule.daySchedule.setName("shade_sch_cooling")
+    shade_cooling_rule.daySchedule.addValue(OpenStudio::Time.new(0,24,0,0), 1)
+
+    shd = OpenStudio::Model::Shade.new(model)
+    shd.setName("shade")
+
+    ctl = OpenStudio::Model::ShadingControl.new(shd)
+    ctl.setName("shade_control")
+    ctl.setSchedule(shade_sch)
+    ctl.setShadingControlType("OnIfHighOutdoorAirTempAndHighSolarOnWindow")
+    ctl.setSetpoint(18)   # °C
+    ctl.setSetpoint2(100) # W/m2
+    ctl.setMultipleSurfaceControlType("Group")
+
+    # Setting setpoint (#1) triggers the following (apparently benign) warning:
+    #
+    #   [openstudio.model.ShadingControl] <0> Object of type 'OS:ShadingControl'
+    #   and named 'shade_control' has a Shading Control Type
+    #   'OnIfHighOutdoorAirTempAndHighSolarOnWindow' which does require a
+    #   Setpoint, not resetting it
+    #
+    #   github.com/NREL/OpenStudio/blob/872300de73e3223f0d541269def844b6250a3ed0
+    #   /src/model/ShadingControl.cpp#L334
+
+    ctl.setSubSurfaces(subs)
+  end
+
   # This next set of utilities (~750 lines) help distinguishing spaces that
   # are directly vs indirectly CONDITIONED, vs SEMI-HEATED. The solution here
   # relies as much as possible on space conditioning categories found in
