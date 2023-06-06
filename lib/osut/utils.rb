@@ -609,6 +609,14 @@ module OSut
     #
     #   github.com/NREL/OpenStudio/blob/872300de73e3223f0d541269def844b6250a3ed0
     #   /src/model/ShadingControl.cpp#L334
+    #
+    # This appears to be the calling point:
+    #
+    #   github.com/NREL/OpenStudio/blob/872300de73e3223f0d541269def844b6250a3ed0
+    #   /src/model/ShadingControl.cpp#L274
+    #
+    # Hopefully, SDK devs could comment out the stdout warning everytime
+    # resetSetpoint() is called.
 
     ctl.setSubSurfaces(subs)
   end
