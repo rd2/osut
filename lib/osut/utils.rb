@@ -181,7 +181,7 @@ module OSut
   #
   # @return [OpenStudio::Model::Construction] a construction (nil if failure)
   def genConstruction(model = nil, specs = {})
-    mth = "Mats::#{__callee__}"
+    mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Model::Model
     cl2 = Hash
 
@@ -544,7 +544,7 @@ module OSut
   #
   # @return [Bool] true if successful
   def genShade(model = nil, subs = OpenStudio::Model::SubSurfaceVector.new)
-    mth = "Mats::#{__callee__}"
+    mth = "OSut::#{__callee__}"
     v   = OpenStudio.openStudioVersion.split(".").join.to_i
     cl1 = OpenStudio::Model::Model
     cl2 = OpenStudio::Model::SubSurfaceVector
@@ -619,6 +619,94 @@ module OSut
     # resetSetpoint() is called.
 
     ctl.setSubSurfaces(subs)
+  end
+
+  ##
+  # Generate an internal mass definition and internal mass instances for
+  # selected spaces.
+  #
+  # @param model [OpenStudio::Model::Model] a model
+  # @param spaces [Array] OpenStudio spaces
+  # @param ratio [Double] internal mass surface area / floor area
+  #
+  # @return [Bool] true if successful
+  def genMass(model = nil, spaces = [], ratio = 2.0)
+    # This is largely adapted from OpenStudio-Standards
+    #
+    # https://github.com/NREL/openstudio-standards/blob/
+    # d332605c2f7a35039bf658bf55cad40a7bcac317/lib/openstudio-standards/
+    # prototypes/common/objects/Prototype.Model.rb#L786
+
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Model::Model
+    cl2 = Array
+    cl3 = Numeric
+    cl4 = OpenStudio::Model::Space
+    no  = false
+
+    # Log/exit if invalid arguments.
+    return mismatch("model", model, cl1, mth, ERR, no) unless model.is_a?(cl1)
+    return mismatch("spaces", spaces, cl2, mth, ERR, no) unless spaces.is_a?(cl2)
+    return mismatch("ratio", ratio, cl3, mth, ERR, no) unless ratio.is_a?(cl3)
+    return empty(   "spaces", mth, WRN, no) if spaces.empty?
+    return negative("ratio", mth, ERR, no) if ratio < 0
+
+    spaces.each do |space|
+      return mismatch("space", space, cl4, mth, ERR, no) unless space.is_a?(cl4)
+    end
+
+    # A single material.
+    mat = "m:mass"
+    m_mass = model.getOpaqueMaterialByName(mat)
+
+    if m_mass.empty?
+      m_mass = OpenStudio::Model::StandardOpaqueMaterial.new(model)
+      m_mass.setName(mat)
+      m_mass.setRoughness("MediumRough")
+      m_mass.setThickness(0.15)
+      m_mass.setConductivity(1.12)
+      m_mass.setDensity(540)
+      m_mass.setSpecificHeat(1210)
+      m_mass.setThermalAbsorptance(0.9)
+      m_mass.setSolarAbsorptance(0.7)
+      m_mass.setVisibleAbsorptance(0.17)
+    else
+      m_mass = m_mass.get
+    end
+
+    # A single, 1x layered construction.
+    construction = "c:mass"
+    c_mass = model.getConstructionByName(construction)
+
+    if c_mass.empty?
+      c_mass = OpenStudio::Model::Construction.new(model)
+      c_mass.setName(construction)
+      layers = OpenStudio::Model::MaterialVector.new
+      layers << m_mass
+      c_mass.setLayers(layers)
+    else
+      c_mass = c_mass.get
+    end
+
+    id = "mass definition:" + (format "%.2f", ratio)
+    definition = model.getInternalMassDefinitionByName(id)
+
+    if definition.empty?
+      definition = OpenStudio::Model::InternalMassDefinition.new(model)
+      definition.setName(id)
+      definition.setConstruction(c_mass)
+      definition.setSurfaceAreaperSpaceFloorArea(ratio)
+    else
+      definition = definition.get
+    end
+
+    spaces.each do |space|
+      mass = OpenStudio::Model::InternalMass.new(definition)
+      mass.setName("mass:#{space.nameString}")
+      mass.setSpace(space)
+    end
+
+    true
   end
 
   # This next set of utilities (~750 lines) help distinguishing spaces that

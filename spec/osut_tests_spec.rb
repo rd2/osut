@@ -2382,4 +2382,70 @@ RSpec.describe OSut do
       model.save(file, true)
     end
   end
+
+  it "checks internal mass" do
+    expect(mod1.clean!).to eq(DBG)
+
+    ratios = {entrance: 0.1, lobby: 0.3, meeting: 1.0}
+
+    model    = OpenStudio::Model::Model.new
+    entrance = OpenStudio::Model::Space.new(model)
+    lobby    = OpenStudio::Model::Space.new(model)
+    meeting  = OpenStudio::Model::Space.new(model)
+    offices  = OpenStudio::Model::Space.new(model)
+
+    entrance.setName("Entrance")
+    lobby.setName("Lobby")
+    meeting.setName("Meeting")
+    offices.setName("Offices")
+
+    model.getSpaces.each do |space|
+      name  = space.nameString.downcase.to_sym
+      ratio = nil
+      ratio = ratios[name] if ratios.keys.include?(name)
+      ok    = mod1.genMass(model, [space], ratio) unless ratio.nil?
+      ok    = mod1.genMass(model, [space])            if ratio.nil?
+      expect(ok).to be(true)
+      expect(mod1.status.zero?).to be(true)
+    end
+
+    construction = nil
+    material = nil
+
+    model.getInternalMasss.each do |m|
+      d = m.internalMassDefinition
+      expect(d.designLevelCalculationMethod).to eq("SurfaceArea/Area")
+      ratio = d.surfaceAreaperSpaceFloorArea
+      expect(ratio.empty?).to be(false)
+      ratio = ratio.get
+
+      case ratio
+      when 0.1
+        expect(d.nameString).to eq("mass definition:0.10")
+        expect(m.nameString.downcase.include?("entrance")).to be(true)
+      when 0.3
+        expect(d.nameString).to eq("mass definition:0.30")
+        expect(m.nameString.downcase.include?("lobby")).to be(true)
+      when 1.0
+        expect(d.nameString).to eq("mass definition:1.00")
+        expect(m.nameString.downcase.include?("meeting")).to be(true)
+      else
+        expect(d.nameString).to eq("mass definition:2.00")
+        expect(ratio).to eq(2.0)
+      end
+
+      c = d.construction
+      expect(c.empty?).to be(false)
+      c = c.get.to_Construction
+      expect(c.empty?).to be(false)
+      c = c.get
+      construction = c if construction.nil?
+      expect(construction).to eq(c)
+      expect(c.nameString).to eq("c:mass")
+      expect(c.numLayers).to eq(1)
+      m = c.layers.first
+      material = m if material.nil?
+      expect(material).to eq(m)
+    end
+  end
 end
