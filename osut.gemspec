@@ -26,9 +26,8 @@ Gem::Specification.new do |s|
   s.required_ruby_version     = [">= 2.5.0", "< 3"]
   s.metadata                  = {}
 
-  # s.add_dependency              "oslg",    "~> 0"
+  s.add_dependency              "oslg",    "~> 0"
 
-  s.add_development_dependency  "oslg",    "~> 0.2.7"
   s.add_development_dependency  "bundler", "~> 2.1"
   s.add_development_dependency  "rake",    "~> 13.0"
   s.add_development_dependency  "rspec",   "~> 3.11"
