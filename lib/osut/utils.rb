@@ -196,8 +196,8 @@ module OSut
     specs[:id  ]   = ""                              unless specs.key?(:id  )
     id             = specs[:id]
     ok             = id.respond_to?(:to_s)
-    id             = "Construction:#{specs[:type]}"  unless ok
-    id             = "Construction:#{specs[:type]}"      if id.empty?
+    id             = "OSut|CON|#{specs[:type]}" unless ok
+    id             = "OSut|CON|#{specs[:type]}" if id.empty?
     specs[:uo  ]   = @@uo[ specs[:type] ]            unless specs.key?(:uo  )
     u              = specs[:uo]
     return mismatch("#{id} Uo", u, Numeric, mth)     unless u.is_a?(Numeric)
@@ -228,23 +228,23 @@ module OSut
       d  = 0.015
       a[:compo][:mat] = @@mats[mt]
       a[:compo][:d  ] = d
-      a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      a[:compo][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
     when :partition
       d  = 0.015
       mt = :drywall
       a[:clad][:mat] = @@mats[mt]
       a[:clad][:d  ] = d
-      a[:clad][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      a[:clad][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
       mt = :sheathing
       a[:compo][:mat] = @@mats[mt]
       a[:compo][:d  ] = d
-      a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      a[:compo][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
       mt = :drywall
       a[:finish][:mat] = @@mats[mt]
       a[:finish][:d  ] = d
-      a[:finish][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      a[:finish][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
     when :wall
       unless specs[:clad] == :none
         mt = :cladding
@@ -254,7 +254,7 @@ module OSut
         d  = 0.015     if specs[:clad] == :light
         a[:clad][:mat] = @@mats[mt]
         a[:clad][:d  ] = d
-        a[:clad][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:clad][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
       end
 
       mt = :drywall
@@ -264,7 +264,7 @@ module OSut
       d  = 0.015      if specs[:frame] == :light
       a[:sheath][:mat] = @@mats[mt]
       a[:sheath][:d  ] = d
-      a[:sheath][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      a[:sheath][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
       mt = :concrete
       mt = :mineral   if specs[:frame] == :light
@@ -272,7 +272,7 @@ module OSut
       d  = 0.200      if specs[:frame] == :heavy
       a[:compo][:mat] = @@mats[mt]
       a[:compo][:d  ] = d
-      a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      a[:compo][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
       unless specs[:finish] == :none
         mt = :concrete
@@ -282,7 +282,7 @@ module OSut
         d  = 0.200      if specs[:finish] == :heavy
         a[:finish][:mat] = @@mats[mt]
         a[:finish][:d  ] = d
-        a[:finish][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:finish][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
       end
     when :roof
       unless specs[:clad] == :none
@@ -293,13 +293,13 @@ module OSut
         d  = 0.200     if specs[:clad] == :heavy  # e.g. parking garage
         a[:clad][:mat] = @@mats[mt]
         a[:clad][:d  ] = d
-        a[:clad][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:clad][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
         mt = :sheathing
         d  = 0.015
         a[:sheath][:mat] = @@mats[mt]
         a[:sheath][:d  ] = d
-        a[:sheath][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:sheath][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
       end
 
       mt = :cellulose
@@ -308,7 +308,7 @@ module OSut
       d  = 0.100
       a[:compo][:mat] = @@mats[mt]
       a[:compo][:d  ] = d
-      a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      a[:compo][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
       unless specs[:finish] == :none
         mt = :concrete
@@ -318,7 +318,7 @@ module OSut
         d  = 0.200      if specs[:finish] == :heavy
         a[:finish][:mat] = @@mats[mt]
         a[:finish][:d  ] = d
-        a[:finish][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:finish][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
       end
     when :floor # exposed
       unless specs[:clad] == :none
@@ -326,13 +326,13 @@ module OSut
         d  = 0.015
         a[:clad][:mat] = @@mats[mt]
         a[:clad][:d  ] = d
-        a[:clad][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:clad][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
         mt = :sheathing
         d  = 0.015
         a[:sheath][:mat] = @@mats[mt]
         a[:sheath][:d  ] = d
-        a[:sheath][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:sheath][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
       end
 
       mt = :cellulose
@@ -341,7 +341,7 @@ module OSut
       d  = 0.100 # possibly an insulating layer to reset
       a[:compo][:mat] = @@mats[mt]
       a[:compo][:d  ] = d
-      a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      a[:compo][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
       unless specs[:finish] == :none
         mt = :concrete
@@ -351,21 +351,21 @@ module OSut
         d  = 0.200      if specs[:finish] == :heavy
         a[:finish][:mat] = @@mats[mt]
         a[:finish][:d  ] = d
-        a[:finish][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:finish][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
       end
     when :slab # basement slab or slab-on-grade
       mt = :sand
       d  = 0.100
       a[:clad][:mat] = @@mats[mt]
       a[:clad][:d  ] = d
-      a[:clad][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      a[:clad][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
       unless specs[:frame] == :none
         mt = :polyiso
         d  = 0.025
         a[:sheath][:mat] = @@mats[mt]
         a[:sheath][:d  ] = d
-        a[:sheath][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:sheath][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
       end
 
       mt = :concrete
@@ -373,14 +373,14 @@ module OSut
       d  = 0.200      if specs[:frame] == :heavy
       a[:compo][:mat] = @@mats[mt]
       a[:compo][:d  ] = d
-      a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      a[:compo][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
       unless specs[:finish] == :none
         mt = :sheathing
         d  = 0.015
         a[:finish][:mat] = @@mats[mt]
         a[:finish][:d  ] = d
-        a[:finish][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:finish][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
       end
     when :basement # wall
       unless specs[:clad] == :none
@@ -390,38 +390,38 @@ module OSut
         d  = 0.015      if specs[:clad] == :light
         a[:clad][:mat] = @@mats[mt]
         a[:clad][:d  ] = d
-        a[:clad][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:clad][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
         mt = :polyiso
         d  = 0.025
         a[:sheath][:mat] = @@mats[mt]
         a[:sheath][:d  ] = d
-        a[:sheath][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:sheath][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
         mt = :concrete
         d  = 0.200
         a[:compo][:mat] = @@mats[mt]
         a[:compo][:d  ] = d
-        a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:compo][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
       else
         mt = :concrete
         d  = 0.200
         a[:sheath][:mat] = @@mats[mt]
         a[:sheath][:d  ] = d
-        a[:sheath][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+        a[:sheath][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
         unless specs[:finish] == :none
           mt = :mineral
           d  = 0.075
           a[:compo][:mat] = @@mats[mt]
           a[:compo][:d  ] = d
-          a[:compo][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+          a[:compo][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
           mt = :drywall
           d  = 0.015
           a[:finish][:mat] = @@mats[mt]
           a[:finish][:d  ] = d
-          a[:finish][:id ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+          a[:finish][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
         end
       end
     when :door # opaque
@@ -431,13 +431,13 @@ module OSut
 
       a[:compo  ][:mat ] = @@mats[mt]
       a[:compo  ][:d   ] = d
-      a[:compo  ][:id  ] = "#{mt}#{format('%03d', d*1000)[-3..-1]}"
+      a[:compo  ][:id  ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
     when :window # e.g. patio doors (simple glazing)
       # SimpleGlazingMaterial.
       a[:glazing][:u   ]  = specs[:uo  ]
       a[:glazing][:shgc]  = 0.450
       a[:glazing][:shgc]  = specs[:shgc] if specs.key?(:shgc)
-      a[:glazing][:id  ]  = "window"
+      a[:glazing][:id  ]  = "OSut|window|"
       a[:glazing][:id  ] += ":U#{format('%.1f', a[:glazing][:u])}"
       a[:glazing][:id  ] += ":SHGC#{format('%d', a[:glazing][:shgc]*100)}"
     when :skylight
@@ -445,7 +445,7 @@ module OSut
       a[:glazing][:u   ] = specs[:uo  ]
       a[:glazing][:shgc] = 0.450
       a[:glazing][:shgc] = specs[:shgc] if specs.key?(:shgc)
-      a[:glazing][:id  ]  = "skylight"
+      a[:glazing][:id  ]  = "OSut|skylight|"
       a[:glazing][:id  ] += ":U#{format('%.1f', a[:glazing][:u])}"
       a[:glazing][:id  ] += ":SHGC#{format('%d', a[:glazing][:shgc]*100)}"
     end
@@ -516,16 +516,19 @@ module OSut
         return invalid("#{id} construction", mth, 0) if lyr[:type ].nil?
         return invalid("#{id} construction", mth, 0) if lyr[:r    ].zero?
 
-        layer = c.getLayer(lyr[:index]).to_StandardOpaqueMaterial
-        return invalid("#{id} standard material", mth, 0) if layer.empty?
+        index = lyr[:index]
+        layer = c.getLayer(index).to_StandardOpaqueMaterial
+        return invalid("#{id} material @#{index}", mth, 0) if layer.empty?
 
         layer = layer.get
         d     = layer.thickness
         k     = layer.conductivity
         d     = (ro - rsi(c) + lyr[:r]) * k
-        nom   = layer.nameString.gsub(/[^a-z]/i, "")
+        nom   = "OSut|"
+        nom  += layer.nameString.gsub(/[^a-z]/i, "").gsub("OSut", "")
+        nom  += "|"
         nom  += format("%03d", d*1000)[-3..-1]
-        layer.setName(nom)
+        layer.setName(nom) if model.getStandardOpaqueMaterialByName(nom).empty?
         layer.setThickness(d)
       end
     end
@@ -535,15 +538,20 @@ module OSut
 
   ##
   # Generate a solar shade (e.g. roller, textile) for glazed sub surfaces,
-  # controlled to minimize overheating in cooling months (Northern Hemisphere,
-  # i.e. May to October), when outdoor dry bulb temperature is above 18°C and
-  # impinging solar radiation is above 100 W/m2). For SDK v3.2.1 and up.
+  # controlled to minimize overheating in cooling months (May to October
+  # in Northern Hemisphere), when outdoor dry bulb temperature is above 18°C
+  # and impinging solar radiation is above 100 W/m2 (for SDK v3.2.1 and up).
   #
   # @param model [OpenStudio::Model::Model] a model
-  # @param subs [OpenStudio::Model::SubSurfaceVector] list of sub surfaces
+  # @param subs [OpenStudio::Model::SubSurfaceVector] sub surfaces
   #
   # @return [Bool] true if successful
   def genShade(model = nil, subs = OpenStudio::Model::SubSurfaceVector.new)
+    # Filter OpenStudio warnings for ShadingControl:
+    #   ref: https://github.com/NREL/OpenStudio/issues/4911
+    str = ".*(?<!ShadingControl)$"
+    OpenStudio::Logger.instance.standardOutLogger.setChannelRegex(str)
+
     mth = "OSut::#{__callee__}"
     v   = OpenStudio.openStudioVersion.split(".").join.to_i
     cl1 = OpenStudio::Model::Model
@@ -554,14 +562,15 @@ module OSut
     return mismatch("model", model, cl1, mth, ERR, no) unless model.is_a?(cl1)
     return mismatch("subs ", subs,  cl2, mth, ERR, no) unless subs.is_a?(cl2)
     return empty(   "subs",              mth, WRN, no)     if subs.empty?
-    return no if v < 321
+    return no                                              if v < 321
 
     # Shading availability period.
-    onoff = model.getScheduleTypeLimitsByName("onoff")
+    id    = "onoff"
+    onoff = model.getScheduleTypeLimitsByName(id)
 
     if onoff.empty?
       onoff = OpenStudio::Model::ScheduleTypeLimits.new(model)
-      onoff.setName("onoff")
+      onoff.setName(id)
       onoff.setLowerLimitValue(0)
       onoff.setUpperLimitValue(1)
       onoff.setNumericType("Discrete")
@@ -571,53 +580,60 @@ module OSut
     end
 
     # Shading schedule.
-    may     = OpenStudio::MonthOfYear.new("May")
-    october = OpenStudio::MonthOfYear.new("Oct")
-    start   = OpenStudio::Date.new(may, 1)
-    finish  = OpenStudio::Date.new(october, 31)
+    id  = "OSut|SHADE|Ruleset"
+    sch = model.getScheduleRulesetByName(id)
 
-    shade_sch = OpenStudio::Model::ScheduleRuleset.new(model, 0)
-    shade_sch.setName("shade_sch")
-    shade_sch.setScheduleTypeLimits(onoff)
-    shade_sch.defaultDaySchedule.setName("shade_sch_dft")
+    if sch.empty?
+      sch = OpenStudio::Model::ScheduleRuleset.new(model, 0)
+      sch.setName(id)
+      sch.setScheduleTypeLimits(onoff)
+      sch.defaultDaySchedule.setName("OSut|Shade|Ruleset|Default")
+    else
+      sch = sch.get
+    end
 
-    shade_cooling_rule = OpenStudio::Model::ScheduleRule.new(shade_sch)
-    shade_cooling_rule.setName("shade_cooling_rule")
-    shade_cooling_rule.setStartDate(start)
-    shade_cooling_rule.setEndDate(finish)
-    shade_cooling_rule.setApplyAllDays(true)
-    shade_cooling_rule.daySchedule.setName("shade_sch_cooling")
-    shade_cooling_rule.daySchedule.addValue(OpenStudio::Time.new(0,24,0,0), 1)
+    # Summer cooling rule.
+    id   = "OSut|SHADE|ScheduleRule"
+    rule = model.getScheduleRuleByName(id)
 
-    shd = OpenStudio::Model::Shade.new(model)
-    shd.setName("shade")
+    if rule.empty?
+      may     = OpenStudio::MonthOfYear.new("May")
+      october = OpenStudio::MonthOfYear.new("Oct")
+      start   = OpenStudio::Date.new(may, 1)
+      finish  = OpenStudio::Date.new(october, 31)
+
+      rule = OpenStudio::Model::ScheduleRule.new(sch)
+      rule.setName(id)
+      rule.setStartDate(start)
+      rule.setEndDate(finish)
+      rule.setApplyAllDays(true)
+      rule.daySchedule.setName("OSut|Shade|Rule|Default")
+      rule.daySchedule.addValue(OpenStudio::Time.new(0,24,0,0), 1)
+    else
+      rule = rule.get
+    end
+
+    # Shade object.
+    id  = "OSut|Shade"
+    shd = model.getShadeByName(id)
+
+    if shd.empty?
+      shd = OpenStudio::Model::Shade.new(model)
+      shd.setName(id)
+    else
+      shd = shd.get
+    end
+
+    # Shading control (unique to each call).
+    id  = "OSut|ShadingControl"
 
     ctl = OpenStudio::Model::ShadingControl.new(shd)
-    ctl.setName("shade_control")
-    ctl.setSchedule(shade_sch)
+    ctl.setName(id)
+    ctl.setSchedule(sch)
     ctl.setShadingControlType("OnIfHighOutdoorAirTempAndHighSolarOnWindow")
     ctl.setSetpoint(18)   # °C
     ctl.setSetpoint2(100) # W/m2
     ctl.setMultipleSurfaceControlType("Group")
-
-    # Setting setpoint (#1) triggers the following (apparently benign) warning:
-    #
-    #   [openstudio.model.ShadingControl] <0> Object of type 'OS:ShadingControl'
-    #   and named 'shade_control' has a Shading Control Type
-    #   'OnIfHighOutdoorAirTempAndHighSolarOnWindow' which does require a
-    #   Setpoint, not resetting it
-    #
-    #   github.com/NREL/OpenStudio/blob/872300de73e3223f0d541269def844b6250a3ed0
-    #   /src/model/ShadingControl.cpp#L334
-    #
-    # This appears to be the calling point:
-    #
-    #   github.com/NREL/OpenStudio/blob/872300de73e3223f0d541269def844b6250a3ed0
-    #   /src/model/ShadingControl.cpp#L274
-    #
-    # Hopefully, SDK devs could comment out the stdout warning everytime
-    # resetSetpoint() is called.
-
     ctl.setSubSurfaces(subs)
   end
 
@@ -626,11 +642,11 @@ module OSut
   # selected spaces.
   #
   # @param model [OpenStudio::Model::Model] a model
-  # @param spaces [Array] OpenStudio spaces
+  # @param sps [Array] OpenStudio spaces
   # @param ratio [Double] internal mass surface area / floor area
   #
   # @return [Bool] true if successful
-  def genMass(model = nil, spaces = [], ratio = 2.0)
+  def genMass(model = nil, sps = [], ratio = 2.0)
     # This is largely adapted from OpenStudio-Standards
     #
     # https://github.com/NREL/openstudio-standards/blob/
@@ -645,65 +661,65 @@ module OSut
     no  = false
 
     # Log/exit if invalid arguments.
-    return mismatch("model", model, cl1, mth, ERR, no) unless model.is_a?(cl1)
-    return mismatch("spaces", spaces, cl2, mth, ERR, no) unless spaces.is_a?(cl2)
-    return mismatch("ratio", ratio, cl3, mth, ERR, no) unless ratio.is_a?(cl3)
-    return empty(   "spaces", mth, WRN, no) if spaces.empty?
-    return negative("ratio", mth, ERR, no) if ratio < 0
+    return mismatch( "model", model, cl1, mth, ERR, no) unless model.is_a?(cl1)
+    return mismatch("spaces",   sps, cl2, mth, ERR, no) unless sps.is_a?(cl2)
+    return mismatch( "ratio", ratio, cl3, mth, ERR, no) unless ratio.is_a?(cl3)
+    return empty(   "spaces",             mth, WRN, no)     if sps.empty?
+    return negative( "ratio",             mth, ERR, no)     if ratio < 0
 
-    spaces.each do |space|
-      return mismatch("space", space, cl4, mth, ERR, no) unless space.is_a?(cl4)
+    sps.each do |sp|
+      return mismatch("space", sp, cl4, mth, ERR, no) unless sp.is_a?(cl4)
     end
 
     # A single material.
-    mat = "m:mass"
-    m_mass = model.getOpaqueMaterialByName(mat)
+    id  = "OSut|MASS|Material"
+    mat = model.getOpaqueMaterialByName(id)
 
-    if m_mass.empty?
-      m_mass = OpenStudio::Model::StandardOpaqueMaterial.new(model)
-      m_mass.setName(mat)
-      m_mass.setRoughness("MediumRough")
-      m_mass.setThickness(0.15)
-      m_mass.setConductivity(1.12)
-      m_mass.setDensity(540)
-      m_mass.setSpecificHeat(1210)
-      m_mass.setThermalAbsorptance(0.9)
-      m_mass.setSolarAbsorptance(0.7)
-      m_mass.setVisibleAbsorptance(0.17)
+    if mat.empty?
+      mat = OpenStudio::Model::StandardOpaqueMaterial.new(model)
+      mat.setName(id)
+      mat.setRoughness("MediumRough")
+      mat.setThickness(0.15)
+      mat.setConductivity(1.12)
+      mat.setDensity(540)
+      mat.setSpecificHeat(1210)
+      mat.setThermalAbsorptance(0.9)
+      mat.setSolarAbsorptance(0.7)
+      mat.setVisibleAbsorptance(0.17)
     else
-      m_mass = m_mass.get
+      mat = mat.get
     end
 
     # A single, 1x layered construction.
-    construction = "c:mass"
-    c_mass = model.getConstructionByName(construction)
+    id  = "OSut|MASS|Construction"
+    con = model.getConstructionByName(id)
 
-    if c_mass.empty?
-      c_mass = OpenStudio::Model::Construction.new(model)
-      c_mass.setName(construction)
+    if con.empty?
+      con = OpenStudio::Model::Construction.new(model)
+      con.setName(id)
       layers = OpenStudio::Model::MaterialVector.new
-      layers << m_mass
-      c_mass.setLayers(layers)
+      layers << mat
+      con.setLayers(layers)
     else
-      c_mass = c_mass.get
+      con = con.get
     end
 
-    id = "mass definition:" + (format "%.2f", ratio)
-    definition = model.getInternalMassDefinitionByName(id)
+    id = "OSut|InternalMassDefinition|" + (format "%.2f", ratio)
+    df = model.getInternalMassDefinitionByName(id)
 
-    if definition.empty?
-      definition = OpenStudio::Model::InternalMassDefinition.new(model)
-      definition.setName(id)
-      definition.setConstruction(c_mass)
-      definition.setSurfaceAreaperSpaceFloorArea(ratio)
+    if df.empty?
+      df = OpenStudio::Model::InternalMassDefinition.new(model)
+      df.setName(id)
+      df.setConstruction(con)
+      df.setSurfaceAreaperSpaceFloorArea(ratio)
     else
-      definition = definition.get
+      df = df.get
     end
 
-    spaces.each do |space|
-      mass = OpenStudio::Model::InternalMass.new(definition)
-      mass.setName("mass:#{space.nameString}")
-      mass.setSpace(space)
+    sps.each do |sp|
+      mass = OpenStudio::Model::InternalMass.new(df)
+      mass.setName("OSut|InternalMass|#{sp.nameString}")
+      mass.setSpace(sp)
     end
 
     true
@@ -2662,7 +2678,7 @@ module OSut
       # sub[:r_buffer  ] # buffer between sub/array and right-side corner (+ m)
       # sub[:l_buffer  ] # buffer between sub/array and left-side corner (+ m)
 
-      sub[:id] = "#{nom}|#{index}" if sub[:id].empty?
+      sub[:id] = "OSut|#{nom}|#{index}" if sub[:id].empty?
       id       = sub[:id]
 
       # If sub surface type is invalid, log/reset. Additional corrections may
@@ -3064,7 +3080,7 @@ module OSut
 
       # Generate sub(s).
       sub[:count].times do |i|
-        name = "#{id}:#{i}"
+        name = "#{id}|#{i}"
         fr   = 0
         fr   = sub[:frame].frameWidth if sub[:frame]
 

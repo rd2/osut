@@ -20,8 +20,7 @@ RSpec.describe OSut do
     expect(cls1.level).to eq(DBG)
     expect(cls1.clean!).to eq(DBG)
 
-    model = OpenStudio::Model::Model.new
-
+    model          = OpenStudio::Model::Model.new
     specs          = {}
     specs[:type  ] = :wall
     specs[:uo    ] = 0.210 # NECB2017
@@ -1517,6 +1516,10 @@ RSpec.describe OSut do
     # insert subsurfaces along rotated/tilted/slanted host/parent/base
     # surfaces. First step, modify SEB.osm model.
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
     translator = OpenStudio::OSVersion::VersionTranslator.new
     v = OpenStudio.openStudioVersion.split(".").join.to_i
     file = File.join(__dir__, "files/osms/in/seb.osm")
@@ -1566,6 +1569,26 @@ RSpec.describe OSut do
     roof.setName("Openarea slanted roof")
     expect(roof.setSurfaceType("RoofCeiling")).to be(true)
     expect(roof.setSpace(openarea)).to be(true)
+
+    # Side-note test: genConstruction --- --- --- --- --- --- --- --- --- --- #
+    expect(roof.isConstructionDefaulted).to be(true)
+    lc = roof.construction
+    expect(lc.empty?).to be(false)
+    lc = lc.get.to_LayeredConstruction
+    expect(lc.empty?).to be(false)
+    lc = lc.get
+    c  = mod1.genConstruction(model, {type: :roof, uo: 1 / 5.46})
+    expect(mod1.status.zero?).to be(true)
+    expect(c.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(roof.setConstruction(c)).to be(true)
+    expect(roof.isConstructionDefaulted).to be(false)
+    r1 = mod1.rsi(lc)
+    r2 = mod1.rsi(c)
+    d1 = mod1.rsi(lc)
+    d2 = mod1.rsi(c)
+    expect((r1 - r2).abs > 0).to be(true)
+    expect((d1 - d2).abs > 0).to be(true)
+    # ... end of genConstruction test --- --- --- --- --- --- --- --- --- --- #
 
     # New, inverse-tilted wall (i.e. cantilevered), under new slanted roof.
     vec  = OpenStudio::Point3dVector.new
@@ -1784,19 +1807,6 @@ RSpec.describe OSut do
     expect(tilt_wall.empty?).to be(false)
     tilt_wall = tilt_wall.get
 
-    expect(mod1.reset(DBG)).to eq(DBG)
-    expect(mod1.level).to eq(DBG)
-    expect(mod1.clean!).to eq(DBG)
-
-    # subs = []
-    # subs << {height: 0.2, width: 0.2}
-    # expect(mod1.addSubs(model, right_wall, subs, false)).to be(true)
-    # expect(mod1.status.zero?).to be(true)
-    # expect(mod1.logs.size.zero?).to be(true)
-    #
-    # file = File.join(__dir__, "files/osms/out/seb_right.osm")
-    # model.save(file, true)
-
     head   = max_y - 0.005
     offset = width + 0.15
 
@@ -1813,7 +1823,7 @@ RSpec.describe OSut do
     expect(mod1.status.zero?).to be(true)
     expect(mod1.logs.size.zero?).to be(true)
 
-    tilted = model.getSubSurfaceByName("Tilted window:0")
+    tilted = model.getSubSurfaceByName("Tilted window|0")
     expect(tilted.empty?).to be(false)
     tilted = tilted.get
     construction = tilted.construction
@@ -1823,6 +1833,7 @@ RSpec.describe OSut do
 
     sub.delete(:head)
     expect(sub.key?(:head)).to be(false)
+    sub[:id  ] = ""
     sub[:sill] = 0.0 # will be reset to 5mm
     sub[:type] = "Skylight"
     expect(mod1.addSubs(model, roof, [sub])).to be(true)
@@ -1868,6 +1879,7 @@ RSpec.describe OSut do
 
     surface = OpenStudio::Model::Surface.new(slab, model)
     expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface.grossArea).to be_within(TOL).of(2 * 20)
     expect(surface.vertices.size).to eq(4)
 
     expect(surface.vertices[0].x).to be_within(TOL).of(x0 + w1)
@@ -1885,11 +1897,6 @@ RSpec.describe OSut do
     expect(surface.vertices[3].x).to be_within(TOL).of(x0)
     expect(surface.vertices[3].y).to be_within(TOL).of(y0 + d2)
     expect(surface.vertices[3].z).to be_within(TOL).of(z0)
-
-    surface = OpenStudio::Model::Surface.new(slab, model)
-    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
-    expect(surface.vertices.size).to eq(4)
-    expect(surface.grossArea).to be_within(TOL).of(2 * 20)
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # 2x valid 'floor' plates.
@@ -2319,6 +2326,8 @@ RSpec.describe OSut do
   end
 
   it "checks roller shades" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
 
     translator = OpenStudio::OSVersion::VersionTranslator.new
@@ -2342,52 +2351,58 @@ RSpec.describe OSut do
     expect(tilted.nameString).to eq("Openarea tilted wall")
     windows = tilted.subSurfaces
 
-    subs = OpenStudio::Model::SubSurfaceVector.new
-    skylights.each { |sub| subs << sub }
-    windows.each   { |sub| subs << sub }
+    # 2x control groups:
+    #   - 3x windows as a single control group
+    #   - 3x skylight as another single control group
+    skies = OpenStudio::Model::SubSurfaceVector.new
+    wins  = OpenStudio::Model::SubSurfaceVector.new
+    skylights.each { |sub| skies << sub }
+    windows.each   { |sub| wins  << sub }
 
     if v < 321
-      expect(mod1.genShade(model, subs)).to be(false)
+      expect(mod1.genShade(model, skies)).to be(false)
     else
-      expect(mod1.genShade(model, subs)).to be(true)
-      ctl = model.getShadingControls
-      expect(ctl.size).to eq(1)
-      ctl = ctl.first
-      expect(ctl.shadingType).to eq("InteriorShade")
-      type = "OnIfHighOutdoorAirTempAndHighSolarOnWindow"
-      expect(ctl.shadingControlType).to eq(type)
-      expect(ctl.isControlTypeValueNeedingSetpoint1).to be(true)
-      expect(ctl.isControlTypeValueNeedingSetpoint2).to be(true)
-      expect(ctl.isControlTypeValueAllowingSchedule).to be(true)
-      expect(ctl.isControlTypeValueRequiringSchedule).to be(false)
-      spt1 = ctl.setpoint
-      spt2 = ctl.setpoint2
-      expect(spt1.empty?).to be(false)
-      expect(spt2.empty?).to be(false)
-      spt1 = spt1.get
-      spt2 = spt2.get
-      expect(spt1).to be_within(TOL).of(18)
-      expect(spt2).to be_within(TOL).of(100)
-      expect(ctl.multipleSurfaceControlType).to eq("Group")
+      expect(mod1.genShade(model, skies)).to be(true)
+      expect(mod1.genShade(model, wins)).to be(true)
+      ctls = model.getShadingControls
+      expect(ctls.size).to eq(2)
 
-      ctl.subSurfaces.each do |sub|
-        surface = sub.surface
-        expect(surface.empty?).to be(false)
-        surface = surface.get
-        ok = surface == slanted || surface == tilted
-        expect(ok).to be(true)
+      ctls.each do |ctl|
+        expect(ctl.shadingType).to eq("InteriorShade")
+        type = "OnIfHighOutdoorAirTempAndHighSolarOnWindow"
+        expect(ctl.shadingControlType).to eq(type)
+        expect(ctl.isControlTypeValueNeedingSetpoint1).to be(true)
+        expect(ctl.isControlTypeValueNeedingSetpoint2).to be(true)
+        expect(ctl.isControlTypeValueAllowingSchedule).to be(true)
+        expect(ctl.isControlTypeValueRequiringSchedule).to be(false)
+        spt1 = ctl.setpoint
+        spt2 = ctl.setpoint2
+        expect(spt1.empty?).to be(false)
+        expect(spt2.empty?).to be(false)
+        spt1 = spt1.get
+        spt2 = spt2.get
+        expect(spt1).to be_within(TOL).of(18)
+        expect(spt2).to be_within(TOL).of(100)
+        expect(ctl.multipleSurfaceControlType).to eq("Group")
+
+        ctl.subSurfaces.each do |sub|
+          surface = sub.surface
+          expect(surface.empty?).to be(false)
+          surface = surface.get
+          ok = surface == slanted || surface == tilted
+          expect(ok).to be(true)
+        end
       end
-
-      file = File.join(__dir__, "files/osms/out/seb_ext5.osm")
-      model.save(file, true)
     end
+
+    file = File.join(__dir__, "files/osms/out/seb_ext5.osm")
+    model.save(file, true)
   end
 
   it "checks internal mass" do
     expect(mod1.clean!).to eq(DBG)
 
-    ratios = {entrance: 0.1, lobby: 0.3, meeting: 1.0}
-
+    ratios   = {entrance: 0.1, lobby: 0.3, meeting: 1.0}
     model    = OpenStudio::Model::Model.new
     entrance = OpenStudio::Model::Space.new(model)
     lobby    = OpenStudio::Model::Space.new(model)
@@ -2421,16 +2436,16 @@ RSpec.describe OSut do
 
       case ratio
       when 0.1
-        expect(d.nameString).to eq("mass definition:0.10")
+        expect(d.nameString).to eq("OSut|InternalMassDefinition|0.10")
         expect(m.nameString.downcase.include?("entrance")).to be(true)
       when 0.3
-        expect(d.nameString).to eq("mass definition:0.30")
+        expect(d.nameString).to eq("OSut|InternalMassDefinition|0.30")
         expect(m.nameString.downcase.include?("lobby")).to be(true)
       when 1.0
-        expect(d.nameString).to eq("mass definition:1.00")
+        expect(d.nameString).to eq("OSut|InternalMassDefinition|1.00")
         expect(m.nameString.downcase.include?("meeting")).to be(true)
       else
-        expect(d.nameString).to eq("mass definition:2.00")
+        expect(d.nameString).to eq("OSut|InternalMassDefinition|2.00")
         expect(ratio).to eq(2.0)
       end
 
@@ -2441,7 +2456,7 @@ RSpec.describe OSut do
       c = c.get
       construction = c if construction.nil?
       expect(construction).to eq(c)
-      expect(c.nameString).to eq("c:mass")
+      expect(c.nameString).to eq("OSut|MASS|Construction")
       expect(c.numLayers).to eq(1)
       m = c.layers.first
       material = m if material.nil?
