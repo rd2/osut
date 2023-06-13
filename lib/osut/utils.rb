@@ -58,8 +58,8 @@ module OSut
   @@film[:basement ] = 0.120
   @@film[:slab     ] = 0.160
   @@film[:door     ] = @@film[:wall]
-  @@film[:window   ] = @@film[:wall] # irrelevant if SimpleGlazingMaterial
-  @@film[:skylight ] = @@film[:roof] # irrelevant if SimpleGlazingMaterial
+  @@film[:window   ] = @@film[:wall] # N/A if SimpleGlazingMaterial
+  @@film[:skylight ] = @@film[:roof] # N/A if SimpleGlazingMaterial
 
   @@uo[:shading    ] = 0.000 # N/A
   @@uo[:partition  ] = 0.000 # N/A
@@ -196,8 +196,8 @@ module OSut
     specs[:id  ]   = ""                              unless specs.key?(:id  )
     id             = specs[:id]
     ok             = id.respond_to?(:to_s)
-    id             = "OSut|CON|#{specs[:type]}" unless ok
-    id             = "OSut|CON|#{specs[:type]}" if id.empty?
+    id             = "OSut|CON|#{specs[:type]}"      unless ok
+    id             = "OSut|CON|#{specs[:type]}"          if id.empty?
     specs[:uo  ]   = @@uo[ specs[:type] ]            unless specs.key?(:uo  )
     u              = specs[:uo]
     return mismatch("#{id} Uo", u, Numeric, mth)     unless u.is_a?(Numeric)
@@ -207,13 +207,14 @@ module OSut
     specs[:clad  ] = :light             unless specs.key?(:clad  ) # exterior
     specs[:frame ] = :light             unless specs.key?(:frame )
     specs[:finish] = :light             unless specs.key?(:finish) # interior
-    specs[:clad  ] = :light             unless @@mass.include?(specs[:clad  ])
-    specs[:frame ] = :light             unless @@mass.include?(specs[:frame ])
-    specs[:finish] = :light             unless @@mass.include?(specs[:finish])
     log(WRN, "Reset to light cladding") unless @@mass.include?(specs[:clad  ])
     log(WRN, "Reset to light framing" ) unless @@mass.include?(specs[:frame ])
     log(WRN, "Reset to light finish"  ) unless @@mass.include?(specs[:finish])
-    film           = @@film[ specs[:type] ]
+    specs[:clad  ] = :light             unless @@mass.include?(specs[:clad  ])
+    specs[:frame ] = :light             unless @@mass.include?(specs[:frame ])
+    specs[:finish] = :light             unless @@mass.include?(specs[:finish])
+
+    film = @@film[ specs[:type] ]
 
     # Layered assembly (max 4 layers):
     #   - cladding
@@ -437,17 +438,17 @@ module OSut
       a[:glazing][:u   ]  = specs[:uo  ]
       a[:glazing][:shgc]  = 0.450
       a[:glazing][:shgc]  = specs[:shgc] if specs.key?(:shgc)
-      a[:glazing][:id  ]  = "OSut|window|"
-      a[:glazing][:id  ] += ":U#{format('%.1f', a[:glazing][:u])}"
-      a[:glazing][:id  ] += ":SHGC#{format('%d', a[:glazing][:shgc]*100)}"
+      a[:glazing][:id  ]  = "OSut|window"
+      a[:glazing][:id  ] += "|U#{format('%.1f', a[:glazing][:u])}"
+      a[:glazing][:id  ] += "|SHGC#{format('%d', a[:glazing][:shgc]*100)}"
     when :skylight
       # SimpleGlazingMaterial.
       a[:glazing][:u   ] = specs[:uo  ]
       a[:glazing][:shgc] = 0.450
       a[:glazing][:shgc] = specs[:shgc] if specs.key?(:shgc)
-      a[:glazing][:id  ]  = "OSut|skylight|"
-      a[:glazing][:id  ] += ":U#{format('%.1f', a[:glazing][:u])}"
-      a[:glazing][:id  ] += ":SHGC#{format('%d', a[:glazing][:shgc]*100)}"
+      a[:glazing][:id  ]  = "OSut|skylight"
+      a[:glazing][:id  ] += "|U#{format('%.1f', a[:glazing][:u])}"
+      a[:glazing][:id  ] += "|SHGC#{format('%d', a[:glazing][:shgc]*100)}"
     end
 
     # Initiate layers.
@@ -521,9 +522,10 @@ module OSut
         return invalid("#{id} material @#{index}", mth, 0) if layer.empty?
 
         layer = layer.get
-        d     = layer.thickness
         k     = layer.conductivity
         d     = (ro - rsi(c) + lyr[:r]) * k
+        return invalid("#{id} adjusted m", mth, 0) if d < 0.03
+
         nom   = "OSut|"
         nom  += layer.nameString.gsub(/[^a-z]/i, "").gsub("OSut", "")
         nom  += "|"
@@ -2460,14 +2462,14 @@ module OSut
   def facets(spaces = [], boundary = "Outdoors", type = "Wall", sides = [])
     faces    = []
     list     = [:bottom, :top, :north, :east, :south, :west].freeze
-    boundary = boundary.downcase
-    type     = type.downcase
+
     return [] unless spaces.respond_to?(:&)
     return [] unless boundary.respond_to?(:to_s)
     return [] unless type.respond_to?(:to_s)
     return [] unless sides.respond_to?(:&)
 
-    spaces.each { |s| return [] unless s.respond_to?(:setSpaceType) }
+    boundary = boundary.to_s.downcase
+    type     = type.to_s.downcase
 
     # Skip empty sides.
     return [] if sides.empty?
@@ -2477,6 +2479,8 @@ module OSut
     return [] if orientations.empty?
 
     spaces.each do |space|
+      return [] unless space.respond_to?(:setSpaceType)
+
       space.surfaces.each do |s|
         next unless s.outsideBoundaryCondition.downcase == boundary
         next unless s.surfaceType.downcase == type
@@ -2498,11 +2502,11 @@ module OSut
   end
 
   ##
-  # Generates an OpenStudio 3D point vector of a composite floor "slab", a
+  # Generate an OpenStudio 3D point vector of a composite floor "slab", a
   # 'union' of multiple rectangular, horizontal floor "plates". Each "plate" is
   # a Hash holding 4x keys: :x & :y coordinates of the origin (i.e. bottom-left
   # corner of each plate), and :dx & :dy (plate width and depth). Each plate
-  # must also either encompass or overlap (or share an adge with) any of the
+  # must also either encompass or overlap (or share an edge with) any of the
   # preceding plates in the array. The resulting vector (or "slab") is empty
   # if input is invalid.
   #
