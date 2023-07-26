@@ -727,6 +727,348 @@ module OSut
     true
   end
 
+  ##
+  # Validate if default construction set holds a base construction.
+  #
+  # @param set [OpenStudio::Model::DefaultConstructionSet] a default set
+  # @param bse [OpensStudio::Model::ConstructionBase] a construction base
+  # @param gr [Bool] true if ground-facing surface
+  # @param ex [Bool] true if exterior-facing surface
+  # @param typ [String] a surface type
+  #
+  # @return [Bool] true if default construction set holds construction
+  # @return [Bool] false if invalid input
+  def holdsConstruction?(set = nil, bse = nil, gr = false, ex = false, typ = "")
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Model::DefaultConstructionSet
+    cl2 = OpenStudio::Model::ConstructionBase
+
+    return invalid("set", mth, 1, DBG, false)         unless set.respond_to?(NS)
+
+    id = set.nameString
+    return mismatch(id, set, cl1, mth, DBG, false)    unless set.is_a?(cl1)
+    return invalid("base", mth, 2, DBG, false)        unless bse.respond_to?(NS)
+
+    id = bse.nameString
+    return mismatch(id, bse, cl2, mth, DBG, false)    unless bse.is_a?(cl2)
+
+    valid = gr == true || gr == false
+    return invalid("ground", mth, 3, DBG, false)      unless valid
+
+    valid = ex == true || ex == false
+    return invalid("exterior", mth, 4, DBG, false)    unless valid
+
+    valid = typ.respond_to?(:to_s)
+    return invalid("surface typ", mth, 4, DBG, false) unless valid
+
+    type = typ.to_s.downcase
+    valid = type == "floor" || type == "wall" || type == "roofceiling"
+    return invalid("surface type", mth, 5, DBG, false) unless valid
+
+    constructions = nil
+
+    if gr
+      unless set.defaultGroundContactSurfaceConstructions.empty?
+        constructions = set.defaultGroundContactSurfaceConstructions.get
+      end
+    elsif ex
+      unless set.defaultExteriorSurfaceConstructions.empty?
+        constructions = set.defaultExteriorSurfaceConstructions.get
+      end
+    else
+      unless set.defaultInteriorSurfaceConstructions.empty?
+        constructions = set.defaultInteriorSurfaceConstructions.get
+      end
+    end
+
+    return false unless constructions
+
+    case type
+    when "roofceiling"
+      unless constructions.roofCeilingConstruction.empty?
+        construction = constructions.roofCeilingConstruction.get
+        return true if construction == bse
+      end
+    when "floor"
+      unless constructions.floorConstruction.empty?
+        construction = constructions.floorConstruction.get
+        return true if construction == bse
+      end
+    else
+      unless constructions.wallConstruction.empty?
+        construction = constructions.wallConstruction.get
+        return true if construction == bse
+      end
+    end
+
+    false
+  end
+
+  ##
+  # Return a surface's default construction set.
+  #
+  # @param model [OpenStudio::Model::Model] a model
+  # @param s [OpenStudio::Model::Surface] a surface
+  #
+  # @return [OpenStudio::Model::DefaultConstructionSet] default set
+  # @return [NilClass] if invalid input
+  def defaultConstructionSet(model = nil, s = nil)
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Model::Model
+    cl2 = OpenStudio::Model::Surface
+    return mismatch("model", model, cl1, mth)           unless model.is_a?(cl1)
+    return invalid("s", mth, 2)                         unless s.respond_to?(NS)
+
+    id   = s.nameString
+    return mismatch(id, s, cl2, mth)                    unless s.is_a?(cl2)
+
+    ok = s.isConstructionDefaulted
+    log(ERR, "'#{id}' construction not defaulted (#{mth})")            unless ok
+    return nil                                                         unless ok
+    return empty("'#{id}' construction", mth, ERR)      if s.construction.empty?
+
+    base = s.construction.get
+    return empty("'#{id}' space", mth, ERR)             if s.space.empty?
+
+    space = s.space.get
+    type = s.surfaceType
+    ground = false
+    exterior = false
+
+    if s.isGroundSurface
+      ground = true
+    elsif s.outsideBoundaryCondition.downcase == "outdoors"
+      exterior = true
+    end
+
+    unless space.defaultConstructionSet.empty?
+      set = space.defaultConstructionSet.get
+      return set        if holdsConstruction?(set, base, ground, exterior, type)
+    end
+
+    unless space.spaceType.empty?
+      spacetype = space.spaceType.get
+
+      unless spacetype.defaultConstructionSet.empty?
+        set = spacetype.defaultConstructionSet.get
+        return set      if holdsConstruction?(set, base, ground, exterior, type)
+      end
+    end
+
+    unless space.buildingStory.empty?
+      story = space.buildingStory.get
+
+      unless story.defaultConstructionSet.empty?
+        set = story.defaultConstructionSet.get
+        return set      if holdsConstruction?(set, base, ground, exterior, type)
+      end
+    end
+
+    building = model.getBuilding
+
+    unless building.defaultConstructionSet.empty?
+      set = building.defaultConstructionSet.get
+      return set        if holdsConstruction?(set, base, ground, exterior, type)
+    end
+
+    nil
+  end
+
+  ##
+  # Validate if every material in a layered construction is standard & opaque.
+  #
+  # @param lc [OpenStudio::LayeredConstruction] a layered construction
+  #
+  # @return [Bool] true if all layers are valid
+  # @return [Bool] false if invalid input
+  def standardOpaqueLayers?(lc = nil)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::LayeredConstruction
+    return invalid("lc", mth, 1, DBG, false) unless lc.respond_to?(NS)
+    return mismatch(lc.nameString, lc, cl, mth, DBG, false) unless lc.is_a?(cl)
+
+    lc.layers.each { |m| return false if m.to_StandardOpaqueMaterial.empty? }
+
+    true
+  end
+
+  ##
+  # Total (standard opaque) layered construction thickness (in m).
+  #
+  # @param lc [OpenStudio::LayeredConstruction] a layered construction
+  #
+  # @return [Float] total layered construction thickness
+  # @return [Float] 0 if invalid input
+  def thickness(lc = nil)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::LayeredConstruction
+    return invalid("lc", mth, 1, DBG, 0.0) unless lc.respond_to?(NS)
+
+    id = lc.nameString
+    return mismatch(id, lc, cl, mth, DBG, 0.0) unless lc.is_a?(cl)
+
+    ok = standardOpaqueLayers?(lc)
+    log(ERR, "'#{id}' holds non-StandardOpaqueMaterial(s) (#{mth})")  unless ok
+    return 0.0                                                        unless ok
+
+    thickness = 0.0
+    lc.layers.each { |m| thickness += m.thickness }
+
+    thickness
+  end
+
+  ##
+  # Return total air film resistance for fenestration.
+  #
+  # @param usi [Float] a fenestrated construction's U-factor (W/m2•K)
+  #
+  # @return [Float] total air film resistance in m2•K/W (0.1216 if errors)
+  def glazingAirFilmRSi(usi = 5.85)
+    # The sum of thermal resistances of calculated exterior and interior film
+    # coefficients under standard winter conditions are taken from:
+    #
+    #   https://bigladdersoftware.com/epx/docs/9-6/engineering-reference/
+    #   window-calculation-module.html#simple-window-model
+    #
+    # These remain acceptable approximations for flat windows, yet likely
+    # unsuitable for subsurfaces with curved or projecting shapes like domed
+    # skylights. The solution here is considered an adequate fix for reporting,
+    # awaiting eventual OpenStudio (and EnergyPlus) upgrades to report NFRC 100
+    # (or ISO) air film resistances under standard winter conditions.
+    #
+    # For U-factors above 8.0 W/m2•K (or invalid input), the function returns
+    # 0.1216 m2•K/W, which corresponds to a construction with a single glass
+    # layer thickness of 2mm & k = ~0.6 W/m.K.
+    #
+    # The EnergyPlus Engineering calculations were designed for vertical windows
+    # - not horizontal, slanted or domed surfaces - use with caution.
+    mth = "OSut::#{__callee__}"
+    cl  = Numeric
+    return mismatch("usi", usi, cl, mth, DBG, 0.1216)  unless usi.is_a?(cl)
+    return invalid("usi", mth, 1, WRN, 0.1216)             if usi > 8.0
+    return negative("usi", mth, WRN, 0.1216)               if usi < 0
+    return zero("usi", mth, WRN, 0.1216)                   if usi.abs < TOL
+
+    rsi = 1 / (0.025342 * usi + 29.163853)   # exterior film, next interior film
+    return rsi + 1 / (0.359073 * Math.log(usi) + 6.949915) if usi < 5.85
+    return rsi + 1 / (1.788041 * usi - 2.886625)
+  end
+
+  ##
+  # Return a construction's 'standard calc' thermal resistance (with air films).
+  #
+  # @param lc [OpenStudio::Model::LayeredConstruction] a layered construction
+  # @param film [Float] thermal resistance of surface air films (m2•K/W)
+  # @param t [Float] gas temperature (°C) (optional)
+  #
+  # @return [Float] calculated RSi at standard conditions (0 if error)
+  def rsi(lc = nil, film = 0.0, t = 0.0)
+    # This is adapted from BTAP's Material Module's "get_conductance" (P. Lopez)
+    #
+    #   https://github.com/NREL/OpenStudio-Prototype-Buildings/blob/
+    #   c3d5021d8b7aef43e560544699fb5c559e6b721d/lib/btap/measures/
+    #   btap_equest_converter/envelope.rb#L122
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Model::LayeredConstruction
+    cl2 = Numeric
+    return invalid("lc", mth, 1, DBG, 0.0)             unless lc.respond_to?(NS)
+
+    id = lc.nameString
+    return mismatch(id, lc, cl1, mth, DBG, 0.0)        unless lc.is_a?(cl1)
+    return mismatch("film", film, cl2, mth, DBG, 0.0)  unless film.is_a?(cl2)
+    return mismatch("temp K", t, cl2, mth, DBG, 0.0)   unless t.is_a?(cl2)
+
+    t += 273.0                                             # °C to K
+    return negative("temp K", mth, DBG, 0.0)               if t < 0
+    return negative("film", mth, DBG, 0.0)                 if film < 0
+
+    rsi = film
+
+    lc.layers.each do |m|
+      # Fenestration materials first (ignoring shades, screens, etc.)
+      empty = m.to_SimpleGlazing.empty?
+      return 1 / m.to_SimpleGlazing.get.uFactor                     unless empty
+
+      empty = m.to_StandardGlazing.empty?
+      rsi += m.to_StandardGlazing.get.thermalResistance             unless empty
+      empty = m.to_RefractionExtinctionGlazing.empty?
+      rsi += m.to_RefractionExtinctionGlazing.get.thermalResistance unless empty
+      empty = m.to_Gas.empty?
+      rsi += m.to_Gas.get.getThermalResistance(t)                   unless empty
+      empty = m.to_GasMixture.empty?
+      rsi += m.to_GasMixture.get.getThermalResistance(t)            unless empty
+
+      # Opaque materials next.
+      empty = m.to_StandardOpaqueMaterial.empty?
+      rsi += m.to_StandardOpaqueMaterial.get.thermalResistance      unless empty
+      empty = m.to_MasslessOpaqueMaterial.empty?
+      rsi += m.to_MasslessOpaqueMaterial.get.thermalResistance      unless empty
+      empty = m.to_RoofVegetation.empty?
+      rsi += m.to_RoofVegetation.get.thermalResistance              unless empty
+      empty = m.to_AirGap.empty?
+      rsi += m.to_AirGap.get.thermalResistance                      unless empty
+    end
+
+    rsi
+  end
+
+  ##
+  # Identify a layered construction's (opaque) insulating layer. The method
+  # returns a 3-keyed hash ... :index (insulating layer index within layered
+  # construction), :type (standard: or massless: material type), and
+  # :r (material thermal resistance in m2•K/W).
+  #
+  # @param lc [OpenStudio::Model::LayeredConstruction] a layered construction
+  #
+  # @return [Hash] index: (Integer), type: (:standard or :massless), r: (Float)
+  # @return [Hash] index: nil, type: nil, r: 0 (if invalid input)
+  def insulatingLayer(lc = nil)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::LayeredConstruction
+    res = { index: nil, type: nil, r: 0.0 }
+    i   = 0                                                           # iterator
+    return invalid("lc", mth, 1, DBG, res) unless lc.respond_to?(NS)
+
+    id   = lc.nameString
+    return mismatch(id, lc, cl1, mth, DBG, res) unless lc.is_a?(cl)
+
+    lc.layers.each do |m|
+      unless m.to_MasslessOpaqueMaterial.empty?
+        m             = m.to_MasslessOpaqueMaterial.get
+
+        if m.thermalResistance < 0.001 || m.thermalResistance < res[:r]
+          i += 1
+          next
+        else
+          res[:r    ] = m.thermalResistance
+          res[:index] = i
+          res[:type ] = :massless
+        end
+      end
+
+      unless m.to_StandardOpaqueMaterial.empty?
+        m             = m.to_StandardOpaqueMaterial.get
+        k             = m.thermalConductivity
+        d             = m.thickness
+
+        if d < 0.003 || k > 3.0 || d / k < res[:r]
+          i += 1
+          next
+        else
+          res[:r    ] = d / k
+          res[:index] = i
+          res[:type ] = :standard
+        end
+      end
+
+      i += 1
+    end
+
+    res
+  end
+
+  # ---- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---- #
+  # ---- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---- #
   # This next set of utilities (~750 lines) help distinguishing spaces that
   # are directly vs indirectly CONDITIONED, vs SEMI-HEATED. The solution here
   # relies as much as possible on space conditioning categories found in
@@ -822,7 +1164,6 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::ScheduleRuleset
     res = { min: nil, max: nil }
-
     return invalid("sched", mth, 1, DBG, res)     unless sched.respond_to?(NS)
 
     id = sched.nameString
@@ -870,7 +1211,6 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::ScheduleConstant
     res = { min: nil, max: nil }
-
     return invalid("sched", mth, 1, DBG, res)     unless sched.respond_to?(NS)
 
     id = sched.nameString
@@ -903,7 +1243,6 @@ module OSut
     vals     = []
     prev_str = ""
     res      = { min: nil, max: nil }
-
     return invalid("sched", mth, 1, DBG, res)     unless sched.respond_to?(NS)
 
     id = sched.nameString
@@ -942,7 +1281,6 @@ module OSut
     cl   = OpenStudio::Model::ScheduleInterval
     vals = []
     res  = { min: nil, max: nil }
-
     return invalid("sched", mth, 1, DBG, res)     unless sched.respond_to?(NS)
 
     id = sched.nameString
@@ -979,7 +1317,6 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::ThermalZone
     res = { spt: nil, dual: false }
-
     return invalid("zone", mth, 1, DBG, res)     unless zone.respond_to?(NS)
 
     id = zone.nameString
@@ -1145,7 +1482,6 @@ module OSut
   def heatingTemperatureSetpoints?(model = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Model
-
     return mismatch("model", model, cl, mth, DBG, false) unless model.is_a?(cl)
 
     model.getThermalZones.each do |zone|
@@ -1172,7 +1508,6 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::ThermalZone
     res = { spt: nil, dual: false }
-
     return invalid("zone", mth, 1, DBG, res)     unless zone.respond_to?(NS)
 
     id = zone.nameString
@@ -1325,7 +1660,6 @@ module OSut
   def coolingTemperatureSetpoints?(model = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Model
-
     return mismatch("model", model, cl, mth, DBG, false)  unless model.is_a?(cl)
 
     model.getThermalZones.each do |zone|
@@ -1345,7 +1679,6 @@ module OSut
   def airLoopsHVAC?(model = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Model
-
     return mismatch("model", model, cl, mth, DBG, false)  unless model.is_a?(cl)
 
     model.getThermalZones.each do |zone|
@@ -1387,7 +1720,6 @@ module OSut
     #         'standards spacetype').
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Space
-
     return invalid("space", mth, 1, DBG, false)     unless space.respond_to?(NS)
 
     id = space.nameString
@@ -1437,7 +1769,6 @@ module OSut
     mth    = "OSut::#{__callee__}"
     cl     = OpenStudio::Model::Model
     limits = nil
-
     return mismatch("model", model, cl, mth)       unless model.is_a?(cl)
     return invalid("availability", avl, 2, mth)    unless avl.respond_to?(:to_s)
 
@@ -1581,353 +1912,9 @@ module OSut
     schedule
   end
 
-  ##
-  # Validate if default construction set holds a base construction.
-  #
-  # @param set [OpenStudio::Model::DefaultConstructionSet] a default set
-  # @param bse [OpensStudio::Model::ConstructionBase] a construction base
-  # @param gr [Bool] true if ground-facing surface
-  # @param ex [Bool] true if exterior-facing surface
-  # @param typ [String] a surface type
-  #
-  # @return [Bool] true if default construction set holds construction
-  # @return [Bool] false if invalid input
-  def holdsConstruction?(set = nil, bse = nil, gr = false, ex = false, typ = "")
-    mth = "OSut::#{__callee__}"
-    cl1 = OpenStudio::Model::DefaultConstructionSet
-    cl2 = OpenStudio::Model::ConstructionBase
-
-    return invalid("set", mth, 1, DBG, false)         unless set.respond_to?(NS)
-
-    id = set.nameString
-    return mismatch(id, set, cl1, mth, DBG, false)    unless set.is_a?(cl1)
-    return invalid("base", mth, 2, DBG, false)        unless bse.respond_to?(NS)
-
-    id = bse.nameString
-    return mismatch(id, bse, cl2, mth, DBG, false)    unless bse.is_a?(cl2)
-
-    valid = gr == true || gr == false
-    return invalid("ground", mth, 3, DBG, false)      unless valid
-
-    valid = ex == true || ex == false
-    return invalid("exterior", mth, 4, DBG, false)    unless valid
-
-    valid = typ.respond_to?(:to_s)
-    return invalid("surface typ", mth, 4, DBG, false) unless valid
-
-    type = typ.to_s.downcase
-    valid = type == "floor" || type == "wall" || type == "roofceiling"
-    return invalid("surface type", mth, 5, DBG, false) unless valid
-
-    constructions = nil
-
-    if gr
-      unless set.defaultGroundContactSurfaceConstructions.empty?
-        constructions = set.defaultGroundContactSurfaceConstructions.get
-      end
-    elsif ex
-      unless set.defaultExteriorSurfaceConstructions.empty?
-        constructions = set.defaultExteriorSurfaceConstructions.get
-      end
-    else
-      unless set.defaultInteriorSurfaceConstructions.empty?
-        constructions = set.defaultInteriorSurfaceConstructions.get
-      end
-    end
-
-    return false unless constructions
-
-    case type
-    when "roofceiling"
-      unless constructions.roofCeilingConstruction.empty?
-        construction = constructions.roofCeilingConstruction.get
-        return true if construction == bse
-      end
-    when "floor"
-      unless constructions.floorConstruction.empty?
-        construction = constructions.floorConstruction.get
-        return true if construction == bse
-      end
-    else
-      unless constructions.wallConstruction.empty?
-        construction = constructions.wallConstruction.get
-        return true if construction == bse
-      end
-    end
-
-    false
-  end
-
-  ##
-  # Return a surface's default construction set.
-  #
-  # @param model [OpenStudio::Model::Model] a model
-  # @param s [OpenStudio::Model::Surface] a surface
-  #
-  # @return [OpenStudio::Model::DefaultConstructionSet] default set
-  # @return [NilClass] if invalid input
-  def defaultConstructionSet(model = nil, s = nil)
-    mth = "OSut::#{__callee__}"
-    cl1 = OpenStudio::Model::Model
-    cl2 = OpenStudio::Model::Surface
-
-    return mismatch("model", model, cl1, mth)           unless model.is_a?(cl1)
-    return invalid("s", mth, 2)                         unless s.respond_to?(NS)
-
-    id   = s.nameString
-    return mismatch(id, s, cl2, mth)                    unless s.is_a?(cl2)
-
-    ok = s.isConstructionDefaulted
-    log(ERR, "'#{id}' construction not defaulted (#{mth})")            unless ok
-    return nil                                                         unless ok
-    return empty("'#{id}' construction", mth, ERR)      if s.construction.empty?
-
-    base = s.construction.get
-    return empty("'#{id}' space", mth, ERR)             if s.space.empty?
-
-    space = s.space.get
-    type = s.surfaceType
-    ground = false
-    exterior = false
-
-    if s.isGroundSurface
-      ground = true
-    elsif s.outsideBoundaryCondition.downcase == "outdoors"
-      exterior = true
-    end
-
-    unless space.defaultConstructionSet.empty?
-      set = space.defaultConstructionSet.get
-      return set        if holdsConstruction?(set, base, ground, exterior, type)
-    end
-
-    unless space.spaceType.empty?
-      spacetype = space.spaceType.get
-
-      unless spacetype.defaultConstructionSet.empty?
-        set = spacetype.defaultConstructionSet.get
-        return set      if holdsConstruction?(set, base, ground, exterior, type)
-      end
-    end
-
-    unless space.buildingStory.empty?
-      story = space.buildingStory.get
-
-      unless story.defaultConstructionSet.empty?
-        set = story.defaultConstructionSet.get
-        return set      if holdsConstruction?(set, base, ground, exterior, type)
-      end
-    end
-
-    building = model.getBuilding
-
-    unless building.defaultConstructionSet.empty?
-      set = building.defaultConstructionSet.get
-      return set        if holdsConstruction?(set, base, ground, exterior, type)
-    end
-
-    nil
-  end
-
-  ##
-  # Validate if every material in a layered construction is standard & opaque.
-  #
-  # @param lc [OpenStudio::LayeredConstruction] a layered construction
-  #
-  # @return [Bool] true if all layers are valid
-  # @return [Bool] false if invalid input
-  def standardOpaqueLayers?(lc = nil)
-    mth = "OSut::#{__callee__}"
-    cl  = OpenStudio::Model::LayeredConstruction
-
-    return invalid("lc", mth, 1, DBG, false) unless lc.respond_to?(NS)
-    return mismatch(lc.nameString, lc, cl, mth, DBG, false) unless lc.is_a?(cl)
-
-    lc.layers.each { |m| return false if m.to_StandardOpaqueMaterial.empty? }
-
-    true
-  end
-
-  ##
-  # Total (standard opaque) layered construction thickness (in m).
-  #
-  # @param lc [OpenStudio::LayeredConstruction] a layered construction
-  #
-  # @return [Float] total layered construction thickness
-  # @return [Float] 0 if invalid input
-  def thickness(lc = nil)
-    mth = "OSut::#{__callee__}"
-    cl  = OpenStudio::Model::LayeredConstruction
-
-    return invalid("lc", mth, 1, DBG, 0.0)             unless lc.respond_to?(NS)
-
-    id = lc.nameString
-    return mismatch(id, lc, cl, mth, DBG, 0.0)         unless lc.is_a?(cl)
-
-    ok = standardOpaqueLayers?(lc)
-    log(ERR, "'#{id}' holds non-StandardOpaqueMaterial(s) (#{mth})")   unless ok
-    return 0.0                                                         unless ok
-
-    thickness = 0.0
-    lc.layers.each { |m| thickness += m.thickness }
-
-    thickness
-  end
-
-  ##
-  # Return total air film resistance for fenestration.
-  #
-  # @param usi [Float] a fenestrated construction's U-factor (W/m2•K)
-  #
-  # @return [Float] total air film resistance in m2•K/W (0.1216 if errors)
-  def glazingAirFilmRSi(usi = 5.85)
-    # The sum of thermal resistances of calculated exterior and interior film
-    # coefficients under standard winter conditions are taken from:
-    #
-    #   https://bigladdersoftware.com/epx/docs/9-6/engineering-reference/
-    #   window-calculation-module.html#simple-window-model
-    #
-    # These remain acceptable approximations for flat windows, yet likely
-    # unsuitable for subsurfaces with curved or projecting shapes like domed
-    # skylights. The solution here is considered an adequate fix for reporting,
-    # awaiting eventual OpenStudio (and EnergyPlus) upgrades to report NFRC 100
-    # (or ISO) air film resistances under standard winter conditions.
-    #
-    # For U-factors above 8.0 W/m2•K (or invalid input), the function returns
-    # 0.1216 m2•K/W, which corresponds to a construction with a single glass
-    # layer thickness of 2mm & k = ~0.6 W/m.K.
-    #
-    # The EnergyPlus Engineering calculations were designed for vertical windows
-    # - not horizontal, slanted or domed surfaces - use with caution.
-    mth = "OSut::#{__callee__}"
-    cl  = Numeric
-
-    return mismatch("usi", usi, cl, mth, DBG, 0.1216)  unless usi.is_a?(cl)
-    return invalid("usi", mth, 1, WRN, 0.1216)             if usi > 8.0
-    return negative("usi", mth, WRN, 0.1216)               if usi < 0
-    return zero("usi", mth, WRN, 0.1216)                   if usi.abs < TOL
-
-    rsi = 1 / (0.025342 * usi + 29.163853)   # exterior film, next interior film
-
-    return rsi + 1 / (0.359073 * Math.log(usi) + 6.949915) if usi < 5.85
-    return rsi + 1 / (1.788041 * usi - 2.886625)
-  end
-
-  ##
-  # Return a construction's 'standard calc' thermal resistance (with air films).
-  #
-  # @param lc [OpenStudio::Model::LayeredConstruction] a layered construction
-  # @param film [Float] thermal resistance of surface air films (m2•K/W)
-  # @param t [Float] gas temperature (°C) (optional)
-  #
-  # @return [Float] calculated RSi at standard conditions (0 if error)
-  def rsi(lc = nil, film = 0.0, t = 0.0)
-    # This is adapted from BTAP's Material Module's "get_conductance" (P. Lopez)
-    #
-    #   https://github.com/NREL/OpenStudio-Prototype-Buildings/blob/
-    #   c3d5021d8b7aef43e560544699fb5c559e6b721d/lib/btap/measures/
-    #   btap_equest_converter/envelope.rb#L122
-    mth = "OSut::#{__callee__}"
-    cl1 = OpenStudio::Model::LayeredConstruction
-    cl2 = Numeric
-
-    return invalid("lc", mth, 1, DBG, 0.0)             unless lc.respond_to?(NS)
-
-    id = lc.nameString
-
-    return mismatch(id, lc, cl1, mth, DBG, 0.0)        unless lc.is_a?(cl1)
-    return mismatch("film", film, cl2, mth, DBG, 0.0)  unless film.is_a?(cl2)
-    return mismatch("temp K", t, cl2, mth, DBG, 0.0)   unless t.is_a?(cl2)
-
-    t += 273.0                                             # °C to K
-    return negative("temp K", mth, DBG, 0.0)               if t < 0
-    return negative("film", mth, DBG, 0.0)                 if film < 0
-
-    rsi = film
-
-    lc.layers.each do |m|
-      # Fenestration materials first (ignoring shades, screens, etc.)
-      empty = m.to_SimpleGlazing.empty?
-      return 1 / m.to_SimpleGlazing.get.uFactor                     unless empty
-
-      empty = m.to_StandardGlazing.empty?
-      rsi += m.to_StandardGlazing.get.thermalResistance             unless empty
-      empty = m.to_RefractionExtinctionGlazing.empty?
-      rsi += m.to_RefractionExtinctionGlazing.get.thermalResistance unless empty
-      empty = m.to_Gas.empty?
-      rsi += m.to_Gas.get.getThermalResistance(t)                   unless empty
-      empty = m.to_GasMixture.empty?
-      rsi += m.to_GasMixture.get.getThermalResistance(t)            unless empty
-
-      # Opaque materials next.
-      empty = m.to_StandardOpaqueMaterial.empty?
-      rsi += m.to_StandardOpaqueMaterial.get.thermalResistance      unless empty
-      empty = m.to_MasslessOpaqueMaterial.empty?
-      rsi += m.to_MasslessOpaqueMaterial.get.thermalResistance      unless empty
-      empty = m.to_RoofVegetation.empty?
-      rsi += m.to_RoofVegetation.get.thermalResistance              unless empty
-      empty = m.to_AirGap.empty?
-      rsi += m.to_AirGap.get.thermalResistance                      unless empty
-    end
-
-    rsi
-  end
-
-  ##
-  # Identify a layered construction's (opaque) insulating layer. The method
-  # returns a 3-keyed hash ... :index (insulating layer index within layered
-  # construction), :type (standard: or massless: material type), and
-  # :r (material thermal resistance in m2•K/W).
-  #
-  # @param lc [OpenStudio::Model::LayeredConstruction] a layered construction
-  #
-  # @return [Hash] index: (Integer), type: (:standard or :massless), r: (Float)
-  # @return [Hash] index: nil, type: nil, r: 0 (if invalid input)
-  def insulatingLayer(lc = nil)
-    mth = "OSut::#{__callee__}"
-    cl  = OpenStudio::Model::LayeredConstruction
-    res = { index: nil, type: nil, r: 0.0 }
-    i   = 0                                                           # iterator
-
-    return invalid("lc", mth, 1, DBG, res)             unless lc.respond_to?(NS)
-
-    id   = lc.nameString
-    return mismatch(id, lc, cl1, mth, DBG, res)        unless lc.is_a?(cl)
-
-    lc.layers.each do |m|
-      unless m.to_MasslessOpaqueMaterial.empty?
-        m             = m.to_MasslessOpaqueMaterial.get
-
-        if m.thermalResistance < 0.001 || m.thermalResistance < res[:r]
-          i += 1
-          next
-        else
-          res[:r    ] = m.thermalResistance
-          res[:index] = i
-          res[:type ] = :massless
-        end
-      end
-
-      unless m.to_StandardOpaqueMaterial.empty?
-        m             = m.to_StandardOpaqueMaterial.get
-        k             = m.thermalConductivity
-        d             = m.thickness
-
-        if d < 0.003 || k > 3.0 || d / k < res[:r]
-          i += 1
-          next
-        else
-          res[:r    ] = d / k
-          res[:index] = i
-          res[:type ] = :standard
-        end
-      end
-
-      i += 1
-    end
-
-    res
-  end
+  # ---- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---- #
+  # ---- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---- #
+  # OpenStudio geometry methods.
 
   ##
   # Return OpenStudio site/space transformation & rotation angle [0,2PI) rads.
@@ -1942,7 +1929,6 @@ module OSut
     cl1 = OpenStudio::Model::Model
     cl2 = OpenStudio::Model::PlanarSurfaceGroup
     res = { t: nil, r: nil }
-
     return mismatch("model", model, cl1, mth, DBG, res) unless model.is_a?(cl1)
     return invalid("group", mth, 2, DBG, res) unless group.respond_to?(NS)
 
@@ -1956,6 +1942,82 @@ module OSut
   end
 
   ##
+  # Return true if 2x OpenStudio 3D points are nearly equal
+  #
+  # @param p1 [OpenStudio::Point3d] 1st 3D point
+  # @param p1 [OpenStudio::Point3d] 2nd 3D point
+  #
+  # @return [Bool] true if equal points (within TOL)
+  def same?(p1 = nil, p2 = nil)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Point3d
+    return mismatch("point 1", p1, cl, mth, DBG, false) unless p1.is_a?(cl)
+    return mismatch("point 2", p2, cl, mth, DBG, false) unless p2.is_a?(cl)
+
+    OpenStudio.isAlmostEqual3dPt(p1, p2, TOL)
+  end
+
+  ##
+  # Return true if a line segment is along the X-axis.
+  #
+  # @param p1 [OpenStudio::Point3d] 1st 3D point of a line segment
+  # @param p2 [OpenStudio::POint3d] 2nd 3D point of a line segment
+  # @param strict [Bool] true if segment doesn't hold Y- or Z-axis components
+  #
+  # @return [Bool] true if along the X-axis
+  def xx?(p1 = nil, p2 = nil, strict = true)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Point3d
+    strict = true unless [true, false].include?(strict)
+    return mismatch("point 1", p1, cl, mth, DBG, false) unless p1.is_a?(cl)
+    return mismatch("point 2", p2, cl, mth, DBG, false) unless p2.is_a?(cl)
+    return false if (p1.y - p2.y).abs > TOL && strict
+    return false if (p1.z - p2.z).abs > TOL && strict
+
+    (p1.x - p2.x).abs > TOL
+  end
+
+  ##
+  # Return true if a line segment is along the Y-axis.
+  #
+  # @param p1 [OpenStudio::Point3d] 1st 3D point of a line segment
+  # @param p2 [OpenStudio::POint3d] 2nd 3D point of a line segment
+  # @param strict [Bool] true if segment doesn't hold X- or Z-axis components
+  #
+  # @return [Bool] true if along the Y-axis
+  def yy?(p1 = nil, p2 = nil, strict = true)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Point3d
+    strict = true unless [true, false].include?(strict)
+    return mismatch("point 1", p1, cl, mth, DBG, false) unless p1.is_a?(cl)
+    return mismatch("point 2", p2, cl, mth, DBG, false) unless p2.is_a?(cl)
+    return false if (p1.x - p2.x).abs > TOL && strict
+    return false if (p1.z - p2.z).abs > TOL && strict
+
+    (p1.y - p2.y).abs > TOL
+  end
+
+  ##
+  # Return true if a line segment is along the Z-axis.
+  #
+  # @param p1 [OpenStudio::Point3d] 1st 3D point of a line segment
+  # @param p2 [OpenStudio::POint3d] 2nd 3D point of a line segment
+  # @param strict [Bool] true if segment doesn't hold X- or Y-axis components
+  #
+  # @return [Bool] true if along the Z-axis
+  def zz?(p1 = nil, p2 = nil, strict = true)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Point3d
+    strict = true unless [true, false].include?(strict)
+    return mismatch("point 1", p1, cl, mth, DBG, false) unless p1.is_a?(cl)
+    return mismatch("point 2", p2, cl, mth, DBG, false) unless p2.is_a?(cl)
+    return false if (p1.x - p2.x).abs > TOL && strict
+    return false if (p1.y - p2.y).abs > TOL && strict
+
+    (p1.z - p2.z).abs > TOL
+  end
+
+  ##
   # Return a scalar product of an OpenStudio Vector3d.
   #
   # @param v [OpenStudio::Vector3d] a vector
@@ -1963,177 +2025,596 @@ module OSut
   #
   # @return [OpenStudio::Vector3d] modified vector
   # @return [OpenStudio::Vector3d] provided (or empty) vector if invalid input
-  def scalar(v = OpenStudio::Vector3d.new(0,0,0), m = 0)
+  def scalar(v = OpenStudio::Vector3d.new, m = 0)
     mth = "OSut::#{__callee__}"
-    cl1 = OpenStudio::Vector3d
-    cl2 = Numeric
+    cl  = OpenStudio::Vector3d
+    ok  = m.respond_to?(:to_f)
+    return mismatch("vector", v, cl,      mth, DBG, v) unless v.is_a?(cl)
+    return mismatch("m",      m, Numeric, mth, DBG, v) unless ok
 
-    return mismatch("vector", v, cl1, mth, DBG, v) unless v.is_a?(cl1)
-    return mismatch("x",    v.x, cl2, mth, DBG, v) unless v.x.respond_to?(:to_f)
-    return mismatch("y",    v.y, cl2, mth, DBG, v) unless v.y.respond_to?(:to_f)
-    return mismatch("z",    v.z, cl2, mth, DBG, v) unless v.z.respond_to?(:to_f)
-    return mismatch("m",      m, cl2, mth, DBG, v) unless m.respond_to?(:to_f)
-
+    m = m.to_f
     OpenStudio::Vector3d.new(m * v.x, m * v.y, m * v.z)
   end
 
   ##
-  # Flatten OpenStudio 3D points vs Z-axis (Z=0).
+  # Return OpenStudio 3D points as an OpenStudio point vector, validating
+  # points in the process (if Array).
   #
-  # @param pts [Array] an OpenStudio Point3D array/vector
+  # @param pts [Set<OpenStudio::Point3d>] OpenStudio 3D points
   #
-  # @return [Array] flattened OpenStudio 3D points
-  def flatZ(pts = nil)
+  # @return [OpenStudio::Point3dVector] vector (empty if fail, check logs)
+  def to_p3Dv(pts = nil)
     mth = "OSut::#{__callee__}"
-    cl1 = OpenStudio::Point3dVector
-    cl2 = OpenStudio::Point3d
+    cl1 = Array
+    cl2 = OpenStudio::Point3dVector
+    cl3 = OpenStudio::Model::PlanarSurface
+    cl4 = OpenStudio::Point3d
     v   = OpenStudio::Point3dVector.new
+    return pts                                           if pts.is_a?(cl2)
+    return pts.vertices                                  if pts.is_a?(cl3)
+    return mismatch("points", pts, cl1, mth, DBG, v) unless pts.is_a?(cl1)
 
-    valid = pts.is_a?(cl1) || pts.is_a?(Array)
-    return mismatch("points", pts, cl1, mth, DBG, v)      unless valid
+    pts.each do |pt|
+      return mismatch("point", pt, cl4, mth, DBG, v) unless pt.is_a?(cl4)
+    end
 
-    pts.each { |pt| mismatch("pt", pt, cl2, mth, ERR, v)  unless pt.is_a?(cl2) }
-    pts.each { |pt| v << OpenStudio::Point3d.new(pt.x, pt.y, 0) }
+    pts.each { |pt| v << OpenStudio::Point3d.new(pt.x, pt.y, pt.z) }
 
     v
   end
 
   ##
-  # Validate whether 1st OpenStudio convex polygon fits in 2nd convex polygon.
+  # Return true if an OpenStudio 3D point is part of a set of 3D points.
   #
-  # @param p1 [OpenStudio::Point3dVector] or Point3D array of polygon #1
-  # @param p2 [OpenStudio::Point3dVector] or Point3D array of polygon #2
-  # @param id1 [String] polygon #1 identifier (optional)
-  # @param id2 [String] polygon #2 identifier (optional)
+  # @param pts [Set<OpenStudio::Point3dVector>] 3d points
+  # @param p1 [OpenStudio::Point3d] a 3D point
   #
-  # @return [Bool] true if 1st polygon fits entirely within the 2nd polygon
-  # @return [Bool] false if invalid input
-  def fits?(p1 = nil, p2 = nil, id1 = "", id2 = "")
+  # @return [Bool] true if part of a set of 3D points
+  def holds?(pts = nil, p1 = nil)
     mth = "OSut::#{__callee__}"
-    cl1 = OpenStudio::Point3dVector
-    cl2 = OpenStudio::Point3d
-    a   = false
+    pts = to_p3Dv(pts)
+    cl  = OpenStudio::Point3d
+    return mismatch("point", p1, cl, mth, DBG, false) unless p1.is_a?(cl)
 
-    return invalid("id1", mth, 3, DBG, a) unless id1.respond_to?(:to_s)
-    return invalid("id2", mth, 4, DBG, a) unless id2.respond_to?(:to_s)
+    pts.each { |pt| return true if same?(p1, pt) }
 
-    i1  = id1.to_s
-    i2  = id2.to_s
-    i1  = "poly1" if i1.empty?
-    i2  = "poly2" if i2.empty?
+    false
+  end
 
-    valid1 = p1.is_a?(cl1) || p1.is_a?(Array)
-    valid2 = p2.is_a?(cl1) || p2.is_a?(Array)
+  ##
+  # Flatten OpenStudio 3D points vs X, Y or Z axes.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  # @param axs [Symbol] if potentially along :x, :y or :z axis
+  # @param val [Numeric] axis value
+  #
+  # @return [OpenStudio::Point3dVector] flattened 3D points (empty if invalid)
+  def flatten(pts = nil, axs = :z, val = 0)
+    mth = "OSut::#{__callee__}"
+    pts = to_p3Dv(pts)
+    v   = OpenStudio::Point3dVector.new
+    ok1 = val.respond_to?(:to_f)
+    ok2 = [:x, :y, :z].include?(axs)
+    return mismatch("val", val, Numeric, mth,    DBG, v) unless ok1
+    return invalid("axis (XYZ?)",        mth, 2, DBG, v) unless ok2
 
-    return mismatch(i1, p1, cl1, mth, DBG, a) unless valid1
-    return mismatch(i2, p2, cl1, mth, DBG, a) unless valid2
-    return empty(i1, mth, ERR, a)                 if p1.empty?
-    return empty(i2, mth, ERR, a)                 if p2.empty?
+    val = val.to_f
 
-    p1.each { |v| return mismatch(i1, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
-    p2.each { |v| return mismatch(i2, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
+    case axs
+    when :x
+      pts.each { |pt| v << OpenStudio::Point3d.new(val, pt.y, pt.z) }
+    when :y
+      pts.each { |pt| v << OpenStudio::Point3d.new(pt.x, val, pt.z) }
+    else
+      pts.each { |pt| v << OpenStudio::Point3d.new(pt.x, pt.y, val) }
+    end
 
-    # XY-plane transformation matrix ... needs to be clockwise for boost.
-    ft    = OpenStudio::Transformation.alignFace(p1)
-    ft_p1 = flatZ( (ft.inverse * p1)         )
-    return  false                                                if ft_p1.empty?
+    v
+  end
 
-    cw    = OpenStudio.pointInPolygon(ft_p1.first, ft_p1, TOL)
-    ft_p1 = flatZ( (ft.inverse * p1).reverse )               unless cw
-    ft_p2 = flatZ( (ft.inverse * p2).reverse )               unless cw
-    ft_p2 = flatZ( (ft.inverse * p2)         )                   if cw
-    return  false                                                if ft_p2.empty?
+  ##
+  # Return true if OpenStudio 3D points share X, Y or Z coordinates.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] OpenStudio 3D points
+  # @param axs [Symbol] if potentially along :x, :y or :z axis
+  # @param val [Numeric] axis value
+  #
+  # @return [Bool] true if points share X, Y or Z coordinates
+  def xyz?(pts = nil, axs = :z, val = 0)
+    mth = "OSut::#{__callee__}"
+    pts = to_p3Dv(pts)
+    ok1 = val.respond_to?(:to_f)
+    ok2 = [:x, :y, :z].include?(axs)
+    return false if pts.empty?
+    return mismatch("val", val, Numeric, mth,    DBG, false) unless ok1
+    return invalid("axis (XYZ?)",        mth, 2, DBG, false) unless ok2
 
-    area1 = OpenStudio.getArea(ft_p1)
-    area2 = OpenStudio.getArea(ft_p2)
-    return  empty("#{i1} area", mth, ERR, a)                     if area1.empty?
-    return  empty("#{i2} area", mth, ERR, a)                     if area2.empty?
+    val = val.to_f
 
-    area1 = area1.get
-    area2 = area2.get
-    union = OpenStudio.join(ft_p1, ft_p2, TOL2)
-    return  false                                                if union.empty?
-
-    union = union.get
-    area  = OpenStudio.getArea(union)
-    return  empty("#{i1}:#{i2} union area", mth, ERR, a)         if area.empty?
-
-    area = area.get
-
-    return false                                     if area < TOL
-    return true                                      if (area - area2).abs < TOL
-    return false                                     if (area - area2).abs > TOL
+    case axs
+    when :x
+      pts.each { |pt| return false if (pt.x - val).abs > TOL }
+    when :y
+      pts.each { |pt| return false if (pt.y - val).abs > TOL }
+    else
+      pts.each { |pt| return false if (pt.z - val).abs > TOL }
+    end
 
     true
   end
 
   ##
-  # Validate whether an OpenStudio polygon overlaps another.
+  # Return next sequential point in an OpenStudio 3D point vector.
   #
-  # @param p1 [OpenStudio::Point3dVector] or Point3D array of polygon #1
-  # @param p2 [OpenStudio::Point3dVector] or Point3D array of polygon #2
-  # @param id1 [String] polygon #1 identifier (optional)
-  # @param id2 [String] polygon #2 identifier (optional)
+  # @param pts [OpenStudio::Point3dVector] 3D points
+  # @param pt [OpenStudio::Point3d] a given 3D point
   #
-  # @return Returns true if polygons overlaps (or either fits into the other)
-  # @return [Bool] false if invalid input
-  def overlaps?(p1 = nil, p2 = nil, id1 = "", id2 = "")
+  # @return [OpenStudio::Point3d] the next sequential point (nil if failed)
+  def next(pts = nil, pt = nil)
     mth = "OSut::#{__callee__}"
-    cl1 = OpenStudio::Point3dVector
-    cl2 = OpenStudio::Point3d
-    a   = false
+    pts = to_p3Dv(pts)
+    cl  = OpenStudio::Point3d
+    return mismatch("point", pt, cl, mth)  unless pt.is_a?(cl)
+    return invalid("points (2+)", mth, 1, WRN) if pts.size < 2
 
-    return invalid("id1", mth, 3, DBG, a) unless id1.respond_to?(:to_s)
-    return invalid("id2", mth, 4, DBG, a) unless id2.respond_to?(:to_s)
+    pair = pts.each_cons(2).find { |p1, _| same?(p1, pt) }
 
-    i1 = id1.to_s
-    i2 = id2.to_s
-    i1 = "poly1" if i1.empty?
-    i2 = "poly2" if i2.empty?
+    pair.nil? ? pts.first : pair.last
+  end
 
-    valid1 = p1.is_a?(cl1) || p1.is_a?(Array)
-    valid2 = p2.is_a?(cl1) || p2.is_a?(Array)
+  ##
+  # Return unique OpenStudio 3D points from an OpenStudio 3D point vector.
+  #
+  # @param pts [Set<OpenStudio::Point3d] 3D points
+  # @param n [Integer] requested number of unique points (0 returns all)
+  #
+  # @return [OpenStudio::Point3dVector] unique points (empty if fail)
+  def getUniques(pts = nil, n = 0)
+    mth = "OSut::#{__callee__}"
+    pts = to_p3Dv(pts)
+    ok  = n.respond_to?(:to_i)
+    v   = OpenStudio::Point3dVector.new
+    return v if pts.empty?
+    return mismatch("n unique points", n, Integer, mth, DBG, v) unless ok
 
-    return mismatch(i1, p1, cl1, mth, DBG, a) unless valid1
-    return mismatch(i2, p2, cl1, mth, DBG, a) unless valid2
-    return empty(i1, mth, ERR, a)                 if p1.empty?
-    return empty(i2, mth, ERR, a)                 if p2.empty?
+    pts.each { |pt| v << pt unless holds?(v, pt) }
 
-    p1.each { |v| return mismatch(i1, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
-    p2.each { |v| return mismatch(i2, v, cl2, mth, ERR, a) unless v.is_a?(cl2) }
+    n = n.to_i
+    n = 0    unless n.abs < v.size
+    v = v[0..n]  if n > 0
+    v = v[n..-1] if n < 0
 
-    # XY-plane transformation matrix ... needs to be clockwise for boost.
-    ft    = OpenStudio::Transformation.alignFace(p1)
-    ft_p1 = flatZ( (ft.inverse * p1)         )
-    ft_p2 = flatZ( (ft.inverse * p2)         )
-    return  false                                                if ft_p1.empty?
-    return  false                                                if ft_p2.empty?
+    v
+  end
 
-    cw    = OpenStudio.pointInPolygon(ft_p1.first, ft_p1, TOL)
-    ft_p1 = flatZ( (ft.inverse * p1).reverse )               unless cw
-    ft_p2 = flatZ( (ft.inverse * p2).reverse )               unless cw
-    return  false                                                if ft_p1.empty?
-    return  false                                                if ft_p2.empty?
+  ##
+  # Return sequential non-collinear points in an OpenStudio 3D point vector.
+  #
+  # @param pts [Set<OpenStudio::Point3d] 3D points
+  # @param n [Integer] requested number of non-collinears (0 returns all)
+  #
+  # @return [OpenStudio::Point3dVector] non-collinear points (empty if fail)
+  def getNonCollinears(pts = nil, n = 0)
+    mth = "OSut::#{__callee__}"
+    pts = getUniques(pts)
+    ok  = n.respond_to?(:to_i)
+    v   = OpenStudio::Point3dVector.new
+    a   = []
+    return pts if pts.size < 2
+    return mismatch("n non-collinears", n, Integer, mth, DBG, v) unless ok
 
-    area1 = OpenStudio.getArea(ft_p1)
-    area2 = OpenStudio.getArea(ft_p2)
-    return  empty("#{i1} area", mth, ERR, a)                     if area1.empty?
-    return  empty("#{i2} area", mth, ERR, a)                     if area2.empty?
+    # Alternative: evaluate cross product of vectors of 3x sequential points.
+    pts.each_with_index do |p1, i1|
+      i2 = i1 + 1
+      i2 = 0 if i2 == pts.size
+      i3 = i2 + 1
+      i3 = 0 if i3 == pts.size
+      p2 = pts[i2]
+      p3 = pts[i3]
+      next if OpenStudio.isPointOnLineBetweenPoints(p1, p3, p2, TOL)
+
+      a << p2
+    end
+
+    if holds?(a, pts[0])
+      a = a.rotate(-1) unless same?(a[0], pts[0])
+    end
+
+    n = n.to_i
+    n = 0    unless n.abs < pts.size
+    a = a[0..n]  if n > 0
+    a = a[n..-1] if n < 0
+
+    to_p3Dv(a)
+  end
+
+  ##
+  # Return paired sequential points as (non-zero length) line segments. If the
+  # set strictly holds 2x unique points, a single segment is returned.
+  # Otherwise, the returned number of segments equals the number of unique
+  # points. If non-collinearity is requested, then the number of returned
+  # segments equals the number of non-colliear points.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  # @param co [Bool] true if requesting to keep collinear points
+  #
+  # @return [OpenStudio::Point3dVectorVector] line segments (empty if fail)
+  def getSegments(pts = nil, co = false)
+    mth = "OSut::#{__callee__}"
+    vv  = OpenStudio::Point3dVectorVector.new
+    co  = false                 unless [true, false].include?(co)
+    pts = getNonCollinears(pts) unless co
+    pts = getUniques(pts)           if co
+    return vv                       if pts.size < 2
+
+    pts.each_with_index do |p1, i1|
+      i2 = i1 + 1
+      i2 = 0 if i2 == pts.size
+      p2 = pts[i2]
+
+      line = OpenStudio::Point3dVector.new
+      line << p1
+      line << p2
+      vv << line
+      break if pts.size == 2
+    end
+
+    vv
+  end
+
+  ##
+  # Return points as (non-zero length) 'triads', i.e. 3x sequential points.
+  # If the set holds less than 3x unique points, an empty triad is
+  # returned. Otherwise, the returned number of triads equals the number of
+  # unique points. If non-collinearity is requested, then the number of
+  # returned triads equals the number of non-collinear points.
+  #
+  # @param pts [OpenStudio::Point3dVector] 3D points
+  # @param co [Bool] true if requesting to keep collinear points
+  #
+  # @return [OpenStudio::Point3dVectorVector] triads (empty if fail)
+  def getTriads(pts = nil, co = false)
+    mth = "OSut::#{__callee__}"
+    vv  = OpenStudio::Point3dVectorVector.new
+    co  = false                 unless [true, false].include?(co)
+    pts = getNonCollinears(pts) unless co
+    pts = getUniques(pts)           if co
+    return vv                       if pts.size < 2
+
+    pts.each_with_index do |p1, i1|
+      i2 = i1 + 1
+      i2 = 0 if i2 == pts.size
+      i3 = i2 + 1
+      i3 = 0 if i3 == pts.size
+      p2 = pts[i2]
+      p3 = pts[i3]
+
+      tri = OpenStudio::Point3dVector.new
+      tri << p1
+      tri << p2
+      tri << p3
+      vv << tri
+    end
+
+    vv
+  end
+
+  # Many of the following geometry methods rely on Boost as an OpenStudio
+  # dependency. As per Boost requirements, points (e.g. polygons) must first
+  # be 'aligned':
+  #   - first rotated/tilted as to lay flat along XY plane (Z-axis ~= 0)
+  #   - initial Z-axis values are represented as Y-axis values
+  #   - points with the lowest X-axis values are 'aligned' along X-axis (0)
+  #   - points with the lowest Z-axis values are 'aligned' along Y-axis (0)
+  #   - for several Boost methods, points must be clockwise in sequence
+
+  ##
+  # Determine if pre-'aligned' OpenStudio 3D points are listed clockwise.
+  #
+  # @param pts [OpenStudio::Point3dVector] 3D points
+  #
+  # @return [true] if sequence is clockwise
+  # @return [false] if sequence is counterclockwise
+  # @return [false] if invalid input (see logs)
+  def clockwise?(pts = nil)
+    mth = "OSut::#{__callee__}"
+    pts = to_p3Dv(pts)
+    n   = false
+    return invalid("points (3+)",      mth, 1, DBG, n)     if pts.size < 3
+    return invalid("points (aligned)", mth, 1, DBG, n) unless xyz?(pts, :z, 0)
+
+    OpenStudio.pointInPolygon(pts.first, pts, TOL)
+  end
+
+  ##
+  # Return 'aligned' OpenStudio 3D points conforming to Openstudio's
+  # counterclockwise UpperLeftCorner (ULC) convention.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] (aligned) 3D points
+  #
+  # @return [OpenStudio::Point3dVector] ULC points, empty if fail (see logs)
+  def ulc(pts = nil)
+    mth = "OSut::#{__callee__}"
+    pts = to_p3Dv(pts)
+    v   = OpenStudio::Point3dVector.new
+    p0  = OpenStudio::Point3d.new(0,0,0)
+    i0  = nil
+
+    return invalid("points (3+)",      mth, 1, DBG, v)     if pts.size < 3
+    return invalid("points (aligned)", mth, 1, DBG, v) unless xyz?(pts, :z, 0)
+
+    # Ensure counterclockwise sequence.
+    pts = pts.to_a
+    pts = pts.reverse if clockwise?(pts)
+
+    # Fetch index of candidate (0,0,0) point (i == 1, in most cases). Resort
+    # to last X == 0 point. Leave as is if failed attempts.
+    i0 = pts.index  { |pt| same?(pt, p0) }
+    i0 = pts.rindex { |pt| pt.x.abs < TOL } if i0.nil?
+
+    unless i0.nil?
+      i   = pts.size - 1
+      i   = i0 - 1 unless i0 == 0
+      pts = pts.rotate(i)
+    end
+
+    to_p3Dv(pts)
+  end
+
+  ##
+  # Return an OpenStudio 3D point vector as basis for a valid OpenStudio 3D
+  # polygon. In addition to basic OpenStudio polygon tests (e.g. all points
+  # sharing the same 3D plane, non-self-intersecting), the method can
+  # optionally check for convexity. Returned vector is empty if basic and/or
+  # convexity tests fail (check logs). Uniqueness and/or collinearity can be
+  # ensured if selected. Returned vector can also be 'aligned', as well as in
+  # UpperLeftCorner (ULC) counterclockwise sequence, or in clockwise sequence.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  # @param vx [Bool] true to check for convexity
+  # @param uq [Bool] true to ensure uniqueness
+  # @param co [Bool] false to ensure non-collinearity
+  # @param tt [false] to not 'align'
+  # @param tt [true] to 'align' (transformation specific to points)
+  # @param tt [OpenStudio::Transformation] to 'align (other transformation)
+  # @param sq [:no] unaltered final sequence
+  # @param sq [:ulc] counterclockwise 'UpperLeftCorner' sequence
+  # @param sq [:cw] clockwise sequence
+  #
+  # @return [OpenStudio::Point3dVector] original points (as vector) if valid
+  # @return [OpenStudio::Point3dVector] empty vector unless valid
+  def poly(pts = nil, vx = false, uq = false, co = true, tt = false, sq = :no)
+    mth = "OSut::#{__callee__}"
+    pts = to_p3Dv(pts)
+    cl  = OpenStudio::Transformation
+    v   = OpenStudio::Point3dVector.new
+    vx  = false unless [true, false].include?(vx)
+    uq  = false unless [true, false].include?(uq)
+    co  = true  unless [true, false].include?(co)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Exit if mismatched/invalid arguments.
+    ok1 = tt == true || tt == false || tt.is_a?(cl)
+    ok2 = sq == :no  || sq == :ulc  || sq == :cw
+    return invalid("transformation", mth, 5, DBG, v) unless ok1
+    return invalid("sequence",       mth, 6, DBG, v) unless ok2
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Basic tests:
+    p3 = getNonCollinears(pts, 3)
+    return empty("polygon", mth, ERR, v) if p3.size < 3
+
+    pln = OpenStudio::Plane.new(p3)
+
+    pts.each do |pt|
+      return empty("plane", mth, ERR, v) unless pln.pointOnPlane(pt)
+    end
+
+    t = tt
+    t = OpenStudio::Transformation.alignFace(pts) unless tt.is_a?(cl)
+    a = (t.inverse * pts).reverse
+
+    if tt.is_a?(cl)
+      # Using a transformation that is most likely not specific to pts. The
+      # most probable reason to retain this option is when testing for polygon
+      # intersections, unions, etc., operations that typically require that
+      # points remain nonetheless 'aligned'. This logs a warning if aligned
+      # points aren't @Z =0, before 'flattening'.
+      invalid("points (non-aligned)", mth, 1, WRN) unless xyz?(a, :z, 0)
+      a = flatten(a).to_a                          unless xyz?(a, :z, 0)
+    end
+
+    # The following 2x lines are commented out. This is a very commnon and very
+    # useful test, yet tested cases are first caught by the 'pointOnPlane'
+    # test above. Keeping it for possible further testing.
+    # bad = OpenStudio.selfIntersects(a, TOL)
+    # return invalid("points (intersecting)", mth, 1, ERR, v) if bad
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Ensure uniqueness and/or non-collinearity. Preserve original sequence.
+    p0 = a.first
+    a  = OpenStudio.simplify(a, false, TOL)     if uq
+    a  = OpenStudio.simplify(a, true,  TOL) unless co
+    i0 = a.index { |pt| same?(pt, p0) }
+    a  = a.rotate(i0)                       unless i0.nil?
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Check for convexity (optional).
+    if vx
+      a1 = OpenStudio.simplify(a, true, TOL).reverse
+      dX = a1.max_by(&:x).x.abs
+      dY = a1.max_by(&:y).y.abs
+      d  = [dX, dY].max
+      return false if d < TOL
+
+      u = OpenStudio::Vector3d.new(0, 0, d)
+
+      a1.each_with_index do |p1, i1|
+        i2 = i1 + 1
+        i2 = 0 if i2 == a1.size
+        p2 = a1[i2]
+        pi = p1 + u
+        vi = OpenStudio::Point3dVector.new
+        vi << pi
+        vi << p1
+        vi << p2
+        plane  = OpenStudio::Plane.new(vi)
+        normal = plane.outwardNormal
+
+        a1.each do |p3|
+          next if same?(p1, p3)
+          next if same?(p2, p3)
+          next if plane.pointOnPlane(p3)
+          next if normal.dot(p3 - p1) < 0
+
+          return invalid("points (non-convex)", mth, 1, ERR, v)
+        end
+      end
+    end
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Alter sequence (optional).
+    unless tt
+      case sq
+      when :ulc
+        a = to_p3Dv(t * ulc(a.reverse))
+      when :cw
+        a = to_p3Dv(t * a)
+        a = OpenStudio.reverse(a) unless clockwise?(a)
+      else
+        a = to_p3Dv(t * a.reverse)
+      end
+    else
+      case sq
+      when :ulc
+        a = ulc(a.reverse)
+      when :cw
+        a = to_p3Dv(a)
+        a = OpenStudio.reverse(a) unless clockwise?(a)
+      else
+        a = to_p3Dv(a.reverse)
+      end
+    end
+
+    a
+  end
+
+  ##
+  # Return 'width' of a set of OpenStudio 3D points (perpendicular view).
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  #
+  # @return [Double] (left-to-right) width; 0 if invalid inputs
+  def width(pts = nil)
+    mth = "OSut::#{__callee__}"
+
+    poly(pts, false, true, false, true).max_by(&:x).x
+  end
+
+  ##
+  # Return 'height' of a set of OpenStudio 3D points (perpendicular view).
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  #
+  # @return [Double] (top-to-bottom) height; 0 if invalid inputs
+  def height(pts = nil)
+    mth = "OSut::#{__callee__}"
+
+    poly(pts, false, true, false, true).max_by(&:y).y
+  end
+
+  ##
+  # Determine whether 1st OpenStudio polygon fits in 2nd polygon.
+  #
+  # @param p1 [Set<OpenStudio::Point3d>] 1st set of 3D points
+  # @param p2 [Set<OpenStudio::Point3d>] 2nd set of 3D points
+  # @param flat [Bool] true if points are to be pre-flattened (Z=0)
+  #
+  # @return [Bool] true if 1st polygon fits within the 2nd polygon
+  # @return [Bool] false if invalid input
+  def fits?(p1 = nil, p2 = nil, flat = true)
+    mth  = "OSut::#{__callee__}"
+    flat = true  unless [true, false].include?(flat)
+    p1   = poly(p1, false, true, false)
+    p2   = poly(p2, false, true, false)
+    return false     if p1.empty?
+    return false     if p2.empty?
+
+    # Aligned, clockwise points using transformation from 2nd polygon.
+    t  = OpenStudio::Transformation.alignFace(p2)
+    p1 = poly(p1, false, false, true, t, :cw)
+    p2 = poly(p2, false, false, true, t, :cw)
+    p1 = flatten(p1) if flat
+    p2 = flatten(p2) if flat
+    return false     if p1.empty?
+    return false     if p2.empty?
+
+    area1 = OpenStudio.getArea(p1)
+    area2 = OpenStudio.getArea(p2)
+    return empty("points 1 area", mth, ERR, false) if area1.empty?
+    return empty("points 2 area", mth, ERR, false) if area2.empty?
 
     area1 = area1.get
     area2 = area2.get
-    union = OpenStudio.join(ft_p1, ft_p2, TOL2)
-    return  false                                                if union.empty?
+    union = OpenStudio.join(p1, p2, TOL2)
+    return false if union.empty?
 
     union = union.get
     area  = OpenStudio.getArea(union)
-    return empty("#{i1}:#{i2} union area", mth, ERR, a)          if area.empty?
+    return false if area.empty?
 
     area = area.get
-    return false                                                 if area < TOL
+    return false if area < TOL
+    return true  if (area - area2).abs < TOL
+    return false if (area - area2).abs > TOL
 
+    true
+  end
+
+  ##
+  # Determine whether OpenStudio polygons overlap.
+  #
+  # @param p1 [Set<OpenStudio::Point3d>] 1st set of 3D points
+  # @param p2 [Set<OpenStudio::Point3d>] 2nd set of 3D points
+  # @param flat [Bool] true if points are to be pre-flattened (Z=0)
+  #
+  # @return [Bool] true if polygons overlaps (or either fits into the other)
+  # @return [Bool] false if invalid input
+  def overlaps?(p1 = nil, p2 = nil, flat = true)
+    mth  = "OSut::#{__callee__}"
+    flat = true unless [true, false].include?(flat)
+    p1   = poly(p1, false, true, false)
+    p2   = poly(p2, false, true, false)
+    return false    if p1.empty?
+    return false    if p2.empty?
+
+    # Aligned, clockwise & convex points using transformation from 1st polygon.
+    t  = OpenStudio::Transformation.alignFace(p1)
+    p1 = poly(p1, false, false, true, t, :cw)
+    p2 = poly(p2, false, false, true, t, :cw)
+    p1 = flatten(p1) if flat
+    p2 = flatten(p2) if flat
+    return false     if p1.empty?
+    return false     if p2.empty?
+
+    area1 = OpenStudio.getArea(p1)
+    area2 = OpenStudio.getArea(p2)
+    return empty("points 1 area", mth, ERR, false) if area1.empty?
+    return empty("points 2 area", mth, ERR, false) if area2.empty?
+
+    area1 = area1.get
+    area2 = area2.get
+    union = OpenStudio.join(p1, p2, TOL2)
+    return false if union.empty?
+
+    union = union.get
+    area  = OpenStudio.getArea(union)
+    return false if area.empty?
+
+    area = area.get
     delta = (area - area1 - area2).abs
-    return false                                                 if delta < TOL
+    return false if area  < TOL
+    return false if delta < TOL
 
     true
   end
@@ -2141,55 +2622,36 @@ module OSut
   ##
   # Generate offset vertices (by width) for a 3- or 4-sided, convex polygon.
   #
-  # @param p1 [OpenStudio::Point3dVector] OpenStudio Point3D vector/array
-  # @param w [Float] offset width (min: 0.0254m)
+  # @param p1 [Set<OpenStudio::Point3d>] OpenStudio 3D points
+  # @param w [Numeric] offset width (min: 0.0254m)
   # @param v [Integer] OpenStudio SDK version, eg '321' for 'v3.2.1' (optional)
   #
   # @return [OpenStudio::Point3dVector] offset points if successful
   # @return [OpenStudio::Point3dVector] original points if invalid input
-  def offset(p1 = [], w = 0, v = 0)
-    mth   = "OSut::#{__callee__}"
-    cl    = OpenStudio::Point3d
-    vrsn  = OpenStudio.openStudioVersion.split(".").map(&:to_i).join.to_i
+  def offset(p1 = nil, w = 0, v = 0)
+    mth = "OSut::#{__callee__}"
+    pts = poly(p1, true, true, false, true, :cw)
+    return invalid("points", mth, 1, DBG, p1) unless [3, 4].include?(pts.size)
 
-    valid = p1.is_a?(OpenStudio::Point3dVector) || p1.is_a?(Array)
-    return  mismatch("pts", p1, cl1, mth, DBG, p1)  unless valid
-    return  empty("pts", mth, ERR, p1)                  if p1.empty?
+    mismatch("width",   w, Numeric, mth) unless w.respond_to?(:to_f)
+    mismatch("version", v, Integer, mth) unless v.respond_to?(:to_i)
 
-    valid = p1.size == 3 || p1.size == 4
-    iv    = true if p1.size == 4
-    return  invalid("pts", mth, 1, DBG, p1)         unless valid
-    return  invalid("width", mth, 2, DBG, p1)       unless w.respond_to?(:to_f)
-
-    w     = w.to_f
-    return  p1                                          if w < 0.0254
-
-    v     = v.to_i                                      if v.respond_to?(:to_i)
-    v     = 0                                       unless v.respond_to?(:to_i)
-    v     = vrsn                                        if v.zero?
-
-    p1.each { |x| return mismatch("p", x, cl, mth, ERR, p1) unless x.is_a?(cl) }
+    vs = OpenStudio.openStudioVersion.split(".").join.to_i
+    iv = true   if pts.size == 4
+    v  = v.to_i if v.respond_to?(:to_i)
+    v  = -1 unless v.respond_to?(:to_i)
+    v  = vs     if v < 0
+    w  = w.to_f if w.respond_to?(:to_f)
+    w  = 0  unless w.respond_to?(:to_f)
+    w  = 0      if w < 0.0254
 
     unless v < 340
-      # XY-plane transformation matrix ... needs to be clockwise for boost.
-      ft     = OpenStudio::Transformation::alignFace(p1)
-      ft_pts = flatZ( (ft.inverse * p1) )
-      return   p1                                       if ft_pts.empty?
+      t      = OpenStudio::Transformation.alignFace(p1)
+      offset = OpenStudio.buffer(pts, w, TOL)
+      return p1 if offset.empty?
 
-      cw     = OpenStudio::pointInPolygon(ft_pts.first, ft_pts, TOL)
-      ft_pts = flatZ( (ft.inverse * p1).reverse )   unless cw
-      offset = OpenStudio.buffer(ft_pts, w, TOL)
-      return   p1                                       if offset.empty?
-
-      offset = offset.get
-      offset =  ft * offset                             if cw
-      offset = (ft * offset).reverse                unless cw
-
-      pz = OpenStudio::Point3dVector.new
-      offset.each { |o| pz << OpenStudio::Point3d.new(o.x, o.y, o.z ) }
-
-      return pz
-    else                                                  # brute force approach
+      return to_p3Dv(t * offset.get.reverse)
+    else                                                 # brute force approach
       pz     = {}
       pz[:A] = {}
       pz[:B] = {}
@@ -2373,76 +2835,92 @@ module OSut
   end
 
   ##
-  # Validate whether an OpenStudio planar surface is safe to process.
+  # Generate a ULC OpenStudio 3D point vector (a bounding box) that surrounds
+  # multiple (smaller) OpenStudio 3D point vectors. The generated, 4-point
+  # outline is optionally buffered (or offset). Frame and Divider frame widths
+  # are taken into account.
   #
-  # @param s [OpenStudio::Model::PlanarSurface] a surface
+  # @param a [Array] sets of OpenStudio 3D points
+  # @param bfr [Numeric] an optional buffer size (min: 0.0254m)
+  # @param flat [Bool] true if points are to be pre-flattened (Z=0)
   #
-  # @return [Bool] true if valid surface
-  def surface_valid?(s = nil)
-    mth = "OSut::#{__callee__}"
-    cl = OpenStudio::Model::PlanarSurface
+  # @return [OpenStudio::Point3dVector] generated ULC outline (empty if fail)
+  def outline(a = [], bfr = 0, flat = true)
+    mth  = "OSut::#{__callee__}"
+    flat = true unless [true, false].include?(flat)
+    xMIN = nil
+    xMAX = nil
+    yMIN = nil
+    yMAX = nil
+    a2   = []
+    out  = OpenStudio::Point3dVector.new
+    cl   = Array
+    return mismatch("array", a, cl, mth, DBG, out) unless a.is_a?(cl)
+    return empty("array",           mth, DBG, out)     if a.empty?
 
-    return mismatch("surface", s, cl, mth, DBG, false) unless s.is_a?(cl)
+    mismatch("buffer", bfr, Numeric, mth) unless bfr.respond_to?(:to_f)
 
-    id   = s.nameString
-    size = s.vertices.size
-    last = size - 1
+    bfr = bfr.to_f if bfr.respond_to?(:to_f)
+    bfr = 0    unless bfr.respond_to?(:to_f)
+    bfr = 0        if bfr < 0.0254
+    vtx = poly(a.first)
+    t   = OpenStudio::Transformation.alignFace(vtx) unless vtx.empty?
+    return out                                          if vtx.empty?
 
-    log(ERR, "#{id} #{size} vertices? need +3 (#{mth})")        unless size > 2
-    return false                                                unless size > 2
+    a.each do |pts|
+      points = poly(pts, false, true, false, t)
+      points = flatten(points) if flat
+      next if points.empty?
 
-    [0, last].each do |i|
-      v1  = s.vertices[i]
-      v2  = s.vertices[i + 1]                                  unless i == last
-      v2  = s.vertices.first                                       if i == last
-      vec = v2 - v1
-      bad = vec.length < TOL
-
-      # As is, this comparison also catches collinear vertices (< 10mm apart)
-      # along an edge. Should avoid red-flagging such cases. TO DO.
-      log(ERR, "#{id}: < #{TOL}m (#{mth})")                              if bad
-      return false                                                       if bad
+      a2 << points
     end
 
-    # Add as many extra tests as needed ...
-    true
-  end
+    a2.each do |pts|
+      minX = pts.min_by(&:x).x
+      maxX = pts.max_by(&:x).x
+      minY = pts.min_by(&:y).y
+      maxY = pts.max_by(&:y).y
 
-  ##
-  # Return 'width' of a planar surface.
-  #
-  # @param s [OpenStudio::Model::PlanarSurface] a planar surface
-  #
-  # @return [Double] planar surface (left-to-right) width; 0 if invalid inputs
-  def width(s = nil)
-    mth = "OSut::#{__callee__}"
-    cl  = OpenStudio::Model::PlanarSurface
+      # Consider frame width, if frame-and-divider-enabled sub surface.
+      if pts.respond_to?(:allowWindowPropertyFrameAndDivider)
+        fd = pts.windowPropertyFrameAndDivider
+        w  = 0
+        w  = fd.get.frameWidth unless fd.empty?
 
-    return mismatch("surface", s, cl, mth, DBG, 0) unless s.is_a?(cl)
-    return zero("surface area", mth, DBG, 0)           if s.grossArea < TOL
+        if w > TOL
+          minX -= w
+          maxX += w
+          minY -= w
+          maxY += w
+        end
+      end
 
-    tr = OpenStudio::Transformation.alignFace(s.vertices)
+      xMIN = minX if xMIN.nil?
+      xMAX = maxX if xMAX.nil?
+      yMIN = minY if yMIN.nil?
+      yMAX = maxY if yMAX.nil?
 
-    (tr.inverse * s.vertices).max_by(&:x).x
-  end
+      xMIN = [xMIN, minX].min
+      xMAX = [xMAX, maxX].max
+      yMIN = [yMIN, minY].min
+      yMAX = [yMAX, maxY].max
+    end
 
-  ##
-  # Return 'height' of a planar surface, viewed perpendicularly (vs space or
-  # building XYZ coordinates).
-  #
-  # @param s [OpenStudio::Model::PlanarSurface] a planar surface
-  #
-  # @return [Double] planar surface (top-to-bottom) height; 0 if invalid inputs
-  def height(s = nil)
-    mth = "OSut::#{__callee__}"
-    cl  = OpenStudio::Model::PlanarSurface
+    return negative("outline width",  mth, DBG, out) if xMAX < xMIN
+    return negative("outline height", mth, DBG, out) if yMAX < yMIN
+    return zero("outline width",      mth, DBG, out) if (xMIN - xMAX).abs < TOL
+    return zero("outline height",     mth, DBG, out) if (yMIN - yMAX).abs < TOL
 
-    return mismatch("surface", s, cl, mth, DBG, 0) unless s.is_a?(cl)
-    return zero("surface area", mth, DBG, 0)           if s.grossArea < TOL
+    # Generate ULC point 3D vector.
+    out << OpenStudio::Point3d.new(xMIN, yMAX, 0)
+    out << OpenStudio::Point3d.new(xMIN, yMIN, 0)
+    out << OpenStudio::Point3d.new(xMAX, yMIN, 0)
+    out << OpenStudio::Point3d.new(xMAX, yMAX, 0)
 
-    tr = OpenStudio::Transformation.alignFace(s.vertices)
+    # Apply buffer, apply ULC (options).
+    out = offset(out, bfr, 300) if bfr > 0.0254
 
-    (tr.inverse * s.vertices).max_by(&:y).y
+    to_p3Dv(t * out)
   end
 
   ##
@@ -2460,22 +2938,19 @@ module OSut
   #
   # @return [Array] matching OpenStudio::Model::Surface's (empty if fail)
   def facets(spaces = [], boundary = "Outdoors", type = "Wall", sides = [])
-    faces    = []
-    list     = [:bottom, :top, :north, :east, :south, :west].freeze
-
     return [] unless spaces.respond_to?(:&)
     return [] unless boundary.respond_to?(:to_s)
     return [] unless type.respond_to?(:to_s)
     return [] unless sides.respond_to?(:&)
+    return []     if sides.empty?
 
     boundary = boundary.to_s.downcase
     type     = type.to_s.downcase
-
-    # Skip empty sides.
-    return [] if sides.empty?
+    faces    = []
+    list     = [:bottom, :top, :north, :east, :south, :west].freeze
 
     # Keep valid sides.
-    orientations = sides.select {|o| list.include?(o)}
+    orientations = sides.select { |o| list.include?(o) }
     return [] if orientations.empty?
 
     spaces.each do |space|
@@ -2507,8 +2982,8 @@ module OSut
   # a Hash holding 4x keys: :x & :y coordinates of the origin (i.e. bottom-left
   # corner of each plate), and :dx & :dy (plate width and depth). Each plate
   # must also either encompass or overlap (or share an edge with) any of the
-  # preceding plates in the array. The resulting vector (or "slab") is empty
-  # if input is invalid.
+  # preceding plates in the array. The generated slab is likely non-convex.
+  # The resulting vector (or "slab") is empty if input is invalid.
   #
   # @param pltz [Array] individual plate Hashes
   # @param z [Double] Z-axis coordinate
@@ -2615,7 +3090,7 @@ module OSut
     return mismatch("model", model, cl1, mth, DBG, no) unless model.is_a?(cl1)
     return mismatch("surface",   s, cl2, mth, DBG, no) unless s.is_a?(cl2)
     return mismatch("subs",   subs, cl3, mth, DBG, no) unless subs.is_a?(cl3)
-    return no                                          unless surface_valid?(s)
+    return empty("surface points",       mth, DBG, no)     if poly(s).empty?
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Clear existing sub surfaces if requested.
@@ -2649,10 +3124,10 @@ module OSut
     #   - vertices with the lowest X-axis values are "aligned" along X-axis (0)
     #   - vertices with the lowest Z-axis values are "aligned" along Y-axis (0)
     #   - Z-axis values are represented as Y-axis values
-    tr = OpenStudio::Transformation.alignFace(s.vertices)
+    t = OpenStudio::Transformation.alignFace(s.vertices)
 
     # Aligned vertices of host surface, and fetch attributes.
-    aligned = tr.inverse * s.vertices
+    aligned = t.inverse * s.vertices
     max_x   = aligned.max_by(&:x).x # same as OSut.width(s)
     max_y   = aligned.max_by(&:y).y # same as OSut.height(s)
     mid_x   = max_x / 2
@@ -3093,13 +3568,14 @@ module OSut
         vec << OpenStudio::Point3d.new(pos,               sub[:sill], 0)
         vec << OpenStudio::Point3d.new(pos + sub[:width], sub[:sill], 0)
         vec << OpenStudio::Point3d.new(pos + sub[:width], sub[:head], 0)
-        vec = tr * vec
+        vec = t * vec
 
         # Log/skip if conflict between individual sub and base surface.
         vc = vec
         vc = offset(vc, fr, 300) if fr > 0
-        ok = fits?(vc, s.vertices, name, nom)
+        ok = fits?(vc, s)
         log(ERR, "Skip '#{name}': won't fit in '#{nom}' (#{mth})") unless ok
+        puts "whoah : #{name}" unless ok
         break                                                      unless ok
 
         # Log/skip if conflicts with existing subs (even if same array).
@@ -3110,7 +3586,7 @@ module OSut
           fr   = fd.get.frameWidth unless fd.empty?
           vk   = sb.vertices
           vk   = offset(vk, fr, 300) if fr > 0
-          oops = overlaps?(vc, vk, name, nome)
+          oops = overlaps?(vc, vk)
           log(ERR, "Skip '#{name}': overlaps '#{nome}' (#{mth})") if oops
           ok = false                                              if oops
           break                                                   if oops
