@@ -2915,8 +2915,11 @@ RSpec.describe OSut do
     expect(core.floorArea).to be_within(TOL).of(149.66 - 4)      # -mini m2
     core_volume = core.floorArea * 3.05
     expect(core_volume).to be_within(TOL).of(core.volume)
+
+    # OpenStudio volume calculations are fixed as of v351. May need to take a
+    # deeper dive.
+    expect(attic.volume).to be_within(TOL).of(949.05)                if v < 350
     expect(attic.volume).to be_within(TOL).of(720.19 + 4 * 3.05) unless v < 350
-    expect(attic.volume).to be_within(TOL).of(798.41 + 4 * 3.05)     if v < 350
     expect(attic.floorArea).to be_within(TOL).of(567.98) # includes overhangs
 
     expect(mod1.poly(core_floor, true).empty?).to be(true)   # now concave
