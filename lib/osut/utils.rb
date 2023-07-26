@@ -2205,14 +2205,16 @@ module OSut
     return mismatch("n non-collinears", n, Integer, mth, DBG, v) unless ok
 
     # Alternative: evaluate cross product of vectors of 3x sequential points.
-    pts.each_with_index do |p1, i1|
-      i2 = i1 + 1
-      i2 = 0 if i2 == pts.size
-      i3 = i2 + 1
-      i3 = 0 if i3 == pts.size
-      p2 = pts[i2]
-      p3 = pts[i3]
-      next if OpenStudio.isPointOnLineBetweenPoints(p1, p3, p2, TOL)
+    pts.each_with_index do |p2, i2|
+      i1  = i2 - 1
+      i3  = i2 + 1
+      i3  = 0 if i3 == pts.size
+      p1  = pts[i1]
+      p3  = pts[i3]
+      v13 = p3 - p1
+      v12 = p2 - p1
+      next if v12.cross(v13).length < TOL
+      # next if OpenStudio.isPointOnLineBetweenPoints(p1, p3, p2, TOL) # v351
 
       a << p2
     end

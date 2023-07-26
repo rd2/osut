@@ -2588,7 +2588,7 @@ RSpec.describe OSut do
     # -----,------,--
     # 17.69 x 8.46 = 149.66 m2
     expect(core.floorArea).to be_within(TOL).of(149.66)
-    core_volume = core.floorArea * core.ceilingHeight
+    core_volume = core.floorArea * 3.05
     expect(core_volume).to be_within(TOL).of(core.volume)
     expect(attic.volume).to be_within(TOL).of(720.19)
     expect(attic.floorArea).to be_within(TOL).of(567.98)
@@ -2706,7 +2706,7 @@ RSpec.describe OSut do
 
     # Re-validating pre-tested areas + volumes, as well as convexity.
     expect(core.floorArea).to be_within(TOL).of(149.66)
-    core_volume = core.floorArea * core.ceilingHeight
+    core_volume = core.floorArea * 3.05
     expect(core_volume).to be_within(TOL).of(core.volume)
     expect(attic.volume).to be_within(TOL).of(720.19)
     expect(attic.floorArea).to be_within(TOL).of(567.98)
@@ -2805,7 +2805,7 @@ RSpec.describe OSut do
 
     # Re-validating pre-tested areas + volumes.
     expect(core.floorArea).to be_within(TOL).of(149.66 - 4) # -mini m2
-    core_volume = core.floorArea * core.ceilingHeight
+    core_volume = core.floorArea * 3.05
     expect(core_volume).to be_within(TOL).of(core.volume)
     expect(attic.volume).to be_within(TOL).of(720.19)
     expect(attic.floorArea).to be_within(TOL).of(567.98)
@@ -2907,7 +2907,7 @@ RSpec.describe OSut do
 
     # Re-validating pre-tested areas + volumes.
     expect(core.floorArea).to be_within(TOL).of(149.66 - 4)      # -mini m2
-    core_volume = core.floorArea * core.ceilingHeight
+    core_volume = core.floorArea * 3.05
     expect(core_volume).to be_within(TOL).of(core.volume)
     expect(attic.volume).to be_within(TOL).of(720.19 + 4 * 3.05) # +mini m3
     expect(attic.floorArea).to be_within(TOL).of(567.98)
