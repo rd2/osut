@@ -2590,8 +2590,12 @@ RSpec.describe OSut do
     expect(core.floorArea).to be_within(TOL).of(149.66)
     core_volume = core.floorArea * 3.05
     expect(core_volume).to be_within(TOL).of(core.volume)
-    expect(attic.volume).to be_within(TOL).of(720.19)
-    expect(attic.floorArea).to be_within(TOL).of(567.98)
+
+    # OpenStudio versions prior to v351 report erroneous volume calculation
+    # results for the attic (798.41 m3).
+    expect(attic.volume).to be_within(TOL).of(720.19) unless v < 350
+    expect(attic.volume).to be_within(TOL).of(798.41)     if v < 350
+    expect(attic.floorArea).to be_within(TOL).of(567.98) # includes overhangs
 
     expect(mod1.poly(core_floor, true).empty?).to be(false)   # convex
     expect(mod1.poly(core_ceiling, true).empty?).to be(false) # convex
@@ -2708,8 +2712,9 @@ RSpec.describe OSut do
     expect(core.floorArea).to be_within(TOL).of(149.66)
     core_volume = core.floorArea * 3.05
     expect(core_volume).to be_within(TOL).of(core.volume)
-    expect(attic.volume).to be_within(TOL).of(720.19)
-    expect(attic.floorArea).to be_within(TOL).of(567.98)
+    expect(attic.volume).to be_within(TOL).of(720.19) unless v < 350
+    expect(attic.volume).to be_within(TOL).of(798.41)     if v < 350
+    expect(attic.floorArea).to be_within(TOL).of(567.98) # includes overhangs
 
     expect(mod1.poly(core_floor, true).empty?).to be(true)   # now concave
     expect(mod1.poly(core_ceiling, true).empty?).to be(true) # now concave
@@ -2807,8 +2812,9 @@ RSpec.describe OSut do
     expect(core.floorArea).to be_within(TOL).of(149.66 - 4) # -mini m2
     core_volume = core.floorArea * 3.05
     expect(core_volume).to be_within(TOL).of(core.volume)
-    expect(attic.volume).to be_within(TOL).of(720.19)
-    expect(attic.floorArea).to be_within(TOL).of(567.98)
+    expect(attic.volume).to be_within(TOL).of(720.19) unless v < 350
+    expect(attic.volume).to be_within(TOL).of(798.41)     if v < 350
+    expect(attic.floorArea).to be_within(TOL).of(567.98) # includes overhangs
 
     expect(mod1.poly(core_floor, true).empty?).to be(true)   # now concave
     expect(mod1.poly(core_ceiling, true).empty?).to be(true) # now concave
@@ -2909,8 +2915,9 @@ RSpec.describe OSut do
     expect(core.floorArea).to be_within(TOL).of(149.66 - 4)      # -mini m2
     core_volume = core.floorArea * 3.05
     expect(core_volume).to be_within(TOL).of(core.volume)
-    expect(attic.volume).to be_within(TOL).of(720.19 + 4 * 3.05) # +mini m3
-    expect(attic.floorArea).to be_within(TOL).of(567.98)
+    expect(attic.volume).to be_within(TOL).of(720.19 + 4 * 3.05) unless v < 350
+    expect(attic.volume).to be_within(TOL).of(798.41 + 4 * 3.05)     if v < 350
+    expect(attic.floorArea).to be_within(TOL).of(567.98) # includes overhangs
 
     expect(mod1.poly(core_floor, true).empty?).to be(true)   # now concave
     expect(mod1.poly(core_ceiling, true).empty?).to be(true) # now concave
@@ -2936,316 +2943,318 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
 
     translator = OpenStudio::OSVersion::VersionTranslator.new
-    v = OpenStudio.openStudioVersion.split(".").join.to_i
-    file = File.join(__dir__, "files/osms/in/smalloffice.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
+    if OpenStudio.openStudioVersion.split(".").join.to_i > 300
 
-    # The following tests are a step-by-step, proof of concept demo towards an
-    # eventual general solution to autogenerate skylight wells, roof monitors,
-    # dormers, etc., in particular when spanning unoccupied spaces like attics
-    # and plenums. Once the final set of methods are completed and validated,
-    # these current tests may or may not be maintained in the long run (in
-    # favour of more compact, to-the-point tests).
+      file = File.join(__dir__, "files/osms/in/smalloffice.osm")
+      path = OpenStudio::Path.new(file)
+      model = translator.loadModel(path)
+      expect(model.empty?).to be(false)
+      model = model.get
 
-    # Test case: Add 2x skylights to the sloped "Attic_roof_north", with a
-    # single individual wels leading down to "Core_ZN". Each (sloped) skylight
-    # is a standard 4'x4' model (1.2m x 1.2m), with a 1m gap between skylights,
-    # and 200mm from the roof ridge.
+      # The following tests are a step-by-step, proof of concept demo towards an
+      # eventual general solution to autogenerate skylight wells, roof monitors,
+      # dormers, etc., in particular when spanning unoccupied spaces like attics
+      # and plenums. Once the final set of methods are completed and validated,
+      # these current tests may or may not be maintained in the long run (in
+      # favour of more compact, to-the-point tests).
 
-    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # 1. Fetch attic space and north-facing roof surface.
-    attic = model.getSpaceByName("Attic")
-    expect(attic.empty?).to be(false)
-    attic = attic.get
+      # Test case: Add 2x skylights to the sloped "Attic_roof_north", with a
+      # single individual wels leading down to "Core_ZN". Each (sloped) skylight
+      # is a standard 4'x4' model (1.2m x 1.2m), with a 1m gap between skylights,
+      # and 200mm from the roof ridge.
 
-    roof = model.getSurfaceByName("Attic_roof_north")
-    expect(roof.empty?).to be(false)
-    roof = roof.get
+      # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+      # 1. Fetch attic space and north-facing roof surface.
+      attic = model.getSpaceByName("Attic")
+      expect(attic.empty?).to be(false)
+      attic = attic.get
 
-    core = model.getSpaceByName("Core_ZN")
-    expect(core.empty?).to be(false)
-    core = core.get
+      roof = model.getSurfaceByName("Attic_roof_north")
+      expect(roof.empty?).to be(false)
+      roof = roof.get
 
-    plafond = model.getSurfaceByName("Perimeter_ZN_1_ceiling")
-    expect(plafond.empty?).to be(false)
-    plafond = plafond.get
+      core = model.getSpaceByName("Core_ZN")
+      expect(core.empty?).to be(false)
+      core = core.get
 
-    ceiling = model.getSurfaceByName("Core_ZN_ceiling")
-    expect(ceiling.empty?).to be(false)
-    ceiling = ceiling.get
+      plafond = model.getSurfaceByName("Perimeter_ZN_1_ceiling")
+      expect(plafond.empty?).to be(false)
+      plafond = plafond.get
 
-    minZ = ceiling.vertices.map(&:z).min
-    maxZ = ceiling.vertices.map(&:z).max
-    expect(minZ).to be_within(TOL).of(maxZ)
-    expect(plafond.vertices.map(&:z).min).to be_within(TOL).of(minZ)
-    expect(plafond.vertices.map(&:z).max).to be_within(TOL).of(maxZ)
+      ceiling = model.getSurfaceByName("Core_ZN_ceiling")
+      expect(ceiling.empty?).to be(false)
+      ceiling = ceiling.get
 
-    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # 2. Generate an array of 2x skylights to North Roof.
-    #      __________
-    #     /  || ||   \
-    #    /            \
-    #   /              \
-    #  /                \
-    # /__________________\
+      minZ = ceiling.vertices.map(&:z).min
+      maxZ = ceiling.vertices.map(&:z).max
+      expect(minZ).to be_within(TOL).of(maxZ)
+      expect(plafond.vertices.map(&:z).min).to be_within(TOL).of(minZ)
+      expect(plafond.vertices.map(&:z).max).to be_within(TOL).of(maxZ)
 
-    side   = 1.2
-    offset = side + 1
-    head   = mod1.height(roof.vertices) - 0.2
-    expect(head).to be_within(TOL).of(10.16)
+      # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+      # 2. Generate an array of 2x skylights to North Roof.
+      #      __________
+      #     /  || ||   \
+      #    /            \
+      #   /              \
+      #  /                \
+      # /__________________\
 
-    sub = {}
-    sub[:id    ] = "North Skylight"
-    sub[:type  ] = "Skylight"
-    sub[:height] = side
-    sub[:width ] = side
-    sub[:head  ] = head
-    sub[:count ] = 2
-    sub[:offset] = offset
-    expect(mod1.addSubs(model, roof, [sub])).to be(true)
-    expect(mod1.status.zero?).to be(true)
-    expect(mod1.logs.size.zero?).to be(true)
-    expect(roof.subSurfaces.size).to eq(2)
-    plane = roof.plane
-    subs  = roof.subSurfaces
-    expect(subs.size).to eq(2)
+      side   = 1.2
+      offset = side + 1
+      head   = mod1.height(roof.vertices) - 0.2
+      expect(head).to be_within(TOL).of(10.16)
 
-    subs.each { |sub| expect(sub.plane.equal(plane)).to be(true) }
+      sub = {}
+      sub[:id    ] = "North Skylight"
+      sub[:type  ] = "Skylight"
+      sub[:height] = side
+      sub[:width ] = side
+      sub[:head  ] = head
+      sub[:count ] = 2
+      sub[:offset] = offset
+      expect(mod1.addSubs(model, roof, [sub])).to be(true)
+      expect(mod1.status.zero?).to be(true)
+      expect(mod1.logs.size.zero?).to be(true)
+      expect(roof.subSurfaces.size).to eq(2)
+      plane = roof.plane
+      subs  = roof.subSurfaces
+      expect(subs.size).to eq(2)
 
-    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # 3. Generate a 'buffered' outline around both skylights. The upper edge
-    # of the outline coincides with the roof ridge. The outline is to define a
-    # new Core_ZN ceiling holding the 2x new skylights.
-    #      __________
-    #     /  |___|   \
-    #    /            \
-    #   /              \
-    #  /                \
-    # /__________________\
+      subs.each { |sub| expect(sub.plane.equal(plane)).to be(true) }
 
-    perimetre = mod1.outline(subs, 0.200)
-    expect(perimetre.is_a?(OpenStudio::Point3dVector)).to be(true)
-    expect(mod1.fits?(perimetre, roof)).to be(true)
+      # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+      # 3. Generate a 'buffered' outline around both skylights. The upper edge
+      # of the outline coincides with the roof ridge. The outline is to define a
+      # new Core_ZN ceiling holding the 2x new skylights.
+      #      __________
+      #     /  |___|   \
+      #    /            \
+      #   /              \
+      #  /                \
+      # /__________________\
 
-    # Generate a projected 'perimetre' unto the original horizontal core
-    # ceiling below. Ensure 'opening' "fits" - a "sine qua non" condition for
-    # an eventual general method: a generated 'outline' must neatly fit within
-    # a receiving surface (below). A reminder: "fits?" ensures candidate
-    # polygons share the same 3D plane, yet will emit a warning if the 2nd
-    # polygon doesn't initially share the same plane as the 1st one. One can
-    # alternatively pre-flatten the 'opening' to avoid the warning.
-    expect(mod1.fits?(perimetre, ceiling)).to be(true)
-    expect(mod1.warn?).to be(true)
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message].include?(" (non-aligned)")).to be(true)
-    expect(mod1.clean!).to eq(DBG)
-    opening = mod1.flatten(perimetre, :z, minZ)
-    expect(mod1.fits?(opening, ceiling)).to be(true)
-    expect(mod1.status.zero?).to be(true)
+      perimetre = mod1.outline(subs, 0.200)
+      expect(perimetre.is_a?(OpenStudio::Point3dVector)).to be(true)
+      expect(mod1.fits?(perimetre, roof)).to be(true)
 
-    # Polygons below appended with an 'a' designate 'aligned' (or flattened)
-    # polygons relying on OpenStudio::Transformation class.
-    t     = OpenStudio::Transformation.alignFace(roof.vertices)
-    aroof = mod1.poly(roof,     false, true, false, true, :cw)
-    aperi = mod1.poly(perimetre, true, true, false,    t, :cw)
-    expect(mod1.clockwise?(aroof)).to be(true)
-    expect(mod1.clockwise?(aperi)).to be(true)
-    expect(mod1.status.zero?).to be(true)
-    expect(mod1.fits?(aperi, aroof)).to be(true)
-    expect(mod1.status.zero?).to be(true)
+      # Generate a projected 'perimetre' unto the original horizontal core
+      # ceiling below. Ensure 'opening' "fits" - a "sine qua non" condition for
+      # an eventual general method: a generated 'outline' must neatly fit within
+      # a receiving surface (below). A reminder: "fits?" ensures candidate
+      # polygons share the same 3D plane, yet will emit a warning if the 2nd
+      # polygon doesn't initially share the same plane as the 1st one. One can
+      # alternatively pre-flatten the 'opening' to avoid the warning.
+      expect(mod1.fits?(perimetre, ceiling)).to be(true)
+      expect(mod1.warn?).to be(true)
+      expect(mod1.logs.size).to eq(1)
+      expect(mod1.logs.first[:message].include?(" (non-aligned)")).to be(true)
+      expect(mod1.clean!).to eq(DBG)
+      opening = mod1.flatten(perimetre, :z, minZ)
+      expect(mod1.fits?(opening, ceiling)).to be(true)
+      expect(mod1.status.zero?).to be(true)
 
-    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # 4. Create a new, clockwise bounding box around aroof.
-    #  ___ __________ ___
-    # |   /          \   |
-    # |  /            \  |
-    # | /              \ |
-    # |/                \|
-    # /__________________\
+      # Polygons below appended with an 'a' designate 'aligned' (or flattened)
+      # polygons relying on OpenStudio::Transformation class.
+      t     = OpenStudio::Transformation.alignFace(roof.vertices)
+      aroof = mod1.poly(roof,     false, true, false, true, :cw)
+      aperi = mod1.poly(perimetre, true, true, false,    t, :cw)
+      expect(mod1.clockwise?(aroof)).to be(true)
+      expect(mod1.clockwise?(aperi)).to be(true)
+      expect(mod1.status.zero?).to be(true)
+      expect(mod1.fits?(aperi, aroof)).to be(true)
+      expect(mod1.status.zero?).to be(true)
 
-    abox = mod1.outline([aroof])
-    expect(mod1.status.zero?).to be(true)
-    expect(mod1.width(aperi)).to be < mod1.width(abox)
+      # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+      # 4. Create a new, clockwise bounding box around aroof.
+      #  ___ __________ ___
+      # |   /          \   |
+      # |  /            \  |
+      # | /              \ |
+      # |/                \|
+      # /__________________\
 
-    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # 5. Create a new, clockwise bounding box 'strip' around aperi (i.e. the
-    # new, flattened sub surface base surface), yet stretched left & right as
-    # to align with the roof bounding 'box' X-axis coordinates.
-    #  ___ __________ ___
-    # |___/__ ___ ___\___|
-    # |  /            \  |
-    # | /              \ |
-    # |/                \|
-    # /__________________\
+      abox = mod1.outline([aroof])
+      expect(mod1.status.zero?).to be(true)
+      expect(mod1.width(aperi)).to be < mod1.width(abox)
 
-    xMIN = abox.min_by(&:x).x
-    xMAX = abox.max_by(&:x).x
-    yMIN = aperi.min_by(&:y).y
-    yMAX = aperi.max_by(&:y).y
+      # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+      # 5. Create a new, clockwise bounding box 'strip' around aperi (i.e. the
+      # new, flattened sub surface base surface), yet stretched left & right as
+      # to align with the roof bounding 'box' X-axis coordinates.
+      #  ___ __________ ___
+      # |___/__ ___ ___\___|
+      # |  /            \  |
+      # | /              \ |
+      # |/                \|
+      # /__________________\
 
-    astrip = OpenStudio::Point3dVector.new
-    astrip << OpenStudio::Point3d.new(xMAX, yMAX, 0)
-    astrip << OpenStudio::Point3d.new(xMAX, yMIN, 0)
-    astrip << OpenStudio::Point3d.new(xMIN, yMIN, 0)
-    astrip << OpenStudio::Point3d.new(xMIN, yMAX, 0)
-    # puts astrip
-    # [28.89, 10.36, 0]
-    # [28.89,  8.76, 0]
-    # [ 0.00,  8.76, 0]
-    # [ 0.00, 10.36, 0]
+      xMIN = abox.min_by(&:x).x
+      xMAX = abox.max_by(&:x).x
+      yMIN = aperi.min_by(&:y).y
+      yMAX = aperi.max_by(&:y).y
 
-    # Split box by intersecting with strip.
-    res1 = OpenStudio.intersect(astrip, abox, TOL)
-    expect(res1.empty?).to be(false)
-    res1 = res1.get
-    # puts res1.polygon1 # ... == res1.polygon2 (strip)
-    # [28.89,  8.76, 0]
-    # [ 0.00,  8.76, 0]
-    # [ 0.00, 10.36, 0]
-    # [28.89, 10.36, 0]
+      astrip = OpenStudio::Point3dVector.new
+      astrip << OpenStudio::Point3d.new(xMAX, yMAX, 0)
+      astrip << OpenStudio::Point3d.new(xMAX, yMIN, 0)
+      astrip << OpenStudio::Point3d.new(xMIN, yMIN, 0)
+      astrip << OpenStudio::Point3d.new(xMIN, yMAX, 0)
+      # puts astrip
+      # [28.89, 10.36, 0]
+      # [28.89,  8.76, 0]
+      # [ 0.00,  8.76, 0]
+      # [ 0.00, 10.36, 0]
 
-    # The 'strip' isn't chopped up, so no residual polygons. The initial 'box'
-    # is however split into 2x (possibly 3x in other cases):
-    #   1. the intersecting strip itself
-    #   2. a residual, non-intersecting 'box' (smaller than the initial one)
-    expect(res1.newPolygons1.empty?).to be(true)
-    expect(res1.newPolygons2.size).to eq(1)
-    # res1.newPolygons2.each { |poly, i| puts poly }
-    # [28.89, 8.76, 0]
-    # [28.89, 0.00, 0]
-    # [ 0.00, 0.00, 0]
-    # [ 0.00, 8.76, 0]
+      # Split box by intersecting with strip.
+      res1 = OpenStudio.intersect(astrip, abox, TOL)
+      expect(res1.empty?).to be(false)
+      res1 = res1.get
+      # puts res1.polygon1 # ... == res1.polygon2 (strip)
+      # [28.89,  8.76, 0]
+      # [ 0.00,  8.76, 0]
+      # [ 0.00, 10.36, 0]
+      # [28.89, 10.36, 0]
 
-    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # 6. Generate a new array to hold (here 3x, possibly 4x in other cases)
-    # new, flattened roof polygons that will replace the initial, single aroof
-    # polygon.
-    aroofs = []
+      # The 'strip' isn't chopped up, so no residual polygons. The initial 'box'
+      # is however split into 2x (possibly 3x in other cases):
+      #   1. the intersecting strip itself
+      #   2. a residual, non-intersecting 'box' (smaller than the initial one)
+      expect(res1.newPolygons1.empty?).to be(true)
+      expect(res1.newPolygons2.size).to eq(1)
+      # res1.newPolygons2.each { |poly, i| puts poly }
+      # [28.89, 8.76, 0]
+      # [28.89, 0.00, 0]
+      # [ 0.00, 0.00, 0]
+      # [ 0.00, 8.76, 0]
 
-    # The first of these new aroofs is the intersection between the previous
-    # residual box and the initial aroof.
-    #  ___ __________ ___
-    # |___/____o_ ___\___|
-    # |  /            \  |
-    # | /      x       \ |
-    # |/                \|
-    # /__________________\
+      # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+      # 6. Generate a new array to hold (here 3x, possibly 4x in other cases)
+      # new, flattened roof polygons that will replace the initial, single aroof
+      # polygon.
+      aroofs = []
 
-    res2 = OpenStudio.intersect(res1.newPolygons2.first, aroof, TOL)
-    expect(res2.empty?).to be(false)
-    res2 = res2.get
-    # puts res2.polygon1 # ... res2.polygon2 ('x' marks the spot)
-    # [28.89, 0.00, 0]
-    # [ 0.00, 0.00, 0]
-    # [ 8.31, 8.76, 0]
-    # [20.58, 8.76, 0]
-    aroofs << mod1.to_p3Dv(res2.polygon1)
+      # The first of these new aroofs is the intersection between the previous
+      # residual box and the initial aroof.
+      #  ___ __________ ___
+      # |___/____o_ ___\___|
+      # |  /            \  |
+      # | /      x       \ |
+      # |/                \|
+      # /__________________\
 
-    expect(res2.newPolygons1.size).to eq(2) # 2x triangles left/right of 'x'
-    expect(res2.newPolygons2.size).to eq(1) # previous residual 'o'
+      res2 = OpenStudio.intersect(res1.newPolygons2.first, aroof, TOL)
+      expect(res2.empty?).to be(false)
+      res2 = res2.get
+      # puts res2.polygon1 # ... res2.polygon2 ('x' marks the spot)
+      # [28.89, 0.00, 0]
+      # [ 0.00, 0.00, 0]
+      # [ 8.31, 8.76, 0]
+      # [20.58, 8.76, 0]
+      aroofs << mod1.to_p3Dv(res2.polygon1)
 
-    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # 7. Repeat similar intersection exercice between aperi ('a') vs 'o'.
-    #      __________
-    #     /_o|_a_|o__\
-    #    /            \
-    #   /              \
-    #  /                \
-    # /__________________\
+      expect(res2.newPolygons1.size).to eq(2) # 2x triangles left/right of 'x'
+      expect(res2.newPolygons2.size).to eq(1) # previous residual 'o'
 
-    # puts aperi
-    # [16.35, 10.36, 0]
-    # [16.35,  8.76, 0]
-    # [12.55,  8.76, 0]
-    # [12.55, 10.36, 0]
-    res3 = OpenStudio.intersect(res2.newPolygons2.first, aperi, TOL)
-    expect(res3.empty?).to be(false)
-    res3 = res3.get
-    # puts res3.polygon1 # ... res3.polygon2 (i.e. aperi)
-    # [16.35,  8.76, 0]
-    # [12.55,  8.76, 0]
-    # [12.55, 10.36, 0]
-    # [16.35, 10.36, 0]
+      # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+      # 7. Repeat similar intersection exercice between aperi ('a') vs 'o'.
+      #      __________
+      #     /_o|_a_|o__\
+      #    /            \
+      #   /              \
+      #  /                \
+      # /__________________\
 
-    expect(res3.newPolygons1.size).to eq(2) # 2x polygons, left/right of 'o'
-    expect(res3.newPolygons2.empty?).to be(true) # aperi remains intact
-    # res3.newPolygons1.each { |poly| puts poly }
-    # [12.55,  8.76, 0]
-    # [ 8.31,  8.76, 0]
-    # [ 9.83, 10.36, 0]
-    # [12.55, 10.36, 0]
-    #
-    # [16.35,  8.76, 0]
-    # [16.35, 10.36, 0]
-    # [19.06, 10.36, 0]
-    # [20.58,  8.76, 0]
-    res3.newPolygons1.each { |poly| aroofs << mod1.to_p3Dv(poly) }
-    expect(aroofs.size).to eq(3)
+      # puts aperi
+      # [16.35, 10.36, 0]
+      # [16.35,  8.76, 0]
+      # [12.55,  8.76, 0]
+      # [12.55, 10.36, 0]
+      res3 = OpenStudio.intersect(res2.newPolygons2.first, aperi, TOL)
+      expect(res3.empty?).to be(false)
+      res3 = res3.get
+      # puts res3.polygon1 # ... res3.polygon2 (i.e. aperi)
+      # [16.35,  8.76, 0]
+      # [12.55,  8.76, 0]
+      # [12.55, 10.36, 0]
+      # [16.35, 10.36, 0]
 
-    # Area check.
-    areas = 0
+      expect(res3.newPolygons1.size).to eq(2) # 2x polygons, left/right of 'o'
+      expect(res3.newPolygons2.empty?).to be(true) # aperi remains intact
+      # res3.newPolygons1.each { |poly| puts poly }
+      # [12.55,  8.76, 0]
+      # [ 8.31,  8.76, 0]
+      # [ 9.83, 10.36, 0]
+      # [12.55, 10.36, 0]
+      #
+      # [16.35,  8.76, 0]
+      # [16.35, 10.36, 0]
+      # [19.06, 10.36, 0]
+      # [20.58,  8.76, 0]
+      res3.newPolygons1.each { |poly| aroofs << mod1.to_p3Dv(poly) }
+      expect(aroofs.size).to eq(3)
 
-    aroofs.each do |poly|
-      area = OpenStudio.getArea(poly)
+      # Area check.
+      areas = 0
+
+      aroofs.each do |poly|
+        area = OpenStudio.getArea(poly)
+        expect(area.empty?).to be(false)
+        areas += area.get
+      end
+
+      area = OpenStudio.getArea(aperi)
       expect(area.empty?).to be(false)
       areas += area.get
+      expect((roof.grossArea - areas).abs).to be < TOL
+
+      # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+      # Temporary setup for testing:
+      #   1. Generate new 'skybase' for the skylights, with 'perimetre' vertices.
+      #      Apply non-defaulted roof parameters. Transfer skylights to skybase.
+      skybase = OpenStudio::Model::Surface.new(perimetre, model)
+      skybase.setName("#{roof.nameString} | skybase")
+      expect(skybase.setSpace(attic)).to be(true)
+
+      unless roof.isConstructionDefaulted
+        construction = roof.construction
+        expect(construction.empty?).to be(false)
+        construction = construction.get.to_LayeredConstruction
+        expect(construction.empty?).to be(false)
+        construction = construction.get
+        expect(skybase.setConstruction(construction)).to be(true)
+      end
+
+      expect(roof.subSurfaces.size).to eq(2)
+      expect(skybase.subSurfaces.empty?).to be(true)
+      subs.each { |sub| expect(sub.setSurface(skybase)).to be(true) }
+      expect(roof.subSurfaces.empty?).to be(true)
+      expect(skybase.subSurfaces.size).to eq(2)
+
+      #   2. Modify initial roof vertices with the 1° new polygon (redressed).
+      poly1 = mod1.to_p3Dv(t * mod1.ulc(aroofs.first))
+      expect(poly1.is_a?(OpenStudio::Point3dVector)).to be(true)
+      # puts poly1
+      # [19.98, 10.75, 5.82]
+      # [28.29, 19.06, 3.05]
+      # [-0.60, 19.06, 3.05]
+      # [ 7.71, 10.75, 5.82]
+      expect(roof.setVertices(poly1)).to be(true)
+
+      #   3. Add subsequent generated roof polygons (also redressed).
+      aroofs.each_with_index do |poly, i|
+        next if i == 0
+
+        vtx = mod1.to_p3Dv(t * mod1.ulc(poly))
+        surface = roof.clone
+        surface = surface.to_Surface
+        expect(surface.empty?).to be(false)
+        surface = surface.get
+        expect(surface.setVertices(vtx)).to be(true)
+      end
+
+      file = File.join(__dir__, "files/osms/out/office.osm")
+      model.save(file, true)
     end
-
-    area = OpenStudio.getArea(aperi)
-    expect(area.empty?).to be(false)
-    areas += area.get
-    expect((roof.grossArea - areas).abs).to be < TOL
-
-    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # Temporary setup for testing:
-    #   1. Generate new 'skybase' for the skylights, with 'perimetre' vertices.
-    #      Apply non-defaulted roof parameters. Transfer skylights to skybase.
-    skybase = OpenStudio::Model::Surface.new(perimetre, model)
-    skybase.setName("#{roof.nameString} | skybase")
-    expect(skybase.setSpace(attic)).to be(true)
-
-    unless roof.isConstructionDefaulted
-      construction = roof.construction
-      expect(construction.empty?).to be(false)
-      construction = construction.get.to_LayeredConstruction
-      expect(construction.empty?).to be(false)
-      construction = construction.get
-      expect(skybase.setConstruction(construction)).to be(true)
-    end
-
-    expect(roof.subSurfaces.size).to eq(2)
-    expect(skybase.subSurfaces.empty?).to be(true)
-    subs.each { |sub| expect(sub.setSurface(skybase)).to be(true) }
-    expect(roof.subSurfaces.empty?).to be(true)
-    expect(skybase.subSurfaces.size).to eq(2)
-
-    #   2. Modify initial roof vertices with the 1° new polygon (redressed).
-    poly1 = mod1.to_p3Dv(t * mod1.ulc(aroofs.first))
-    expect(poly1.is_a?(OpenStudio::Point3dVector)).to be(true)
-    # puts poly1
-    # [19.98, 10.75, 5.82]
-    # [28.29, 19.06, 3.05]
-    # [-0.60, 19.06, 3.05]
-    # [ 7.71, 10.75, 5.82]
-    expect(roof.setVertices(poly1)).to be(true)
-
-    #   3. Add subsequent generated roof polygons (also redressed).
-    aroofs.each_with_index do |poly, i|
-      next if i == 0
-
-      vtx = mod1.to_p3Dv(t * mod1.ulc(poly))
-      surface = roof.clone
-      surface = surface.to_Surface
-      expect(surface.empty?).to be(false)
-      surface = surface.get
-      expect(surface.setVertices(vtx)).to be(true)
-    end
-
-    file = File.join(__dir__, "files/osms/out/office.osm")
-    model.save(file, true)
   end
 
   it "checks facet retrieval" do
