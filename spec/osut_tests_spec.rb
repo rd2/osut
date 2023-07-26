@@ -309,8 +309,7 @@ RSpec.describe OSut do
 
   it "checks if a set holds a construction" do
     mdl = OpenStudio::Model::Model.new
-    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
-    v = version.join.to_i
+    v = mdl.getVersion.versionIdentifier.split(".").join.to_i
     translator = OpenStudio::OSVersion::VersionTranslator.new
 
     if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
@@ -387,9 +386,7 @@ RSpec.describe OSut do
 
   it "retrieves a surface default construction set" do
     mdl = OpenStudio::Model::Model.new
-    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
-    v = version.join.to_i
-
+    v = OpenStudio.openStudioVersion.split(".").join.to_i
     translator = OpenStudio::OSVersion::VersionTranslator.new
 
     if v < 350 # 5ZoneNoHVAC holds 1x OS:Material:AirWall, deprecated > 3.4.0
@@ -762,7 +759,6 @@ RSpec.describe OSut do
     model = translator.loadModel(path)
     expect(model.empty?).to be(false)
     model = model.get
-
     expect(cls1.clean!).to eq(DBG)
 
     sc1 = "Schedule Constant 1"
@@ -837,7 +833,6 @@ RSpec.describe OSut do
     model = translator.loadModel(path)
     expect(model.empty?).to be(false)
     model = model.get
-
     expect(mod1.clean!).to eq(DBG)
 
     spt = 22
@@ -915,7 +910,6 @@ RSpec.describe OSut do
     model = translator.loadModel(path)
     expect(model.empty?).to be(false)
     model = model.get
-
     expect(M.clean!).to eq(DBG)
 
     m1 = "OSut::maxHeatScheduledSetpoint"
@@ -1024,9 +1018,7 @@ RSpec.describe OSut do
 
   it "checks for HVAC air loops" do
     mdl = OpenStudio::Model::Model.new
-    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
-    v = version.join.to_i
-
+    v = OpenStudio.openStudioVersion.split(".").join.to_i
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
@@ -1068,9 +1060,7 @@ RSpec.describe OSut do
 
   it "checks for plenums" do
     mdl = OpenStudio::Model::Model.new
-    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
-    v = version.join.to_i
-
+    v = OpenStudio.openStudioVersion.split(".").join.to_i
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
@@ -1167,9 +1157,7 @@ RSpec.describe OSut do
 
   it "checks availability schedule generation" do
     mdl = OpenStudio::Model::Model.new
-    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
-    v = version.join.to_i
-
+    v = OpenStudio.openStudioVersion.split(".").join.to_i
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)
@@ -1366,9 +1354,7 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
 
     mdl = OpenStudio::Model::Model.new
-    version = mdl.getVersion.versionIdentifier.split('.').map(&:to_i)
-    v = version.join.to_i
-
+    v = OpenStudio.openStudioVersion.split(".").join.to_i
     translator = OpenStudio::OSVersion::VersionTranslator.new
     file = File.join(__dir__, "files/osms/in/seb.osm")
     path = OpenStudio::Path.new(file)

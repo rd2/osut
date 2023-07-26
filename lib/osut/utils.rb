@@ -1954,7 +1954,8 @@ module OSut
     return mismatch("point 1", p1, cl, mth, DBG, false) unless p1.is_a?(cl)
     return mismatch("point 2", p2, cl, mth, DBG, false) unless p2.is_a?(cl)
 
-    OpenStudio.isAlmostEqual3dPt(p1, p2, TOL)
+    # OpenStudio.isAlmostEqual3dPt(p1, p2, TOL) # ... from v350 onwards.
+    (p1.x - p2.x).abs < TOL && (p1.y - p2.y).abs < TOL && (p1.z - p2.z).abs < TOL
   end
 
   ##
