@@ -182,80 +182,6 @@ RSpec.describe OSut do
     expect(u).to be_within(TOL).of(specs[:uo])
   end
 
-  it "checks roller shades" do
-    expect(mod1.reset(DBG)).to eq(DBG)
-    expect(mod1.level).to eq(DBG)
-    expect(mod1.clean!).to eq(DBG)
-
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    v = OpenStudio.openStudioVersion.split(".").join.to_i
-    file = File.join(__dir__, "files/osms/out/seb_ext4.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-    spaces = model.getSpaces
-
-    slanted = mod1.facets(spaces, "Outdoors", "RoofCeiling", [:top, :north])
-    expect(slanted.size).to eq(1)
-    slanted = slanted.first
-    expect(slanted.nameString).to eq("Openarea slanted roof")
-    skylights = slanted.subSurfaces
-
-    tilted = mod1.facets(spaces, "Outdoors", "Wall", [:bottom])
-    expect(tilted.size).to eq(1)
-    tilted = tilted.first
-    expect(tilted.nameString).to eq("Openarea tilted wall")
-    windows = tilted.subSurfaces
-
-    # 2x control groups:
-    #   - 3x windows as a single control group
-    #   - 3x skylight as another single control group
-    skies = OpenStudio::Model::SubSurfaceVector.new
-    wins  = OpenStudio::Model::SubSurfaceVector.new
-    skylights.each { |sub| skies << sub }
-    windows.each   { |sub| wins  << sub }
-
-    if v < 321
-      expect(mod1.genShade(model, skies)).to be(false)
-    else
-      expect(mod1.genShade(model, skies)).to be(true)
-      expect(mod1.genShade(model, wins)).to be(true)
-      ctls = model.getShadingControls
-      expect(ctls.size).to eq(2)
-
-      ctls.each do |ctl|
-        expect(ctl.shadingType).to eq("InteriorShade")
-        type = "OnIfHighOutdoorAirTempAndHighSolarOnWindow"
-        expect(ctl.shadingControlType).to eq(type)
-        expect(ctl.isControlTypeValueNeedingSetpoint1).to be(true)
-        expect(ctl.isControlTypeValueNeedingSetpoint2).to be(true)
-        expect(ctl.isControlTypeValueAllowingSchedule).to be(true)
-        expect(ctl.isControlTypeValueRequiringSchedule).to be(false)
-        spt1 = ctl.setpoint
-        spt2 = ctl.setpoint2
-        expect(spt1.empty?).to be(false)
-        expect(spt2.empty?).to be(false)
-        spt1 = spt1.get
-        spt2 = spt2.get
-        expect(spt1).to be_within(TOL).of(18)
-        expect(spt2).to be_within(TOL).of(100)
-        expect(ctl.multipleSurfaceControlType).to eq("Group")
-
-        ctl.subSurfaces.each do |sub|
-          surface = sub.surface
-          expect(surface.empty?).to be(false)
-          surface = surface.get
-          ok = surface == slanted || surface == tilted
-          expect(ok).to be(true)
-        end
-      end
-    end
-
-    file = File.join(__dir__, "files/osms/out/seb_ext5.osm")
-    model.save(file, true)
-  end
-
   it "checks internal mass" do
     expect(mod1.clean!).to eq(DBG)
 
@@ -1675,57 +1601,6 @@ RSpec.describe OSut do
     # [20,  0, 0]
   end
 
-  it "checks surface width & height" do
-    expect(mod1.reset(DBG)).to eq(DBG)
-    expect(mod1.level).to eq(DBG)
-    expect(mod1.clean!).to eq(DBG)
-
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/out/seb_ext2.osm")
-    path = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
-    model = model.get
-
-    tilted = model.getSurfaceByName("Openarea tilted wall")
-    expect(tilted.empty?).to be(false)
-    tilted = tilted.get
-    w1 = mod1.width(tilted)
-    h1 = mod1.height(tilted)
-    expect(w1).to be_within(TOL).of(5.89)
-    expect(h1).to be_within(TOL).of(3.09)
-
-    left = model.getSurfaceByName("Openarea left side wall")
-    expect(left.empty?).to be(false)
-    left = left.get
-    w2 = mod1.width(left)
-    h2 = mod1.height(left)
-    expect(w2).to be_within(TOL).of(2.24)
-    expect(h2).to be_within(TOL).of(3.35)
-
-    right = model.getSurfaceByName("Openarea right side wall")
-    expect(right.empty?).to be(false)
-    right = right.get
-    w3 = mod1.width(right)
-    h3 = mod1.height(right)
-    expect(w3).to be_within(TOL).of(w2)
-    expect(h3).to be_within(TOL).of(h2)
-
-    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # What if wall vertex sequences were no longer ULC (e.g. URC)?
-    vec  = OpenStudio::Point3dVector.new
-    vec << tilted.vertices[3]
-    vec << tilted.vertices[0]
-    vec << tilted.vertices[1]
-    vec << tilted.vertices[2]
-    expect(tilted.setVertices(vec)).to be(true)
-    expect(mod1.width(tilted)).to be_within(TOL).of(w1)  # same result
-    expect(mod1.height(tilted)).to be_within(TOL).of(h1) # same result
-
-    file = File.join(__dir__, "files/osms/out/seb_ext4.osm")
-    model.save(file, true)
-  end
-
   it "checks line segments, triads & orientation" do
     expect(mod1.reset(DBG)).to eq(DBG)
     expect(mod1.level).to eq(DBG)
@@ -2430,6 +2305,57 @@ RSpec.describe OSut do
     expect(mod1.logs.first[:message].include?(message)).to be(true)
 
     file = File.join(__dir__, "files/osms/out/seb_ext2.osm")
+    model.save(file, true)
+  end
+
+  it "checks surface width & height" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    file = File.join(__dir__, "files/osms/out/seb_ext2.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+
+    tilted = model.getSurfaceByName("Openarea tilted wall")
+    expect(tilted.empty?).to be(false)
+    tilted = tilted.get
+    w1 = mod1.width(tilted)
+    h1 = mod1.height(tilted)
+    expect(w1).to be_within(TOL).of(5.89)
+    expect(h1).to be_within(TOL).of(3.09)
+
+    left = model.getSurfaceByName("Openarea left side wall")
+    expect(left.empty?).to be(false)
+    left = left.get
+    w2 = mod1.width(left)
+    h2 = mod1.height(left)
+    expect(w2).to be_within(TOL).of(2.24)
+    expect(h2).to be_within(TOL).of(3.35)
+
+    right = model.getSurfaceByName("Openarea right side wall")
+    expect(right.empty?).to be(false)
+    right = right.get
+    w3 = mod1.width(right)
+    h3 = mod1.height(right)
+    expect(w3).to be_within(TOL).of(w2)
+    expect(h3).to be_within(TOL).of(h2)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # What if wall vertex sequences were no longer ULC (e.g. URC)?
+    vec  = OpenStudio::Point3dVector.new
+    vec << tilted.vertices[3]
+    vec << tilted.vertices[0]
+    vec << tilted.vertices[1]
+    vec << tilted.vertices[2]
+    expect(tilted.setVertices(vec)).to be(true)
+    expect(mod1.width(tilted)).to be_within(TOL).of(w1)  # same result
+    expect(mod1.height(tilted)).to be_within(TOL).of(h1) # same result
+
+    file = File.join(__dir__, "files/osms/out/seb_ext4.osm")
     model.save(file, true)
   end
 
@@ -3571,5 +3497,79 @@ RSpec.describe OSut do
     expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
     expect(surface.vertices.size).to eq(12)
     expect(surface.grossArea).to be_within(TOL).of(5 * 20 - 1)
+  end
+
+  it "checks roller shades" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    v = OpenStudio.openStudioVersion.split(".").join.to_i
+    file = File.join(__dir__, "files/osms/out/seb_ext4.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
+    spaces = model.getSpaces
+
+    slanted = mod1.facets(spaces, "Outdoors", "RoofCeiling", [:top, :north])
+    expect(slanted.size).to eq(1)
+    slanted = slanted.first
+    expect(slanted.nameString).to eq("Openarea slanted roof")
+    skylights = slanted.subSurfaces
+
+    tilted = mod1.facets(spaces, "Outdoors", "Wall", [:bottom])
+    expect(tilted.size).to eq(1)
+    tilted = tilted.first
+    expect(tilted.nameString).to eq("Openarea tilted wall")
+    windows = tilted.subSurfaces
+
+    # 2x control groups:
+    #   - 3x windows as a single control group
+    #   - 3x skylight as another single control group
+    skies = OpenStudio::Model::SubSurfaceVector.new
+    wins  = OpenStudio::Model::SubSurfaceVector.new
+    skylights.each { |sub| skies << sub }
+    windows.each   { |sub| wins  << sub }
+
+    if v < 321
+      expect(mod1.genShade(model, skies)).to be(false)
+    else
+      expect(mod1.genShade(model, skies)).to be(true)
+      expect(mod1.genShade(model, wins)).to be(true)
+      ctls = model.getShadingControls
+      expect(ctls.size).to eq(2)
+
+      ctls.each do |ctl|
+        expect(ctl.shadingType).to eq("InteriorShade")
+        type = "OnIfHighOutdoorAirTempAndHighSolarOnWindow"
+        expect(ctl.shadingControlType).to eq(type)
+        expect(ctl.isControlTypeValueNeedingSetpoint1).to be(true)
+        expect(ctl.isControlTypeValueNeedingSetpoint2).to be(true)
+        expect(ctl.isControlTypeValueAllowingSchedule).to be(true)
+        expect(ctl.isControlTypeValueRequiringSchedule).to be(false)
+        spt1 = ctl.setpoint
+        spt2 = ctl.setpoint2
+        expect(spt1.empty?).to be(false)
+        expect(spt2.empty?).to be(false)
+        spt1 = spt1.get
+        spt2 = spt2.get
+        expect(spt1).to be_within(TOL).of(18)
+        expect(spt2).to be_within(TOL).of(100)
+        expect(ctl.multipleSurfaceControlType).to eq("Group")
+
+        ctl.subSurfaces.each do |sub|
+          surface = sub.surface
+          expect(surface.empty?).to be(false)
+          surface = surface.get
+          ok = surface == slanted || surface == tilted
+          expect(ok).to be(true)
+        end
+      end
+    end
+
+    file = File.join(__dir__, "files/osms/out/seb_ext5.osm")
+    model.save(file, true)
   end
 end
