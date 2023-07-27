@@ -2652,39 +2652,41 @@ RSpec.describe OSut do
     expect(mini_attic.adjacentSurface.get).to eq(mini_ceiling)
 
     # Reset existing core floor, core ceiling & attic floor vertices to
-    # accomodate 3x new mini 'holes' (filled in by the 3x new 'mini' surfaces).
-    # To ensure valid (core and attic) area & volume calculations (and avoid
-    # OpenStudio stdout errors/warnings), append the last vertex of the
-    # original surface vertices: each EnergyPlus edge must be referenced twice
-    # (i.e. the 'leader line' between each of the 3x original base surfaces
-    # and each of the 'mini' holes must be doubled).
+    # accommodate 3x new mini 'holes' (filled in by the 3x new 'mini'
+    # surfaces). 'Hole' vertices are defined in the opposite 'winding' of their
+    # 'mini' counterparts (e.g. clockwise if the initial vertex sequence is
+    # counterclockwise). To ensure valid (core and attic) area & volume
+    # calculations (and avoid OpenStudio stdout errors/warnings), append the
+    # last vertex of the original surface: each EnergyPlus edge must be
+    # referenced (at least) twice (i.e. the 'leader line' between each of the
+    # 3x original surfaces and each of the 'mini' holes must be doubled).
     vtx = OpenStudio::Point3dVector.new
     core_floor.vertices.each {|v| vtx << v}
-    vtx << mini_floor_vtx[0]
     vtx << mini_floor_vtx[3]
     vtx << mini_floor_vtx[2]
     vtx << mini_floor_vtx[1]
     vtx << mini_floor_vtx[0]
+    vtx << mini_floor_vtx[3]
     vtx << vtx[3]
     expect(core_floor.setVertices(vtx)).to be(true)
 
     vtx = OpenStudio::Point3dVector.new
     core_ceiling.vertices.each {|v| vtx << v}
-    vtx << mini_ceiling_vtx[2]
     vtx << mini_ceiling_vtx[1]
     vtx << mini_ceiling_vtx[0]
     vtx << mini_ceiling_vtx[3]
     vtx << mini_ceiling_vtx[2]
+    vtx << mini_ceiling_vtx[1]
     vtx << vtx[3]
     expect(core_ceiling.setVertices(vtx)).to be(true)
 
     vtx = OpenStudio::Point3dVector.new
     attic_floor.vertices.each {|v| vtx << v}
-    vtx << mini_attic_vtx[0]
     vtx << mini_attic_vtx[3]
     vtx << mini_attic_vtx[2]
     vtx << mini_attic_vtx[1]
     vtx << mini_attic_vtx[0]
+    vtx << mini_attic_vtx[3]
     vtx << vtx[3]
     expect(attic_floor.setVertices(vtx)).to be(true)
 
