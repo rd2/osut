@@ -764,7 +764,7 @@ module OSut
     ok3 = [true, false].include?(gr)
     ok4 = [true, false].include?(ex)
     ok5 = tp.respond_to?(:to_s)
-    return mismatch(id1, set, cl2, mth,    DBG, false) unless set.is_a?(cl1)
+    return mismatch(id1, set, cl1, mth,    DBG, false) unless set.is_a?(cl1)
     return mismatch(id2, bse, cl2, mth,    DBG, false) unless bse.is_a?(cl2)
     return invalid("ground",       mth, 3, DBG, false) unless ok3
     return invalid("exterior",     mth, 4, DBG, false) unless ok4
