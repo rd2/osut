@@ -755,7 +755,7 @@ module OSut
     no  = false
 
     ok1 = set.respond_to?(NS)
-    ok2 = base.respond_to?(NS)
+    ok2 = bse.respond_to?(NS)
     return invalid("set",          mth, 1, DBG, false) unless ok1
     return invalid("base",         mth, 2, DBG, false) unless ok2
 
