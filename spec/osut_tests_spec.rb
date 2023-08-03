@@ -567,7 +567,7 @@ RSpec.describe OSut do
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.rsi(lc, -1)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.error?).to be(true)
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m2)
 
@@ -579,7 +579,7 @@ RSpec.describe OSut do
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.rsi(lc, 0.150, -300)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.error?).to be(true)
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m4)
 
@@ -1058,7 +1058,7 @@ RSpec.describe OSut do
     end
   end
 
-  it "checks for plenums" do
+  it "checks for plenums (vs attics)" do
     mdl = OpenStudio::Model::Model.new
     v = OpenStudio.openStudioVersion.split(".").join.to_i
     translator = OpenStudio::OSVersion::VersionTranslator.new
@@ -1067,6 +1067,8 @@ RSpec.describe OSut do
     model = translator.loadModel(path)
     expect(model.empty?).to be(false)
     model = model.get
+
+    # TODO : check for unconditioned?
 
     m  = "OSut::plenum?"
     m1 = "Invalid 'space' arg #1 (#{m})"
@@ -2940,6 +2942,20 @@ RSpec.describe OSut do
     # mini2.osm A  FullInteriorAndExterior                 252 GJ 3.5 UMH cool
     # mini2.osm B  FullExteriorWithReflections             253 GJ 3.5 UMH cool
     # mini2.osm C  FullInteriorAndExteriorWithReflections  253 GJ 3.5 UMH cool
+  end
+
+  it "checks for candidate toplit spaces" do
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    v = OpenStudio.openStudioVersion.split(".").join.to_i
+    file = File.join(__dir__, "files/osms/in/smalloffice.osm")
+    path = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model.empty?).to be(false)
+    model = model.get
   end
 
   it "checks generated skylight wells" do
