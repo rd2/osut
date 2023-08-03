@@ -766,9 +766,9 @@ module OSut
     ok5 = tp.respond_to?(:to_s)
     return mismatch(id1, set, cl2, mth,    DBG, false) unless set.is_a?(cl1)
     return mismatch(id2, bse, cl2, mth,    DBG, false) unless bse.is_a?(cl2)
-    return invalid("ground",       mth, 3, DBG, false) unless ok1
-    return invalid("exterior",     mth, 4, DBG, false) unless ok2
-    return invalid("surface typ",  mth, 5, DBG, false) unless ok3
+    return invalid("ground",       mth, 3, DBG, false) unless ok3
+    return invalid("exterior",     mth, 4, DBG, false) unless ok4
+    return invalid("surface typ",  mth, 5, DBG, false) unless ok5
 
     type = tp.to_s.downcase
     ok6  = ["floor", "wall", "roofceiling"].include?(type)
