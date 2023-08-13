@@ -761,18 +761,20 @@ module OSut
 
     id1 = set.nameString
     id2 = bse.nameString
+    ok1 = set.is_a?(cl1)
+    ok2 = bse.is_a?(cl2)
     ok3 = [true, false].include?(gr)
     ok4 = [true, false].include?(ex)
     ok5 = tp.respond_to?(:to_s)
-    return mismatch(id1, set, cl1, mth,    DBG, false) unless set.is_a?(cl1)
-    return mismatch(id2, bse, cl2, mth,    DBG, false) unless bse.is_a?(cl2)
+    return mismatch(id1, set, cl1, mth,    DBG, false) unless ok1
+    return mismatch(id2, bse, cl2, mth,    DBG, false) unless ok2
     return invalid("ground",       mth, 3, DBG, false) unless ok3
     return invalid("exterior",     mth, 4, DBG, false) unless ok4
     return invalid("surface typ",  mth, 5, DBG, false) unless ok5
 
     type = tp.to_s.downcase
-    ok6  = ["floor", "wall", "roofceiling"].include?(type)
-    return invalid("surface type", mth, 5, DBG, false) unless ok6
+    ok5  = ["floor", "wall", "roofceiling"].include?(type)
+    return invalid("surface type", mth, 5, DBG, false) unless ok5
 
     constructions = nil
 
@@ -1134,10 +1136,10 @@ module OSut
   # to ASHRAE 90.1 (e.g. heating and/or cooling based, no distinction for
   # INDIRECTLY conditioned spaces like plenums).
   #
-  # SEMI-HEATED spaces are also a defined NECB term, but again the distinction
-  # is based on desired/intended design space setpoint temperatures - not
-  # system sizing criteria. No further treatment is implemented here to
-  # distinguish SEMI-HEATED from CONDITIONED spaces.
+  # SEMI-HEATED spaces are described in the NECB (yet not a defined term). The
+  # distinction is also based on desired/intended design space setpoint
+  # temperatures (here 15°C) - not system sizing criteria. No further treatment
+  # is implemented here to distinguish SEMI-HEATED from CONDITIONED spaces.
   #
   # The single NECB criterion distinguishing UNCONDITIONED ENCLOSED spaces
   # (such as vestibules) from UNENCLOSED spaces (such as attics) remains the
@@ -1146,24 +1148,94 @@ module OSut
   # by focusing on adjacent surfaces to CONDITIONED (or SEMI-HEATED) spaces as
   # part of the building envelope.
 
-  # In light of the above, methods here are designed without a priori knowledge
-  # of explicit system sizing choices or access to iterative autosizing
-  # processes. As discussed in greater detail elswhere, methods are developed
-  # to rely on zoning info and/or "intended" temperature setpoints.
-  #
-  # In addition, methods here cannot distinguish between UNCONDITIONED vs
-  # UNENCLOSED spaces by OpenStudio geometry alone.
+  # In light of the above, OSut methods here are designed without a priori
+  # knowledge of explicit system sizing choices or access to iterative
+  # autosizing processes. As discussed in greater detail below, methods here
+  # are developed to rely on zoning and/or "intended" temperature setpoints.
+  # In addition, OSut methods here cannot distinguish between UNCONDITIONED vs
+  # UNENCLOSED spaces from OpenStudio geometry alone. They are henceforth
+  # considered synonymous.
   #
   # For an OpenStudio model in an incomplete or preliminary state, e.g. holding
   # fully-formed ENCLOSED spaces without thermal zoning information or setpoint
   # temperatures (early design stage assessments of form, porosity or
-  # envelope), all OpenStudio spaces will be considered CONDITIONED, presuming
-  # setpoints of ~21°C (heating) and ~24°C (cooling).
+  # envelope), OpenStudio spaces are considered CONDITIONED by default. This
+  # default behaviour may be reset based on the (Space) AdditionalProperties
+  # "space_conditioning_category" key (4x possible values), which is relied
+  # upon by OpenStudio-Standards:
   #
-  # If ANY valid space/zone-specific temperature setpoints are found in the
-  # OpenStudio model, spaces/zones WITHOUT valid heating or cooling setpoints
-  # are considered as UNCONDITIONED or UNENCLOSED spaces (see "unconditioned?"
-  # method), or INDIRECTLY CONDITIONED spaces (see "plenum?" method).
+  #   github.com/NREL/openstudio-standards/blob/
+  #   d2b5e28928e712cb3f137ab5c1ad6d8889ca02b7/lib/openstudio-standards/
+  #   standards/Standards.Space.rb#L1604C5-L1605C1
+  #
+  # OpenStudio-Standards recognizes 4x possible value strings:
+  #   - "NonResConditioned"
+  #   - "ResConditioned"
+  #   - "Semiheated"
+  #   - "Unconditioned"
+  #
+  # OSut maintains existing "space_conditioning_category" key/value pairs
+  # intact. Based on these, OSut may generate related return values in any of
+  # its methods, e.g. status, postulated setpoints:
+  #
+  #   "space_conditioning_category" | OSut status   | heating °C | cooling °C
+  # -------------------------------   -------------   ----------   ----------
+  #   - "NonResConditioned"           CONDITIONED     21.0         24.0
+  #   - "ResConditioned"              CONDITIONED     21.0         24.0
+  #   - "Semiheated"                  SEMIHEATED      15.0         NA
+  #   - "Unconditioned"               UNCONDITIONED   NA           NA
+  #
+  # OSut also looks up another (Space) AdditionalProperties 'key',
+  # "indirectlyconditioned" to flag plenum or occupied spaces indectly
+  # conditioned with transfer air only. The only accepted 'value' for an
+  # "indirectlyconditioned" 'key' is the name (string) of another (linked)
+  # space, e.g.:
+  #
+  #   "indirectlyconditioned" space | linked space, e.g. "core_space"
+  # -------------------------------   ---------------------------------------
+  #   return air plenum               occupied space below
+  #   supply air plenum               occupied space above
+  #   dead air space (not a plenum)   nearby occupied space
+  #
+  # OSut doesn't validate whether the "indirectlyconditioned" space is actually
+  # adjacent to its linked space. It nonetheless relies on the latter's
+  # conditioning category (e.g. CONDITIONED, SEMIHEATED) to determine
+  # anticipated ambient temperatures in the former. For instance, an
+  # "indirectlyconditioned"-tagged return air plenum linked to a SEMIHEATED
+  # space is considered as free-floating in terms of cooling, and unlikely to
+  # have ambient conditions below 15°C under heating (winter) design
+  # conditions. OSut will associate this plenum to a 15°C heating setpoint
+  # temperature. If the SEMIHEATED space instead has a heating setpoint
+  # temperature of 7°C, then OSut will associate a 7°C heating setpoint to this
+  # plenum.
+  #
+  # Even when a (more developed) OpenStudio model holds valid space/zone
+  # temperature setpoints, OSut gives priority to these AdditionalProperties.
+  # For instance, a CONDITIONED space can be considered INDIRECTLYCONDITIONED,
+  # even if its thermal zone thermostat has a valid heating and/or cooling
+  # setpoint. This is in sync with OpenStudio-Standards' method
+  # "space_conditioning_category()".
+
+  ##
+  # Validates if model has zones with HVAC air loops.
+  #
+  # @param model [OpenStudio::Model::Model] a model
+  #
+  # @return [Bool] true if model has one or more HVAC air loops
+  # @return [Bool] false if invalid input (see logs)
+  def airLoopsHVAC?(model = nil)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::Model
+    return mismatch("model", model, cl, mth, DBG, false) unless model.is_a?(cl)
+
+    model.getThermalZones.each do |zone|
+      next            if zone.canBePlenum
+      return true unless zone.airLoopHVACs.empty?
+      return true     if zone.isPlenum
+    end
+
+    false
+  end
 
   ##
   # Returns MIN/MAX values of a schedule (ruleset).
@@ -1680,7 +1752,7 @@ module OSut
   def coolingTemperatureSetpoints?(model = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Model
-    return mismatch("model", model, cl, mth, DBG, false)  unless model.is_a?(cl)
+    return mismatch("model", model, cl, mth, DBG, false) unless model.is_a?(cl)
 
     model.getThermalZones.each do |zone|
       return true if minCoolScheduledSetpoint(zone)[:spt]
@@ -1690,21 +1762,72 @@ module OSut
   end
 
   ##
-  # Validates if model has zones with HVAC air loops.
+  # Validates whether space is a vestibule.
   #
-  # @param model [OpenStudio::Model::Model] a model
+  # @param space [OpenStudio::Model::Space] a space
   #
-  # @return [Bool] true if model has one or more HVAC air loops
+  # @return [Bool] returns true if vestibule
   # @return [Bool] false if invalid input (see logs)
-  def airLoopsHVAC?(model = nil)
+  def vestibule?(space = nil)
+    # INFO: OpenStudio-Standards' "thermal_zone_vestibule" criteria:
+    #   - zones less than 200ft2; AND
+    #   - having infiltration using Design Flow Rate
+    #
+    #   github.com/NREL/openstudio-standards/blob/
+    #   86bcd026a20001d903cc613bed6d63e94b14b142/lib/openstudio-standards/
+    #   standards/Standards.ThermalZone.rb#L1264
+    #
+    # This (unused) OpenStudio-Standards method likely needs revision; it would
+    # return "false" if the thermal zone area were less than 200ft2. Not sure
+    # which vintage of 90.1 relies on a 200ft2 threshold (2010?); 90.1 2016
+    # doesn't. Yet even fixed, the method would nonetheless misidentify as
+    # "vestibule" a small space along an exterior wall, such as a semi-heated
+    # storage space.
+    #
+    # The code below is intended as a simple short-term solution, basically
+    # relying on AdditionalProperties, or (if missing) a "vestibule" substring
+    # within a space's spaceType name (or the latter's standardsSpaceType).
+    #
+    # Alternatively, some future method could infer its status as a vestibule
+    # based on a few basic features (common to all vintages):
+    #   - 1x+ outdoor-facing wall(s) holding 1x+ door(s)
+    #   - adjacent to 1x+ 'occupied' conditioned space(s)
+    #   - ideally, 1x+ door(s) between vestibule and 1x+ such adjacent space(s)
+    #
+    # An additional method parameter (i.e. std = :necb) could be added to
+    # ensure supplementary Standard-specific checks, e.g. maximum floor area,
+    # minimum distance between doors.
+    #
+    # Finally, an entirely separate method could be developed to first identify
+    # whether "building entrances" (a defined term in 90.1) actually require
+    # vestibules as per specific code requirements. Food for thought.
     mth = "OSut::#{__callee__}"
-    cl  = OpenStudio::Model::Model
-    return mismatch("model", model, cl, mth, DBG, false) unless model.is_a?(cl)
+    cl  = OpenStudio::Model::Space
+    return mismatch("space", space, cl, mth, DBG, false) unless space.is_a?(cl)
 
-    model.getThermalZones.each do |zone|
-      next            if zone.canBePlenum
-      return true unless zone.airLoopHVACs.empty?
-      return true     if zone.isPlenum
+    id  = space.nameString
+    m1  = "#{id}:vestibule"
+    m1  = "#{id}:vestibule boolean"
+
+    if space.additionalProperties.hasFeature("vestibule")
+      val = space.additionalProperties.getFeatureAsBoolean("vestibule")
+      return invalid(m1, mth, 1, ERR, false) if val.empty?
+
+      val = val.get
+      return invalid(m2, mth, 1, ERR, false) unless [true, false].include?(val)
+      return val
+    end
+
+    unless space.spaceType.empty?
+      type = space.spaceType.get
+      return false if type.nameString.downcase.include?("plenum")
+      return true  if type.nameString.downcase.include?("vestibule")
+
+      unless type.standardsSpaceType.empty?
+        type = type.standardsSpaceType.get.downcase
+        return false if type.include?("plenum")
+        return true  if type.include?("vestibule")
+      end
     end
 
     false
@@ -1714,93 +1837,223 @@ module OSut
   # Validates whether a space is an indirectly-conditioned plenum.
   #
   # @param space [OpenStudio::Model::Space] a space
-  # @param loops [Bool] true if model has airLoopHVAC object(s)
-  # @param setpoints [Bool] true if model has valid temperature setpoints
   #
   # @return [Bool] true if plenum
   # @return [Bool] false if invalid input (see logs)
-  def plenum?(space = nil, loops = nil, setpoints = nil)
-    # Largely inspired from NREL's "space_plenum?" procedure:
+  def plenum?(space = nil)
+    # Largely inspired from NREL's "space_plenum?":
     #
-    # github.com/NREL/openstudio-standards/blob/
-    # 58964222d25783e9da4ae292e375fb0d5c902aa5/lib/openstudio-standards/
-    # standards/Standards.Space.rb#L1384
+    #   github.com/NREL/openstudio-standards/blob/
+    #   58964222d25783e9da4ae292e375fb0d5c902aa5/lib/openstudio-standards/
+    #   standards/Standards.Space.rb#L1384
     #
-    # A space is considered a plenum if:
+    # Ideally, "plenum?" should be in sync with OpenStudio SDK's "isPlenum"
+    # method, which solely looks for either HVAC air mixer objects:
+    #  - AirLoopHVACReturnPlenum
+    #  - AirLoopHVACSupplyPlenum
     #
-    # CASE A: its zone's "isPlenum" == true (SDK method) for a fully-developed
-    #         OpenStudio model (complete with HVAC air loops); OR
+    # Of the OpenStudio-Standards Prototype models, only the LargeOffice
+    # holds AirLoopHVACReturnPlenum objects. OpenStudio-Standards' method
+    # "space_plenum?" indeed catches them by checking if the space is
+    # "partofTotalFloorArea" (which internally has an "isPlenum" check). So
+    # "isPlenum" closely follows ASHRAE 90.1 2016's definition of "plenum":
     #
-    # CASE B: (IN ABSENCE OF HVAC AIRLOOPS) if it is excluded from a building's
-    #         total floor area yet linked to a zone holding an 'inactive'
-    #         thermostat, i.e. can't extract valid setpoints; OR
+    #   "plenum": a compartment or chamber ...
+    #             - to which one or more ducts are connected
+    #             - that forms a part of the air distribution system, and
+    #             - that is NOT USED for occupancy or storage.
     #
-    # CASE C: (IN ABSENCE OF HVAC AIRLOOPS & VALID SETPOINTS) it has "plenum"
-    #         (case insensitive) as a spacetype (or as a spacetype's
-    #         'standards spacetype').
+    # Canadian NECB 2020 has the following (not as well) defined term:
+    #   "plenum": a chamber forming part of an air duct system.
+    #             ... we'll assume that a space shall also be considered
+    #             UNOCCUPIED if it's "part of an air duct system".
+    #
+    # As intended, "isPlenum" would NOT identify as a "plenum" any vented
+    # UNCONDITIONED or UNENCLOSED attic or crawlspace - good. Yet "isPlenum"
+    # would also ignore dead air spaces integrating ducted return air. The
+    # SDK's "partofTotalFloorArea" would be more suitable in such cases, as
+    # long as modellers have, a priori, set this parameter to FALSE.
+    #
+    # OpenStudio-Standards' "space_plenum?" catches a MUCH WIDER range of
+    # spaces, which aren't caught by "isPlenum". This includes attics,
+    # crawlspaces, non-plenum air spaces above ceiling tiles, and any other
+    # UNOCCUPIED space in a model. The term "plenum" in this context is more
+    # of a catch-all shorthand - to be used with caution. For instance,
+    # "space_plenum?" shouldn't be used (in isolation) to determine whether an
+    # UNOCCUPIED space should have its envelope insulated ("plenum") or not
+    # ("attic").
+    #
+    # In contrast to OpenStudio-Standards' "space_plenum?", this method
+    # strictly returns FALSE if a space is indeed "partofTotalFloorArea". It
+    # also returns FALSE if the space is a vestibule. Otherwise, it needs more
+    # information to determine if such an UNOCCUPIED space is indeed a
+    # plenum. Beyond these 2x criteria, a space is considered a plenum if:
+    #
+    # CASE A: it includes the substring "plenum" (case insensitive) in its
+    #         spaceType's name, or in the latter's standardsSpaceType string;
+    #
+    # CASE B: "isPlenum" == TRUE in an OpenStudio model WITH HVAC airloops: OR
+    #
+    # CASE C: its zone holds an 'inactive' thermostat (i.e. can't extract valid
+    #         setpoints) in an OpenStudio model with setpoint temperatures.
+    #
+    # If a modeller is instead simply interested in identifying UNOCCUPIED
+    # spaces that are INDIRECTLYCONDITIONED (not necessarily plenums), then the
+    # following combination is likely more reliable and less confusing:
+    #   - SDK's partofTotalFloorArea == FALSE
+    #   - OSut's unconditioned? == FALSE
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Space
-    return invalid("space", mth, 1, DBG, false) unless space.respond_to?(NS)
+    return mismatch("space", space, cl, mth, DBG, false) unless space.is_a?(cl)
+    return false if space.partofTotalFloorArea
+    return false if vestibule?(space)
 
-    id  = space.nameString
-    ok1 = [true, false].include?(loops)
-    ok2 = [true, false].include?(setpoints)
-    return mismatch(id, space, cl, mth, DBG, false) unless space.is_a?(cl)
-    return invalid("loops",     mth, 2, DBG, false) unless ok1
-    return invalid("setpoints", mth, 3, DBG, false) unless ok2
+    id = space.nameString
+    m1 = "#{id}:plenum"
+    m1 = "#{id}:plenum boolean"
 
-    unless space.thermalZone.empty?
-      zone = space.thermalZone.get
-      return zone.isPlenum if loops                                         # A
+    # CASE A: "plenum" spaceType.
+    unless space.spaceType.empty?
+      type = space.spaceType.get
+      return true if type.nameString.downcase.include?("plenum")
 
-      if setpoints
-        heat = maxHeatScheduledSetpoint(zone)
-        cool = minCoolScheduledSetpoint(zone)
-        return false if heat[:spt] || cool[:spt] # directly conditioned
-        return heat[:dual] || cool[:dual] unless space.partofTotalFloorArea # B
-        return false
+      unless type.standardsSpaceType.empty?
+        type = type.standardsSpaceType.get.downcase
+        return true if type.include?("plenum")
       end
     end
 
-    type1 = space.spaceType
-    type2 = type.standardsSpaceType
-    return type1.nameString.downcase == "plenum" unless type1.empty?        # C
-    return type2.downcase            == "plenum" unless type2.empty?        # C
+    # CASE B: "isPlenum" == TRUE if airloops.
+    return space.isPlenum if airLoopsHVAC?(space.model)
+
+    # CASE C: zone holds an 'inactive' thermostat.
+    zone   = space.thermalZone
+    heated = heatingTemperatureSetpoints?(space.model)
+    cooled = coolingTemperatureSetpoints?(space.model)
+
+    if heated || cooled
+      return false if zone.empty?
+
+      zone = zone.get
+      heat = maxHeatScheduledSetpoint(zone)
+      cool = minCoolScheduledSetpoint(zone)
+      return false if heat[:spt] || cool[:spt] # directly CONDITIONED
+      return heat[:dual] || cool[:dual]        # FALSE if both are nilled
+    end
 
     false
   end
 
   ##
-  # Validates whether a space is UNCONDITIONED, e.g. vented attic, crawlspace.
+  # Retrieve a space's (implicit or explicit) heating/cooling setpoints.
   #
   # @param space [OpenStudio::Model::Space] a space
-  # @param loops [Bool] true if model has airLoopHVAC object(s)
-  # @param setpoints [Bool] true if model has valid temperature setpoints
   #
-  # @return [Bool] true if UNCONDITIONED
-  # @return [Bool] false if invalid input (see logs)
-  def unconditioned?(space = nil, loops = nil, setpoints = nil)
-    # A space is considered UNCONDITIONED if:
-    #   - it is not a plenum; OR
-    #   - it is excluded from a building's total floor area; AND
-    #   - its zone does not hold a thermostat
+  # @return [Hash] heating: (Float), cooling: (Float)
+  # @return [Hash] heating: (nil), cooling: (nil) if invalid input (see logs)
+  def setpoints(space = nil)
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Model::Space
+    cl2 = String
+    res = {heating: nil, cooling: nil}
+    tg1 = "space_conditioning_category"
+    tg2 = "indirectlyconditioned"
+    cts = ["nonresconditioned", "resconditioned", "semiheated", "unconditioned"]
+    cnd = nil
+    return mismatch("space", space, cl1, mth, DBG, res) unless space.is_a?(cl1)
+
+    # 1. Check for OpenStudio-Standards' space conditioning categories.
+    if space.additionalProperties.hasFeature(tg1)
+      cnd = space.additionalProperties.getFeatureAsString(tg1)
+
+      if cnd.empty?
+        cnd = nil
+      else
+        cnd = cnd.get.downcase
+
+        if cts.include?(cnd)
+          return res if cnd == "unconditioned"
+        else
+          cnd = nil
+          invalid("#{tag}:#{cnd}", mth, 0, ERR)
+        end
+      end
+    end
+
+    # 2. Check instead OSut's INDIRECTLYCONDITIONED (parent space) link.
+    if cnd.nil?
+      id = space.additionalProperties.getFeatureAsString(tg2)
+
+      unless id.empty?
+        id  = id.get
+        dad = space.model.getSpaceByName(id)
+
+        if dad.empty?
+          log(ERR, "Unknown space #{id} (#{mth})")
+        else
+          # Now focus on 'parent' space linked to INDIRECTLYCONDITIONED space.
+          space = dad.get
+          cnd   = tg2
+        end
+      end
+    end
+
+    # 3. Fetch space setpoints (if model indeed holds valid setpoints).
+    heated = heatingTemperatureSetpoints?(space.model)
+    cooled = coolingTemperatureSetpoints?(space.model)
+    zone   = space.thermalZone
+
+    if heated || cooled
+      return res if zone.empty? # UNCONDITIONED
+
+      zone = zone.get
+      res[:heating] = maxHeatScheduledSetpoint(zone)[:spt]
+      res[:cooling] = minCoolScheduledSetpoint(zone)[:spt]
+    end
+
+    # 4. Reset if AdditionalProperties were found & valid.
+    unless cnd.nil?
+      if cnd == "unconditioned"
+        res[:heating] = nil
+        res[:cooling] = nil
+      elsif cnd == "semiheated"
+        res[:heating] = 15.0 if res[:heating].nil?
+        res[:cooling] = nil
+      elsif cnd.include?("conditioned")
+        # "nonresconditioned", "resconditioned" or "indirectlyconditioned"
+        res[:heating] = 21.0 if res[:heating].nil? # default
+        res[:cooling] = 24.0 if res[:cooling].nil? # default
+      end
+    end
+
+    # 5. Reset if plenum?
+    if plenum?(space)
+      res[:heating] = 21.0 if res[:heating].nil? # default
+      res[:cooling] = 24.0 if res[:cooling].nil? # default
+    end
+    
+    res
+  end
+
+  ##
+  # Validates if a space is UNCONDITIONED.
+  #
+  # @param space [OpenStudio::Model::Space] a space
+  #
+  # @return [Bool] true if space can be considered as UNCONDITIONED
+  # @retrun [Bool] false if invalid input (see logs)
+  def unconditioned?(space = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Space
-    return invalid("space", mth, 1, DBG, false) unless space.respond_to?(NS)
+    return mismatch("space", space, cl, mth, DBG, false) unless space.is_a?(cl)
 
-    id  = space.nameString
-    ok1 = [true, false].include?(loops)
-    ok2 = [true, false].include?(setpoints)
-    return mismatch(id, space, cl, mth, DBG, false) unless space.is_a?(cl)
-    return invalid("loops",     mth, 2, DBG, false) unless ok1
-    return invalid("setpoints", mth, 3, DBG, false) unless ok2
+    ok = false
+    ok = setpoints(space)[:heating].nil? && setpoints(space)[:cooling].nil?
 
-    return false if plenum?(space, loops, setpoints)
-    return false if space.thermalZone.empty?
-    return true  if space.thermalZone.get.thermostat.empty?
-
-    false
+    ok
   end
+
+
 
   ##
   # Generates an HVAC availability schedule.
@@ -1969,6 +2222,8 @@ module OSut
   #   - points with the lowest X-axis values are 'aligned' along X-axis (0)
   #   - points with the lowest Z-axis values are 'aligned' along Y-axis (0)
   #   - for several Boost methods, points must be clockwise in sequence
+  #
+  # Check OSut's poly() method, which offers such Boost-related options.
 
   ##
   # Returns OpenStudio site/space transformation & rotation angle [0,2PI) rads.
