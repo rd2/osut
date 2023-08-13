@@ -201,8 +201,10 @@ RSpec.describe OSut do
       name  = space.nameString.downcase.to_sym
       ratio = nil
       ratio = ratios[name] if ratios.keys.include?(name)
-      ok    = mod1.genMass(model, [space], ratio) unless ratio.nil?
-      ok    = mod1.genMass(model, [space])            if ratio.nil?
+      sps   = OpenStudio::Model::SpaceVector.new
+      sps  << space
+      ok    = mod1.genMass(sps, ratio) unless ratio.nil?
+      ok    = mod1.genMass(sps)            if ratio.nil?
       expect(ok).to be(true)
       expect(mod1.status.zero?).to be(true)
     end
@@ -371,7 +373,7 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
 
     # INVALID case: arg #1 : model (instead of surface type string)
-    expect(mod1.holdsConstruction?(model, c, true, true, t1)).to be(false)
+    expect(mod1.holdsConstruction?(mdl, c, true, true, t1)).to be(false)
     expect(mod1.debug?).to be(true)
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m6)
@@ -382,8 +384,8 @@ RSpec.describe OSut do
     mdl = OpenStudio::Model::Model.new
     translator = OpenStudio::OSVersion::VersionTranslator.new
 
-    file = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
-    path = OpenStudio::Path.new(file)
+    file  = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+    path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model.empty?).to be(false)
     model = model.get
@@ -392,23 +394,20 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
 
     model.getSurfaces.each do |s|
-      set = mod1.defaultConstructionSet(model, s)
+      set = mod1.defaultConstructionSet(s)
       expect(set.nil?).to be(false)
       expect(mod1.status.zero?).to be(true)
-      expect(mod1.logs.empty?).to be(true)
     end
 
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    file = File.join(__dir__, "files/osms/in/seb.osm")
-    path = OpenStudio::Path.new(file)
+    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model.empty?).to be(false)
     model = model.get
-
-    mod1.clean!
+    expect(mod1.clean!).to eq(DBG)
 
     model.getSurfaces.each do |s|
-      set = mod1.defaultConstructionSet(model, s)
+      set = mod1.defaultConstructionSet(s)
       expect(set.nil?).to be(true)
       expect(mod1.status).to eq(ERR)
 
@@ -1423,7 +1422,7 @@ RSpec.describe OSut do
     model = model.get
 
     model.getSpaces.each do |space|
-      tr = mod1.transforms(model, space)
+      tr = mod1.transforms(space)
       expect(tr.is_a?(Hash)).to be(true)
       expect(tr.key?(:t)).to be(true)
       expect(tr.key?(:r)).to be(true)
@@ -1434,7 +1433,7 @@ RSpec.describe OSut do
     # Invalid input test.
     m1 = "Invalid 'group' arg #2 (OSut::transforms)"
     expect(mod1.status.zero?).to be(true)
-    tr = mod1.transforms(model, nil)
+    tr = mod1.transforms(nil)
     expect(tr.is_a?(Hash)).to be(true)
     expect(tr.key?(:t)).to be(true)
     expect(tr.key?(:r)).to be(true)
@@ -1666,7 +1665,7 @@ RSpec.describe OSut do
     # Retrieve polygon 'triads' (3x consecutive points) and qualify each as
     # describing an acute, right or obtuse angle. As the considered polygons
     # are either triangles or convex quadrilaterals, the number of returned
-    # unique triads should be limited to either 3x or 4x, as confirmed by th
+    # unique triads should be limited to either 3x or 4x, as confirmed by the
     # poly method (convex = true, uniqueness = true, collinearity = false).
     expect(vtx.size).to eq(3)
     expect(mod1.poly(vtx, true, true, false).size).to eq(3)
@@ -1674,6 +1673,8 @@ RSpec.describe OSut do
     triads = mod1.getTriads(vtx)
     expect(mod1.status.zero?).to be(true)
     expect(triads.size).to eq(3)
+
+    # TO DO ... in progress.
   end
 
   it "checks ULC" do
@@ -2305,7 +2306,7 @@ RSpec.describe OSut do
     sub[:count ] = 3
     sub[:offset] = offset
     # sub[:type  ] = "FixedWindow" # defaulted if not specified.
-    expect(mod1.addSubs(model, tilt_wall, [sub])).to be(true)
+    expect(mod1.addSubs(tilt_wall, [sub])).to be(true)
     expect(mod1.status.zero?).to be(true)
     expect(mod1.logs.size.zero?).to be(true)
 
@@ -2322,7 +2323,7 @@ RSpec.describe OSut do
     sub[:id  ] = ""
     sub[:sill] = 0.0 # will be reset to 5mm
     sub[:type] = "Skylight"
-    expect(mod1.addSubs(model, roof, [sub])).to be(true)
+    expect(mod1.addSubs(roof, [sub])).to be(true)
     expect(mod1.warn?).to be(true)
     expect(mod1.logs.size).to eq(1)
     message = "' sill height to 0.005 m (OSut::addSubs)"
@@ -2438,7 +2439,7 @@ RSpec.describe OSut do
     wwr2[:sill ] = wwr1[:head] + 0.1
 
     sbz = [wwr1, wwr2]
-    expect(mod1.addSubs(model, wall3, sbz)).to be(true)
+    expect(mod1.addSubs(wall3, sbz)).to be(true)
     expect(mod1.status.zero?).to be(true)
     sbz = wall3.subSurfaces
     expect(sbz.size).to eq(2)
@@ -2520,7 +2521,7 @@ RSpec.describe OSut do
     t2[:centreline] = w2[:centreline]
 
     sbz = [w1, w2, t1, t2]
-    expect(mod1.addSubs(model, wall4, sbz)).to be(true)
+    expect(mod1.addSubs(wall4, sbz)).to be(true)
     expect(mod1.status.zero?).to be(true)
 
 
@@ -2553,7 +2554,7 @@ RSpec.describe OSut do
     a6[:offset    ] = a6[:width] + gap
     a6[:l_buffer  ] = gap
 
-    expect(mod1.addSubs(model, wall6, [a6])).to be(true)
+    expect(mod1.addSubs(wall6, [a6])).to be(true)
     expect(mod1.status.zero?).to be(true)
 
     # 1x Array of 2x square windows, 8" from the right corner of wall7.
@@ -2567,7 +2568,7 @@ RSpec.describe OSut do
     a7[:offset    ] = a7[:width] + gap
     a7[:r_buffer  ] = gap
 
-    expect(mod1.addSubs(model, wall7, [a7])).to be(true)
+    expect(mod1.addSubs(wall7, [a7])).to be(true)
     expect(mod1.status.zero?).to be(true)
 
     file = File.join(__dir__, "files/osms/out/seb_ext3.osm")
@@ -2745,7 +2746,7 @@ RSpec.describe OSut do
     sub[:head  ] = head
     sub[:count ] = 2
     sub[:offset] = offset
-    expect(mod1.addSubs(model, attic_south, [sub])).to be(true)
+    expect(mod1.addSubs(attic_south, [sub])).to be(true)
     expect(mod1.status.zero?).to be(true)
 
     # Re-validating pre-tested areas + volumes, as well as convexity.
@@ -3072,7 +3073,7 @@ RSpec.describe OSut do
       sub[:head  ] = head
       sub[:count ] = 2
       sub[:offset] = offset
-      expect(mod1.addSubs(model, roof, [sub])).to be(true)
+      expect(mod1.addSubs(roof, [sub])).to be(true)
       expect(mod1.status.zero?).to be(true)
       expect(mod1.logs.size.zero?).to be(true)
       expect(roof.subSurfaces.size).to eq(2)
@@ -3588,10 +3589,12 @@ RSpec.describe OSut do
     windows.each   { |sub| wins  << sub }
 
     if v < 321
-      expect(mod1.genShade(model, skies)).to be(false)
+      expect(mod1.genShade(skies)).to be(false)
+      expect(mod1.status.zero?).to be(true)
     else
-      expect(mod1.genShade(model, skies)).to be(true)
-      expect(mod1.genShade(model, wins)).to be(true)
+      expect(mod1.genShade(skies)).to be(true)
+      expect(mod1.genShade(wins)).to be(true)
+      expect(mod1.status.zero?).to be(true)
       ctls = model.getShadingControls
       expect(ctls.size).to eq(2)
 

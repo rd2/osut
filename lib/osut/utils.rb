@@ -553,12 +553,11 @@ module OSut
   # (May to October in Northern Hemisphere), when outdoor dry bulb temperature
   # is above 18°C and impinging solar radiation is above 100 W/m2.
   #
-  # @param model [OpenStudio::Model::Model] a model
   # @param subs [OpenStudio::Model::SubSurfaceVector] sub surfaces
   #
   # @return [Bool] true if successful
   # @return [Bool] false if invalid input (see logs)
-  def genShade(model = nil, subs = OpenStudio::Model::SubSurfaceVector.new)
+  def genShade(subs = OpenStudio::Model::SubSurfaceVector.new)
     # Filter OpenStudio warnings for ShadingControl:
     #   ref: https://github.com/NREL/OpenStudio/issues/4911
     str = ".*(?<!ShadingControl)$"
@@ -566,22 +565,20 @@ module OSut
 
     mth = "OSut::#{__callee__}"
     v   = OpenStudio.openStudioVersion.split(".").join.to_i
-    cl1 = OpenStudio::Model::Model
-    cl2 = OpenStudio::Model::SubSurfaceVector
-    no  = false
+    cl  = OpenStudio::Model::SubSurfaceVector
 
     # Log/exit if invalid arguments.
-    return mismatch("model", model, cl1, mth, ERR, no) unless model.is_a?(cl1)
-    return mismatch("subs ", subs,  cl2, mth, ERR, no) unless subs.is_a?(cl2)
-    return empty(   "subs",              mth, WRN, no)     if subs.empty?
-    return no                                              if v < 321
+    return mismatch("subs ", subs,  cl2, mth, DBG, false) unless subs.is_a?(cl)
+    return empty(   "subs",              mth, WRN, false)     if subs.empty?
+    return false                                              if v < 321
 
     # Shading availability period.
+    mdl   = subs.first.model
     id    = "onoff"
-    onoff = model.getScheduleTypeLimitsByName(id)
+    onoff = mdl.getScheduleTypeLimitsByName(id)
 
     if onoff.empty?
-      onoff = OpenStudio::Model::ScheduleTypeLimits.new(model)
+      onoff = OpenStudio::Model::ScheduleTypeLimits.new(mdl)
       onoff.setName(id)
       onoff.setLowerLimitValue(0)
       onoff.setUpperLimitValue(1)
@@ -593,10 +590,10 @@ module OSut
 
     # Shading schedule.
     id  = "OSut|SHADE|Ruleset"
-    sch = model.getScheduleRulesetByName(id)
+    sch = mdl.getScheduleRulesetByName(id)
 
     if sch.empty?
-      sch = OpenStudio::Model::ScheduleRuleset.new(model, 0)
+      sch = OpenStudio::Model::ScheduleRuleset.new(mdl, 0)
       sch.setName(id)
       sch.setScheduleTypeLimits(onoff)
       sch.defaultDaySchedule.setName("OSut|Shade|Ruleset|Default")
@@ -606,7 +603,7 @@ module OSut
 
     # Summer cooling rule.
     id   = "OSut|SHADE|ScheduleRule"
-    rule = model.getScheduleRuleByName(id)
+    rule = mdl.getScheduleRuleByName(id)
 
     if rule.empty?
       may     = OpenStudio::MonthOfYear.new("May")
@@ -627,10 +624,10 @@ module OSut
 
     # Shade object.
     id  = "OSut|Shade"
-    shd = model.getShadeByName(id)
+    shd = mdl.getShadeByName(id)
 
     if shd.empty?
-      shd = OpenStudio::Model::Shade.new(model)
+      shd = OpenStudio::Model::Shade.new(mdl)
       shd.setName(id)
     else
       shd = shd.get
@@ -638,7 +635,6 @@ module OSut
 
     # Shading control (unique to each call).
     id  = "OSut|ShadingControl"
-
     ctl = OpenStudio::Model::ShadingControl.new(shd)
     ctl.setName(id)
     ctl.setSchedule(sch)
@@ -652,43 +648,35 @@ module OSut
   ##
   # Generates an internal mass definition and instances for target spaces.
   #
-  # @param model [OpenStudio::Model::Model] a model
-  # @param sps [Array<OpenStudio::Model::Space>] target spaces
+  # @param sps [OpenStudio::Model::SpaceVector] target spaces
   # @param ratio [Double] internal mass surface / floor areas
   #
   # @return [Bool] true if successful
   # @return [Bool] false if invalid input (see logs)
-  def genMass(model = nil, sps = [], ratio = 2.0)
-    # This is largely adapted from OpenStudio-Standards
+  def genMass(sps = OpenStudio::Model::SpaceVector.new, ratio = 2.0)
+    # This is largely adapted from OpenStudio-Standards:
     #
-    # https://github.com/NREL/openstudio-standards/blob/
-    # d332605c2f7a35039bf658bf55cad40a7bcac317/lib/openstudio-standards/
-    # prototypes/common/objects/Prototype.Model.rb#L786
-
+    #   https://github.com/NREL/openstudio-standards/blob/
+    #   d332605c2f7a35039bf658bf55cad40a7bcac317/lib/openstudio-standards/
+    #   prototypes/common/objects/Prototype.Model.rb#L786
     mth = "OSut::#{__callee__}"
-    cl1 = OpenStudio::Model::Model
-    cl2 = Array
-    cl3 = Numeric
-    cl4 = OpenStudio::Model::Space
+    cl1 = OpenStudio::Model::SpaceVector
+    cl2 = Numeric
     no  = false
 
     # Log/exit if invalid arguments.
-    return mismatch( "model", model, cl1, mth, ERR, no) unless model.is_a?(cl1)
-    return mismatch("spaces",   sps, cl2, mth, ERR, no) unless sps.is_a?(cl2)
-    return mismatch( "ratio", ratio, cl3, mth, ERR, no) unless ratio.is_a?(cl3)
+    return mismatch("spaces",   sps, cl1, mth, DBG, no) unless sps.is_a?(cl1)
+    return mismatch( "ratio", ratio, cl2, mth, DBG, no) unless ratio.is_a?(cl2)
     return empty(   "spaces",             mth, WRN, no)     if sps.empty?
     return negative( "ratio",             mth, ERR, no)     if ratio < 0
 
-    sps.each do |sp|
-      return mismatch("space", sp, cl4, mth, ERR, no) unless sp.is_a?(cl4)
-    end
-
     # A single material.
+    mdl = sps.first.model
     id  = "OSut|MASS|Material"
-    mat = model.getOpaqueMaterialByName(id)
+    mat = mdl.getOpaqueMaterialByName(id)
 
     if mat.empty?
-      mat = OpenStudio::Model::StandardOpaqueMaterial.new(model)
+      mat = OpenStudio::Model::StandardOpaqueMaterial.new(mdl)
       mat.setName(id)
       mat.setRoughness("MediumRough")
       mat.setThickness(0.15)
@@ -704,10 +692,10 @@ module OSut
 
     # A single, 1x layered construction.
     id  = "OSut|MASS|Construction"
-    con = model.getConstructionByName(id)
+    con = mdl.getConstructionByName(id)
 
     if con.empty?
-      con = OpenStudio::Model::Construction.new(model)
+      con = OpenStudio::Model::Construction.new(mdl)
       con.setName(id)
       layers = OpenStudio::Model::MaterialVector.new
       layers << mat
@@ -717,10 +705,10 @@ module OSut
     end
 
     id = "OSut|InternalMassDefinition|" + (format "%.2f", ratio)
-    df = model.getInternalMassDefinitionByName(id)
+    df = mdl.getInternalMassDefinitionByName(id)
 
     if df.empty?
-      df = OpenStudio::Model::InternalMassDefinition.new(model)
+      df = OpenStudio::Model::InternalMassDefinition.new(mdl)
       df.setName(id)
       df.setConstruction(con)
       df.setSurfaceAreaperSpaceFloorArea(ratio)
@@ -818,30 +806,28 @@ module OSut
   ##
   # Returns a surface's default construction set.
   #
-  # @param model [OpenStudio::Model::Model] a model
   # @param s [OpenStudio::Model::Surface] a surface
   #
   # @return [OpenStudio::Model::DefaultConstructionSet] default set
   # @return [NilClass] if invalid input (see logs)
-  def defaultConstructionSet(model = nil, s = nil)
+  def defaultConstructionSet(s = nil)
     mth = "OSut::#{__callee__}"
-    cl1 = OpenStudio::Model::Model
-    cl2 = OpenStudio::Model::Surface
-    return invalid("surface", mth, 2)         unless s.respond_to?(NS)
+    cl  = OpenStudio::Model::Surface
+    return invalid("surface", mth, 2) unless s.respond_to?(NS)
 
     id = s.nameString
     ok = s.isConstructionDefaulted
     m1 = "'#{id}' construction not defaulted (#{mth})"
     m2 = "'#{id}' construction"
     m3 = "'#{id}' space"
-    return mismatch(id,          s, cl2, mth) unless s.is_a?(cl2)
-    return mismatch("model", model, cl1, mth) unless model.is_a?(cl1)
+    return mismatch(id, s, cl2, mth)  unless s.is_a?(cl)
 
-    log(ERR, m1)                              unless ok
-    return nil                                unless ok
-    return empty(m2, mth, ERR)                    if s.construction.empty?
-    return empty(m3, mth, ERR)                    if s.space.empty?
+    log(ERR, m1)                      unless ok
+    return nil                        unless ok
+    return empty(m2, mth, ERR)            if s.construction.empty?
+    return empty(m3, mth, ERR)            if s.space.empty?
 
+    mdl      = s.model
     base     = s.construction.get
     space    = s.space.get
     type     = s.surfaceType
@@ -877,7 +863,7 @@ module OSut
       end
     end
 
-    building = model.getBuilding
+    building = mdl.getBuilding
 
     unless building.defaultConstructionSet.empty?
       set = building.defaultConstructionSet.get
@@ -2031,7 +2017,7 @@ module OSut
       res[:heating] = 21.0 if res[:heating].nil? # default
       res[:cooling] = 24.0 if res[:cooling].nil? # default
     end
-    
+
     res
   end
 
@@ -2052,8 +2038,6 @@ module OSut
 
     ok
   end
-
-
 
   ##
   # Generates an HVAC availability schedule.
@@ -2228,24 +2212,22 @@ module OSut
   ##
   # Returns OpenStudio site/space transformation & rotation angle [0,2PI) rads.
   #
-  # @param model [OpenStudio::Model::Model] a model
   # @param group [OpenStudio::Model::PlanarSurfaceGroup] a group
   #
   # @return [Hash] t: (OpenStudio::Transformation), r: (Float)
   # @return [Hash] t: (nil), r: (nil) if invalid input (see logs)
-  def transforms(model = nil, group = nil)
+  def transforms(group = nil)
     mth = "OSut::#{__callee__}"
-    cl1 = OpenStudio::Model::Model
     cl2 = OpenStudio::Model::PlanarSurfaceGroup
     res = { t: nil, r: nil }
-    return mismatch("model", model, cl1, mth, DBG, res) unless model.is_a?(cl1)
     return invalid("group", mth, 2, DBG, res) unless group.respond_to?(NS)
 
-    id = group.nameString
+    id  = group.nameString
+    mdl = group.model
     return mismatch(id, group, cl2, mth, DBG, res) unless group.is_a?(cl2)
 
     res[:t] = group.siteTransformation
-    res[:r] = group.directionofRelativeNorth + model.getBuilding.northAxis
+    res[:r] = group.directionofRelativeNorth + mdl.getBuilding.northAxis
 
     res
   end
@@ -3380,7 +3362,6 @@ module OSut
   ##
   # Adds sub surfaces (e.g. windows, doors, skylights) to surface.
   #
-  # @param model [OpenStudio::Model::Model] a model
   # @param s [OpenStudio::Model::Surface] a model surface
   # @param [Array<Hash>] subs requested attributes, each may hold:
   # @option subs [String] :id identifier e.g. "Window 007"
@@ -3403,28 +3384,27 @@ module OSut
   #
   # @return [Bool] true if successful
   # @return [Bool] false if invalid input (see logs)
-  def addSubs(model = nil, s = nil, subs = [], clear = false, bfr = 0.005)
+  def addSubs(s = nil, subs = [], clear = false, bfr = 0.005)
     mth = "OSut::#{__callee__}"
     v   = OpenStudio.openStudioVersion.split(".").join.to_i
-    cl1 = OpenStudio::Model::Model
-    cl2 = OpenStudio::Model::Surface
-    cl3 = Array
-    cl4 = Hash
-    cl5 = Numeric
+    cl1 = OpenStudio::Model::Surface
+    cl2 = Array
+    cl3 = Hash
+    cl4 = Numeric
     min = 0.050 # minimum ratio value ( 5%)
     max = 0.950 # maximum ratio value (95%)
     no  = false
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Exit if mismatched or invalid argument classes.
-    return mismatch("model", model, cl1, mth, DBG, no) unless model.is_a?(cl1)
-    return mismatch("surface",   s, cl2, mth, DBG, no) unless s.is_a?(cl2)
-    return mismatch("subs",   subs, cl3, mth, DBG, no) unless subs.is_a?(cl3)
-    return empty("surface points",       mth, DBG, no)     if poly(s).empty?
+    return mismatch("surface",  s, cl2, mth, DBG, no) unless s.is_a?(cl1)
+    return mismatch("subs",  subs, cl3, mth, DBG, no) unless subs.is_a?(cl2)
+    return empty("surface points",      mth, DBG, no)     if poly(s).empty?
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Clear existing sub surfaces if requested.
     nom = s.nameString
+    mdl = s.model
 
     unless [true, false].include?(clear)
       log(WRN, "#{nom}: Keeping existing sub surfaces (#{mth})")
@@ -3457,7 +3437,7 @@ module OSut
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Assign default values to certain sub keys (if missing), +more validation.
     subs.each_with_index do |sub, index|
-      return mismatch("sub", sub, cl4, mth, DBG, no) unless sub.is_a?(cl4)
+      return mismatch("sub", sub, cl4, mth, DBG, no) unless sub.is_a?(cl3)
 
       # Required key:value pairs (either set by the user or defaulted).
       sub[:id        ] = ""     unless sub.key?(:id        )
@@ -3510,7 +3490,7 @@ module OSut
         next if key == :frame
         next if key == :assembly
 
-        return mismatch(key, value, cl5, mth, DBG, no) unless value.is_a?(cl5)
+        return mismatch(key, value, cl5, mth, DBG, no) unless value.is_a?(cl4)
         next if key == :centreline
 
         negative(key, mth, WRN) if value < 0
@@ -3903,7 +3883,7 @@ module OSut
 
         break unless ok
 
-        sb = OpenStudio::Model::SubSurface.new(vec, model)
+        sb = OpenStudio::Model::SubSurface.new(vec, mdl)
         sb.setName(name)
         sb.setSubSurfaceType(sub[:type])
         sb.setConstruction(sub[:assembly])               if sub[:assembly]
