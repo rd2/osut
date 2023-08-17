@@ -34,17 +34,15 @@ module OSut
   # DEBUG for devs; WARN/ERROR for users (bad OS input), see OSlg
   extend OSlg
 
-  TOL  = 0.01
-  TOL2 = TOL * TOL
-  DBG  = OSut::DEBUG
-  INF  = OSut::INFO
-  WRN  = OSut::WARN
-  ERR  = OSut::ERROR
-  FTL  = OSut::FATAL
-  NS   = "nameString"
+  TOL  = 0.01         # default distance tolerance (m)
+  TOL2 = TOL * TOL    # default area tolerance (m2)
+  DBG  = OSlg::DEBUG  # see github.com/rd2/oslg
+  INF  = OSlg::INFO   # see github.com/rd2/oslg
+  WRN  = OSlg::WARN   # see github.com/rd2/oslg
+  ERR  = OSlg::ERROR  # see github.com/rd2/oslg
+  FTL  = OSlg::FATAL  # see github.com/rd2/oslg
+  NS   = "nameString" # OpenStudio object identifier method
 
-  # ---- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---- #
-  # ---- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---- #
   HEAD = 2.032 # standard 80" door
   SILL = 0.762 # standard 30" window sill
 
@@ -68,32 +66,56 @@ module OSut
   #   - "Medium Smooth" : clear pine
   #   - "Smooth"        : smooth plaster
   #   - "Very Smooth"   : glass
-  @@mass = [:none, :light, :medium, :heavy].freeze
-  @@film = {} # standard air films, m2.K/W
-  @@uo   = {} # default (~1980s) envelope Uo (W/m2.K), based on surface type
-  @@mats = {} # StandardOpaqueMaterials only
 
-  @@film[:shading  ] = 0.000
-  @@film[:partition] = 0.000
-  @@film[:wall     ] = 0.150
-  @@film[:roof     ] = 0.140
-  @@film[:floor    ] = 0.190
-  @@film[:basement ] = 0.120
-  @@film[:slab     ] = 0.160
-  @@film[:door     ] = @@film[:wall]
-  @@film[:window   ] = @@film[:wall] # N/A if SimpleGlazingMaterial
-  @@film[:skylight ] = @@film[:roof] # N/A if SimpleGlazingMaterial
+  # thermal mass categories (e.g. exterior cladding, interior finish, framing)
+  @@mass = [
+      :none, # token for 'no user selection', resort to defaults
+     :light, # e.g. 16mm drywall interior
+    :medium, # e.g. 100mm brick cladding
+     :heavy  # e.g. 200mm poured concrete
+  ].freeze
 
-  @@uo[:shading    ] = 0.000 # N/A
-  @@uo[:partition  ] = 0.000 # N/A
-  @@uo[:wall       ] = 0.384 # rated Ro ~14.8
-  @@uo[:roof       ] = 0.327 # rated Ro ~17.6
-  @@uo[:floor      ] = 0.317 # rated Ro ~17.9 (exposed floor)
-  @@uo[:basement   ] = 0.000 # uninsulated
-  @@uo[:slab       ] = 0.000 # uninsulated
-  @@uo[:door       ] = 1.800 # insulated, unglazed steel door (single layer)
-  @@uo[:window     ] = 2.800 # e.g. patio doors (simple glazing)
-  @@uo[:skylight   ] = 3.500 # all skylight technologies
+  # basic materials (StandardOpaqueMaterials only)
+  @@mats = {
+        sand: {},
+    concrete: {},
+       brick: {},
+    cladding: {}, # e.g. lightweight cladding over furring
+   sheathing: {}, # e.g. plywood
+     polyiso: {}, # e.g. polyisocyanurate panel (or similar)
+   cellulose: {}, # e.g. blown, dry/stabilized fiber
+     mineral: {}, # e.g. semi-rigid rock wool insulation
+     drywall: {},
+        door: {}  # single composite material (45mm insulated steel door)
+  }.freeze
+
+  # default inside+outside air film resistances (m2.K/W)
+  @@film = {
+      shading: 0.000, # NA
+    partition: 0.000,
+         wall: 0.150,
+         roof: 0.140,
+        floor: 0.190,
+     basement: 0.120,
+         slab: 0.160,
+         door: 0.150,
+       window: 0.150, # ignored if SimpleGlazingMaterial
+     skylight: 0.140  # ignored if SimpleGlazingMaterial
+  }.freeze
+
+  # default (~1980s) envelope Uo (W/m2•K), based on surface type
+  @@uo = {
+      shading: 0.000, # N/A
+    partition: 0.000, # N/A
+         wall: 0.384, # rated Ro ~14.8 hr•ft2F/Btu
+         roof: 0.327, # rated Ro ~17.6 hr•ft2F/Btu
+        floor: 0.317, # rated Ro ~17.9 hr•ft2F/Btu (exposed floor)
+     basement: 0.000, # uninsulated
+         slab: 0.000, # uninsulated
+         door: 1.800, # insulated, unglazed steel door (single layer)
+       window: 2.800, # e.g. patio doors (simple glazing)
+     skylight: 3.500  # all skylight technologies
+  }.freeze
 
   # Standard opaque materials, taken from a variety of sources (e.g. energy
   # codes, NREL's BCL). Material identifiers are symbols, e.g.:
@@ -115,8 +137,7 @@ module OSut
   #   - solar                (sol) : 70%
   #   - visible              (vis) : 70%
   #
-  # These can also be explicitly set, here (e.g. a redundant example):
-  @@mats[:sand     ]         = {}
+  # These can also be explicitly set, here (e.g. a redundant 'sand' example):
   @@mats[:sand     ][:rgh] = "Rough"
   @@mats[:sand     ][:k  ] =    1.290
   @@mats[:sand     ][:rho] = 2240.000
@@ -125,53 +146,44 @@ module OSut
   @@mats[:sand     ][:sol] =    0.700
   @@mats[:sand     ][:vis] =    0.700
 
-  @@mats[:concrete ]       = {}
   @@mats[:concrete ][:rgh] = "MediumRough"
   @@mats[:concrete ][:k  ] =    1.730
   @@mats[:concrete ][:rho] = 2240.000
   @@mats[:concrete ][:cp ] =  830.000
 
-  @@mats[:brick    ]       = {}
   @@mats[:brick    ][:rgh] = "Rough"
   @@mats[:brick    ][:k  ] =    0.675
   @@mats[:brick    ][:rho] = 1600.000
   @@mats[:brick    ][:cp ] =  790.000
 
-  @@mats[:cladding ]       = {} # e.g. lightweight cladding over furring
   @@mats[:cladding ][:rgh] = "MediumSmooth"
   @@mats[:cladding ][:k  ] =    0.115
   @@mats[:cladding ][:rho] =  540.000
   @@mats[:cladding ][:cp ] = 1200.000
 
-  @@mats[:sheathing]       = {} # e.g. plywood
   @@mats[:sheathing][:k  ] =    0.160
   @@mats[:sheathing][:rho] =  545.000
   @@mats[:sheathing][:cp ] = 1210.000
 
-  @@mats[:polyiso  ]       = {}
   @@mats[:polyiso  ][:k  ] =    0.025
   @@mats[:polyiso  ][:rho] =   25.000
   @@mats[:polyiso  ][:cp ] = 1590.000
 
-  @@mats[:cellulose]       = {}
   @@mats[:cellulose][:rgh] = "VeryRough"
   @@mats[:cellulose][:k  ] =    0.050
   @@mats[:cellulose][:rho] =   80.000
   @@mats[:cellulose][:cp ] =  835.000
 
-  @@mats[:mineral  ]       = {}
   @@mats[:mineral  ][:k  ] =    0.050
   @@mats[:mineral  ][:rho] =   19.000
   @@mats[:mineral  ][:cp ] =  960.000
 
-  @@mats[:drywall  ]       = {}
   @@mats[:drywall  ][:k  ] =    0.160
   @@mats[:drywall  ][:rho] =  785.000
   @@mats[:drywall  ][:cp ] = 1090.000
 
-  @@mats[:door     ]        = {}
   @@mats[:door     ][:rgh] = "MediumSmooth"
-  @@mats[:door     ][:k  ] =    0.080 # = 1.8 * 0.045m
+  @@mats[:door     ][:k  ] =    0.080
   @@mats[:door     ][:rho] =  600.000
   @@mats[:door     ][:cp ] = 1000.000
 
@@ -187,14 +199,12 @@ module OSut
   # @option specs [Symbol] :frame (:light) assembly framing, see @@mass
   # @option specs [Symbol] :finish (:light) interior finishing, see @@mass
   #
-  # @return [OpenStudio::Model::Construction] a construction
-  # @return [NilClass] if invalid specs (see logs)
+  # @return [OpenStudio::Model::Construction] generated construction
+  # @return [nil] if invalid inputs (see logs)
   def genConstruction(model = nil, specs = {})
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Model::Model
     cl2 = Hash
-
-    # Log/exit if invalid arguments.
     return mismatch("model", model, cl1, mth)        unless model.is_a?(cl1)
     return mismatch("specs", specs, cl2, mth)        unless specs.is_a?(cl2)
 
@@ -555,8 +565,8 @@ module OSut
   #
   # @param subs [OpenStudio::Model::SubSurfaceVector] sub surfaces
   #
-  # @return [Bool] true if successful
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if successfully generated
+  # @return [false] if invalid input (see logs)
   def genShade(subs = OpenStudio::Model::SubSurfaceVector.new)
     # Filter OpenStudio warnings for ShadingControl:
     #   ref: https://github.com/NREL/OpenStudio/issues/4911
@@ -566,8 +576,6 @@ module OSut
     mth = "OSut::#{__callee__}"
     v   = OpenStudio.openStudioVersion.split(".").join.to_i
     cl  = OpenStudio::Model::SubSurfaceVector
-
-    # Log/exit if invalid arguments.
     return mismatch("subs ", subs,  cl2, mth, DBG, false) unless subs.is_a?(cl)
     return empty(   "subs",              mth, WRN, false)     if subs.empty?
     return false                                              if v < 321
@@ -649,10 +657,10 @@ module OSut
   # Generates an internal mass definition and instances for target spaces.
   #
   # @param sps [OpenStudio::Model::SpaceVector] target spaces
-  # @param ratio [Double] internal mass surface / floor areas
+  # @param ratio [Numeric] internal mass surface / floor areas
   #
-  # @return [Bool] true if successful
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if successfully generated
+  # @return [false] if invalid input (see logs)
   def genMass(sps = OpenStudio::Model::SpaceVector.new, ratio = 2.0)
     # This is largely adapted from OpenStudio-Standards:
     #
@@ -663,8 +671,6 @@ module OSut
     cl1 = OpenStudio::Model::SpaceVector
     cl2 = Numeric
     no  = false
-
-    # Log/exit if invalid arguments.
     return mismatch("spaces",   sps, cl1, mth, DBG, no) unless sps.is_a?(cl1)
     return mismatch( "ratio", ratio, cl2, mth, DBG, no) unless ratio.is_a?(cl2)
     return empty(   "spaces",             mth, WRN, no)     if sps.empty?
@@ -730,18 +736,17 @@ module OSut
   #
   # @param set [OpenStudio::Model::DefaultConstructionSet] a default set
   # @param bse [OpensStudio::Model::ConstructionBase] a construction base
-  # @param gr [Bool] true if ground-facing surface
-  # @param ex [Bool] true if exterior-facing surface
-  # @param tp [String] a surface type
+  # @param gr [Bool] if ground-facing surface
+  # @param ex [Bool] if exterior-facing surface
+  # @param tp [#to_s] a surface type
   #
-  # @return [Bool] true if default construction set holds construction
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if default set holds construction
+  # @return [false] if invalid input (see logs)
   def holdsConstruction?(set = nil, bse = nil, gr = false, ex = false, tp = "")
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Model::DefaultConstructionSet
     cl2 = OpenStudio::Model::ConstructionBase
     no  = false
-
     ok1 = set.respond_to?(NS)
     ok2 = bse.respond_to?(NS)
     return invalid("set",          mth, 1, DBG, false) unless ok1
@@ -809,7 +814,7 @@ module OSut
   # @param s [OpenStudio::Model::Surface] a surface
   #
   # @return [OpenStudio::Model::DefaultConstructionSet] default set
-  # @return [NilClass] if invalid input (see logs)
+  # @return [nil] if invalid input (see logs)
   def defaultConstructionSet(s = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Surface
@@ -878,8 +883,8 @@ module OSut
   #
   # @param lc [OpenStudio::LayeredConstruction] a layered construction
   #
-  # @return [Bool] true if all layers are valid
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if all layers are valid
+  # @return [false] if invalid input (see logs)
   def standardOpaqueLayers?(lc = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::LayeredConstruction
@@ -896,8 +901,8 @@ module OSut
   #
   # @param lc [OpenStudio::LayeredConstruction] a layered construction
   #
-  # @return [Float] total layered construction thickness
-  # @return [Float] 0 if invalid input (see logs)
+  # @return [Float] construction thickness
+  # @return [0.0] if invalid input (see logs)
   def thickness(lc = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::LayeredConstruction
@@ -917,12 +922,12 @@ module OSut
   end
 
   ##
-  # Returns the total air film resistance of a fenestrated construction.
+  # Returns total air film resistance of a fenestrated construction (m2•K/W)
   #
-  # @param usi [Float] a fenestrated construction's U-factor (W/m2•K)
+  # @param usi [Numeric] a fenestrated construction's U-factor (W/m2•K)
   #
-  # @return [Float] total air film resistance in m2•K/W
-  # @return [0.1216] if invalid input or errors (see logs)
+  # @return [Float] total air film resistances
+  # @return [0.1216] if invalid input (see logs)
   def glazingAirFilmRSi(usi = 5.85)
     # The sum of thermal resistances of calculated exterior and interior film
     # coefficients under standard winter conditions are taken from:
@@ -955,15 +960,16 @@ module OSut
   end
 
   ##
-  # Returns a construction's 'standard calc' thermal resistance, which includes
-  # air film resistances while excluding insulating effects of shades, screens,
-  # etc. in the case of fenestrated constructions.
+  # Returns a construction's 'standard calc' thermal resistance (m2•K/W), which
+  # includes air film resistances. It excludes insulating effects of shades,
+  # screens, etc. in the case of fenestrated constructions.
   #
   # @param lc [OpenStudio::Model::LayeredConstruction] a layered construction
-  # @param film [Float] thermal resistance of surface air films (m2•K/W)
-  # @param t [Float] gas temperature (°C) (optional)
+  # @param film [Numeric] thermal resistance of surface air films (m2•K/W)
+  # @param t [Numeric] gas temperature (°C) (optional)
   #
-  # @return [Float] calculated RSi at standard conditions (0 if error)
+  # @return [Float] layered construction's thermal resistance
+  # @return [0.0] if invalid input (see logs)
   def rsi(lc = nil, film = 0.0, t = 0.0)
     # This is adapted from BTAP's Material Module "get_conductance" (P. Lopez)
     #
@@ -1016,19 +1022,19 @@ module OSut
 
   ##
   # Identify a layered construction's (opaque) insulating layer. The method
-  # returns a 3-keyed hash ... :index (insulating layer index within layered
-  # construction), :type (standard: or massless: material type), and
-  # :r (material thermal resistance in m2•K/W).
+  # returns a 3-keyed hash :index, the insulating layer index [0, n layers)
+  # within the layered construction; :type, either :standard or :massless; and
+  # :r, material thermal resistance in m2•K/W.
   #
   # @param lc [OpenStudio::Model::LayeredConstruction] a layered construction
   #
-  # @return [Hash] index: (Integer), type: (:standard or :massless), r: (Float)
-  # @return [Hash] index: nil, type: nil, r: 0 (if invalid input)
+  # @return [Hash] index: (Integer), type: (:Symbol), r: (Float)
+  # @return [Hash] index: nil, type: nil, r: 0 if invalid input (see logs)
   def insulatingLayer(lc = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::LayeredConstruction
     res = { index: nil, type: nil, r: 0.0 }
-    i   = 0                                                           # iterator
+    i   = 0  # iterator
     return invalid("lc", mth, 1, DBG, res) unless lc.respond_to?(NS)
 
     id   = lc.nameString
@@ -1072,7 +1078,7 @@ module OSut
   # ---- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---- #
   # ---- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---- #
   # This next set of utilities (~850 lines) help distinguish spaces that are
-  # directly vs indirectly CONDITIONED, vs SEMI-HEATED. The solution here
+  # directly vs indirectly CONDITIONED, vs SEMIHEATED. The solution here
   # relies as much as possible on space conditioning categories found in
   # standards like ASHRAE 90.1 and energy codes like the Canadian NECBs.
   #
@@ -1097,11 +1103,11 @@ module OSut
   #
   #               ... includes plenums, atria, etc.
   #
-  #     - SEMI-HEATED space: an ENCLOSED space that has a heating system
+  #     - SEMIHEATED space: an ENCLOSED space that has a heating system
   #       >= 10 W/m2, yet NOT a CONDITIONED space (see above).
   #
   #     - UNCONDITIONED space: an ENCLOSED space that is NOT a conditioned
-  #       space or a SEMI-HEATED space (see above).
+  #       space or a SEMIHEATED space (see above).
   #
   #       NOTE: Crawlspaces, attics, and parking garages with natural or
   #       mechanical ventilation are considered UNENCLOSED spaces.
@@ -1122,16 +1128,19 @@ module OSut
   # to ASHRAE 90.1 (e.g. heating and/or cooling based, no distinction for
   # INDIRECTLY conditioned spaces like plenums).
   #
-  # SEMI-HEATED spaces are described in the NECB (yet not a defined term). The
+  # SEMIHEATED spaces are described in the NECB (yet not a defined term). The
   # distinction is also based on desired/intended design space setpoint
   # temperatures (here 15°C) - not system sizing criteria. No further treatment
-  # is implemented here to distinguish SEMI-HEATED from CONDITIONED spaces.
+  # is implemented here to distinguish SEMIHEATED from CONDITIONED spaces;
+  # notwithstanding the AdditionalProperties tag (described further in this
+  # section), it is up to users to determine if a CONDITIONED space is
+  # indeed SEMIHEATED or not (e.g. based on MIN/MAX setpoints).
   #
   # The single NECB criterion distinguishing UNCONDITIONED ENCLOSED spaces
   # (such as vestibules) from UNENCLOSED spaces (such as attics) remains the
   # intention to ventilate - or rather to what degree. Regardless, the methods
   # here are designed to process both classifications in the same way, namely
-  # by focusing on adjacent surfaces to CONDITIONED (or SEMI-HEATED) spaces as
+  # by focusing on adjacent surfaces to CONDITIONED (or SEMIHEATED) spaces as
   # part of the building envelope.
 
   # In light of the above, OSut methods here are designed without a priori
@@ -1143,7 +1152,7 @@ module OSut
   # considered synonymous.
   #
   # For an OpenStudio model in an incomplete or preliminary state, e.g. holding
-  # fully-formed ENCLOSED spaces without thermal zoning information or setpoint
+  # fully-formed ENCLOSED spaces WITHOUT thermal zoning information or setpoint
   # temperatures (early design stage assessments of form, porosity or
   # envelope), OpenStudio spaces are considered CONDITIONED by default. This
   # default behaviour may be reset based on the (Space) AdditionalProperties
@@ -1161,8 +1170,7 @@ module OSut
   #   - "Unconditioned"
   #
   # OSut maintains existing "space_conditioning_category" key/value pairs
-  # intact. Based on these, OSut may generate related return values in any of
-  # its methods, e.g. status, postulated setpoints:
+  # intact. Based on these, OSut methods may return related outputs:
   #
   #   "space_conditioning_category" | OSut status   | heating °C | cooling °C
   # -------------------------------   -------------   ----------   ----------
@@ -1172,7 +1180,7 @@ module OSut
   #   - "Unconditioned"               UNCONDITIONED   NA           NA
   #
   # OSut also looks up another (Space) AdditionalProperties 'key',
-  # "indirectlyconditioned" to flag plenum or occupied spaces indectly
+  # "indirectlyconditioned" to flag plenum or occupied spaces indirectly
   # conditioned with transfer air only. The only accepted 'value' for an
   # "indirectlyconditioned" 'key' is the name (string) of another (linked)
   # space, e.g.:
@@ -1198,8 +1206,8 @@ module OSut
   # Even when a (more developed) OpenStudio model holds valid space/zone
   # temperature setpoints, OSut gives priority to these AdditionalProperties.
   # For instance, a CONDITIONED space can be considered INDIRECTLYCONDITIONED,
-  # even if its thermal zone thermostat has a valid heating and/or cooling
-  # setpoint. This is in sync with OpenStudio-Standards' method
+  # even if its zone thermostat has a valid heating and/or cooling setpoint.
+  # This is in sync with OpenStudio-Standards' method
   # "space_conditioning_category()".
 
   ##
@@ -1207,8 +1215,8 @@ module OSut
   #
   # @param model [OpenStudio::Model::Model] a model
   #
-  # @return [Bool] true if model has one or more HVAC air loops
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if model has HVAC air loops
+  # @return [false] if invalid input (see logs)
   def airLoopsHVAC?(model = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Model
@@ -1229,7 +1237,7 @@ module OSut
   # @param sched [OpenStudio::Model::ScheduleRuleset] a schedule
   #
   # @return [Hash] min: (Float), max: (Float)
-  # @return [Hash] min: (nil), max: (nil) if invalid input (see logs)
+  # @return [Hash] min: nil, max: nil if invalid inputs (see logs)
   def scheduleRulesetMinMax(sched = nil)
     # Largely inspired from David Goldwasser's
     # "schedule_ruleset_annual_min_max_value":
@@ -1276,7 +1284,7 @@ module OSut
   # @param sched [OpenStudio::Model::ScheduleConstant] a schedule
   #
   # @return [Hash] min: (Float), max: (Float)
-  # @return [Hash] min: (nil), max: (nil) if invalid input (see logs)
+  # @return [Hash] min: nil, max: nil if invalid inputs (see logs)
   def scheduleConstantMinMax(sched = nil)
     # Largely inspired from David Goldwasser's
     # "schedule_constant_annual_min_max_value":
@@ -1306,7 +1314,7 @@ module OSut
   # @param sched [OpenStudio::Model::ScheduleCompact] schedule
   #
   # @return [Hash] min: (Float), max: (Float)
-  # @return [Hash] min: (nil), max: (nil) if invalid input (see logs)
+  # @return [Hash] min: nil, max: nil if invalid input (see logs)
   def scheduleCompactMinMax(sched = nil)
     # Largely inspired from Andrew Parker's
     # "schedule_compact_annual_min_max_value":
@@ -1352,7 +1360,7 @@ module OSut
   # @param sched [OpenStudio::Model::ScheduleInterval] schedule
   #
   # @return [Hash] min: (Float), max: (Float)
-  # @return [Hash] min: (nil), max: (nil) if invalid input (see logs)
+  # @return [Hash] min: nil, max: nil if invalid input (see logs)
   def scheduleIntervalMinMax(sched = nil)
     mth  = "OSut::#{__callee__}"
     cl   = OpenStudio::Model::ScheduleInterval
@@ -1382,10 +1390,10 @@ module OSut
   # @param zone [OpenStudio::Model::ThermalZone] a thermal zone
   #
   # @return [Hash] spt: (Float), dual: (Bool)
-  # @return [Hash] spt: (nil), dual: (false) if invalid input (see logs)
+  # @return [Hash] spt: nil, dual: false if invalid input (see logs)
   def maxHeatScheduledSetpoint(zone = nil)
     # Largely inspired from Parker & Marrec's "thermal_zone_heated?" procedure.
-    # The solution here is a tad more relaxed to encompass SEMI-HEATED zones as
+    # The solution here is a tad more relaxed to encompass SEMIHEATED zones as
     # per Canadian NECB criteria (basically any space with at least 10 W/m2 of
     # installed heating equipement, i.e. below freezing in Canada).
     #
@@ -1555,8 +1563,8 @@ module OSut
   #
   # @param model [OpenStudio::Model::Model] a model
   #
-  # @return [Bool] true if valid heating temperature setpoints
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if model holds valid heating temperature setpoints
+  # @return [false] false if invalid input (see logs)
   def heatingTemperatureSetpoints?(model = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Model
@@ -1576,7 +1584,7 @@ module OSut
   # @param zone [OpenStudio::Model::ThermalZone] a thermal zone
   #
   # @return [Hash] spt: (Float), dual: (Bool)
-  # @return [Hash] spt: (nil), dual: (false) if invalid input (see logs)
+  # @return [Hash] spt: nil, dual: false if invalid input (see logs)
   def minCoolScheduledSetpoint(zone = nil)
     # Largely inspired from Parker & Marrec's "thermal_zone_cooled?" procedure.
     #
@@ -1733,8 +1741,8 @@ module OSut
   #
   # @param model [OpenStudio::Model::Model] a model
   #
-  # @return [Bool] true if valid cooling temperature setpoints
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if model holds valid cooling temperature setpoints
+  # @return [false] if invalid input (see logs)
   def coolingTemperatureSetpoints?(model = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Model
@@ -1752,8 +1760,8 @@ module OSut
   #
   # @param space [OpenStudio::Model::Space] a space
   #
-  # @return [Bool] returns true if vestibule
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if space is considered a vestibule
+  # @return [false] if invalid input (see logs)
   def vestibule?(space = nil)
     # INFO: OpenStudio-Standards' "thermal_zone_vestibule" criteria:
     #   - zones less than 200ft2; AND
@@ -1765,9 +1773,9 @@ module OSut
     #
     # This (unused) OpenStudio-Standards method likely needs revision; it would
     # return "false" if the thermal zone area were less than 200ft2. Not sure
-    # which vintage of 90.1 relies on a 200ft2 threshold (2010?); 90.1 2016
+    # which edition of 90.1 relies on a 200ft2 threshold (2010?); 90.1 2016
     # doesn't. Yet even fixed, the method would nonetheless misidentify as
-    # "vestibule" a small space along an exterior wall, such as a semi-heated
+    # "vestibule" a small space along an exterior wall, such as a semiheated
     # storage space.
     #
     # The code below is intended as a simple short-term solution, basically
@@ -1824,8 +1832,8 @@ module OSut
   #
   # @param space [OpenStudio::Model::Space] a space
   #
-  # @return [Bool] true if plenum
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if space is considered a plenum
+  # @return [false] if invalid input (see logs)
   def plenum?(space = nil)
     # Largely inspired from NREL's "space_plenum?":
     #
@@ -1936,7 +1944,7 @@ module OSut
   # @param space [OpenStudio::Model::Space] a space
   #
   # @return [Hash] heating: (Float), cooling: (Float)
-  # @return [Hash] heating: (nil), cooling: (nil) if invalid input (see logs)
+  # @return [Hash] heating: nil, cooling: nil if invalid input (see logs)
   def setpoints(space = nil)
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Model::Space
@@ -2026,8 +2034,8 @@ module OSut
   #
   # @param space [OpenStudio::Model::Space] a space
   #
-  # @return [Bool] true if space can be considered as UNCONDITIONED
-  # @retrun [Bool] false if invalid input (see logs)
+  # @return [Bool] if space is considered as UNCONDITIONED
+  # @return [false] if invalid input (see logs)
   def unconditioned?(space = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::Space
@@ -2046,7 +2054,7 @@ module OSut
   # @param avl [String] seasonal availability choice (optional, default "ON")
   #
   # @return [OpenStudio::Model::Schedule] HVAC availability sched
-  # @return [NilClass] if invalid input (see logs)
+  # @return [nil] if invalid input (see logs)
   def availabilitySchedule(model = nil, avl = "")
     mth    = "OSut::#{__callee__}"
     cl     = OpenStudio::Model::Model
@@ -2198,8 +2206,8 @@ module OSut
 
   # ---- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---- #
   # ---- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---- #
-  # This final set of utilities supports OpenStudio geometry methods. Many of
-  # the following geometry methods rely on Boost as an OpenStudio dependency.
+  # This final set of utilities targets OpenStudio geometry. Many of the
+  # following geometry methods rely on Boost as an OpenStudio dependency.
   # As per Boost requirements, points (e.g. polygons) must first be 'aligned':
   #   - first rotated/tilted as to lay flat along XY plane (Z-axis ~= 0)
   #   - initial Z-axis values are represented as Y-axis values
@@ -2212,10 +2220,10 @@ module OSut
   ##
   # Returns OpenStudio site/space transformation & rotation angle [0,2PI) rads.
   #
-  # @param group [OpenStudio::Model::PlanarSurfaceGroup] a group
+  # @param group [OpenStudio::Model::PlanarSurfaceGroup] a site or space object
   #
   # @return [Hash] t: (OpenStudio::Transformation), r: (Float)
-  # @return [Hash] t: (nil), r: (nil) if invalid input (see logs)
+  # @return [Hash] t: nil, r: nil if invalid input (see logs)
   def transforms(group = nil)
     mth = "OSut::#{__callee__}"
     cl2 = OpenStudio::Model::PlanarSurfaceGroup
@@ -2233,13 +2241,13 @@ module OSut
   end
 
   ##
-  # Returns true if 2x OpenStudio 3D points are nearly equal
+  # Returns true if 2 OpenStudio 3D points are nearly equal
   #
   # @param p1 [OpenStudio::Point3d] 1st 3D point
-  # @param p1 [OpenStudio::Point3d] 2nd 3D point
+  # @param p2 [OpenStudio::Point3d] 2nd 3D point
   #
-  # @return [Bool] true if equal points (within TOL)
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if equal points (within TOL)
+  # @return [false] if invalid input (see logs)
   def same?(p1 = nil, p2 = nil)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Point3d
@@ -2254,11 +2262,11 @@ module OSut
   # Returns true if a line segment is along the X-axis.
   #
   # @param p1 [OpenStudio::Point3d] 1st 3D point of a line segment
-  # @param p2 [OpenStudio::POint3d] 2nd 3D point of a line segment
-  # @param strict [Bool] true if segment doesn't hold Y- or Z-axis components
+  # @param p2 [OpenStudio::Point3d] 2nd 3D point of a line segment
+  # @param strict [Bool] whether segment shouldn't hold Y- or Z-axis components
   #
-  # @return [Bool] true if along the X-axis
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if along the X-axis
+  # @return [false] if invalid input (see logs)
   def xx?(p1 = nil, p2 = nil, strict = true)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Point3d
@@ -2275,11 +2283,11 @@ module OSut
   # Returns true if a line segment is along the Y-axis.
   #
   # @param p1 [OpenStudio::Point3d] 1st 3D point of a line segment
-  # @param p2 [OpenStudio::POint3d] 2nd 3D point of a line segment
-  # @param strict [Bool] true if segment doesn't hold X- or Z-axis components
+  # @param p2 [OpenStudio::Point3d] 2nd 3D point of a line segment
+  # @param strict [Bool] whether segment shouldn't hold X- or Z-axis components
   #
-  # @return [Bool] true if along the Y-axis
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if along the Y-axis
+  # @return [false] if invalid input (see logs)
   def yy?(p1 = nil, p2 = nil, strict = true)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Point3d
@@ -2296,11 +2304,11 @@ module OSut
   # Returns true if a line segment is along the Z-axis.
   #
   # @param p1 [OpenStudio::Point3d] 1st 3D point of a line segment
-  # @param p2 [OpenStudio::POint3d] 2nd 3D point of a line segment
-  # @param strict [Bool] true if segment doesn't hold X- or Y-axis components
+  # @param p2 [OpenStudio::Point3d] 2nd 3D point of a line segment
+  # @param strict [Bool] whether segment shouldn't hold X- or Y-axis components
   #
-  # @return [Bool] true if along the Z-axis
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if along the Z-axis
+  # @return [false] if invalid input (see logs)
   def zz?(p1 = nil, p2 = nil, strict = true)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Point3d
@@ -2317,10 +2325,9 @@ module OSut
   # Returns a scalar product of an OpenStudio Vector3d.
   #
   # @param v [OpenStudio::Vector3d] a vector
-  # @param m [Float] a scalar
+  # @param m [#to_f] a scalar
   #
-  # @return [OpenStudio::Vector3d] scaled points
-  # @return [OpenStudio::Vector3d] empty if invalid input (see logs)
+  # @return [OpenStudio::Vector3d] scaled points (see logs if empty)
   def scalar(v = OpenStudio::Vector3d.new, m = 0)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Vector3d
@@ -2338,8 +2345,7 @@ module OSut
   #
   # @param pts [Set<OpenStudio::Point3d>] OpenStudio 3D points
   #
-  # @return [OpenStudio::Point3dVector] points vector
-  # @return [OpenStudio::Point3dVector] empty points if failed (see logs)
+  # @return [OpenStudio::Point3dVector] 3D vector (see logs if empty)
   def to_p3Dv(pts = nil)
     mth = "OSut::#{__callee__}"
     cl1 = Array
@@ -2366,8 +2372,8 @@ module OSut
   # @param pts [Set<OpenStudio::Point3dVector>] 3d points
   # @param p1 [OpenStudio::Point3d] a 3D point
   #
-  # @return [Bool] true if part of a set of 3D points
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if part of a set of 3D points
+  # @return [false] if invalid input (see logs)
   def holds?(pts = nil, p1 = nil)
     mth = "OSut::#{__callee__}"
     pts = to_p3Dv(pts)
@@ -2383,11 +2389,10 @@ module OSut
   # Flattens OpenStudio 3D points vs X, Y or Z axes.
   #
   # @param pts [Set<OpenStudio::Point3d>] 3D points
-  # @param axs [Symbol] if potentially along :x, :y or :z axis
-  # @param val [Numeric] axis value
+  # @param axs [Symbol] :x, :y or :z axis
+  # @param val [#to_f] axis value
   #
-  # @return [OpenStudio::Point3dVector] flattened 3D points
-  # @return [OpenStudio::Point3dVector] empty if invalid input (see logs)
+  # @return [OpenStudio::Point3dVector] flattened points (see logs if empty)
   def flatten(pts = nil, axs = :z, val = 0)
     mth = "OSut::#{__callee__}"
     pts = to_p3Dv(pts)
@@ -2418,8 +2423,8 @@ module OSut
   # @param axs [Symbol] if potentially along :x, :y or :z axis
   # @param val [Numeric] axis value
   #
-  # @return [Bool] true if points share X, Y or Z coordinates
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if points share X, Y or Z coordinates
+  # @return [false] if invalid input (see logs)
   def xyz?(pts = nil, axs = :z, val = 0)
     mth = "OSut::#{__callee__}"
     pts = to_p3Dv(pts)
@@ -2450,7 +2455,7 @@ module OSut
   # @param pt [OpenStudio::Point3d] a given 3D point
   #
   # @return [OpenStudio::Point3d] the next sequential point
-  # @return [NilClass] nil if invalid input (see logs)
+  # @return [nil] if invalid input (see logs)
   def next(pts = nil, pt = nil)
     mth = "OSut::#{__callee__}"
     pts = to_p3Dv(pts)
@@ -2467,10 +2472,9 @@ module OSut
   # Returns unique OpenStudio 3D points from an OpenStudio 3D point vector.
   #
   # @param pts [Set<OpenStudio::Point3d] 3D points
-  # @param n [Integer] requested number of unique points (0 returns all)
+  # @param n [#to_i] requested number of unique points (0 returns all)
   #
-  # @return [OpenStudio::Point3dVector] unique points
-  # @return [OpenStudio::Point3dVector] empty if failed (see logs)
+  # @return [OpenStudio::Point3dVector] unique points (see logs if empty)
   def getUniques(pts = nil, n = 0)
     mth = "OSut::#{__callee__}"
     pts = to_p3Dv(pts)
@@ -2493,10 +2497,9 @@ module OSut
   # Returns sequential non-collinear points in an OpenStudio 3D point vector.
   #
   # @param pts [Set<OpenStudio::Point3d] 3D points
-  # @param n [Integer] requested number of non-collinears (0 returns all)
+  # @param n [#to_i] requested number of non-collinears (0 returns all)
   #
-  # @return [OpenStudio::Point3dVector] non-collinear points
-  # @return [OpenStudio::Point3dVector] empty if failed (see logs)
+  # @return [OpenStudio::Point3dVector] non-collinears (see logs if empty)
   def getNonCollinears(pts = nil, n = 0)
     mth = "OSut::#{__callee__}"
     pts = getUniques(pts)
@@ -2541,10 +2544,9 @@ module OSut
   # segments equals the number of non-colliear points.
   #
   # @param pts [Set<OpenStudio::Point3d>] 3D points
-  # @param co [Bool] true if requesting to keep collinear points
+  # @param co [Bool] to keep collinear points
   #
-  # @return [OpenStudio::Point3dVectorVector] line segments
-  # @return [OpenStudio::Point3dVectorVector] empty if failed)
+  # @return [OpenStudio::Point3dVectorVector] line segments (see logs if empty)
   def getSegments(pts = nil, co = false)
     mth = "OSut::#{__callee__}"
     vv  = OpenStudio::Point3dVectorVector.new
@@ -2576,10 +2578,9 @@ module OSut
   # returned triads equals the number of non-collinear points.
   #
   # @param pts [OpenStudio::Point3dVector] 3D points
-  # @param co [Bool] true if requesting to keep collinear points
+  # @param co [Bool] to keep collinear points
   #
-  # @return [OpenStudio::Point3dVectorVector] triads
-  # @return [OpenStudio::Point3dVectorVector] empty if failed (see logs)
+  # @return [OpenStudio::Point3dVectorVector] triads (see logs if empty)
   def getTriads(pts = nil, co = false)
     mth = "OSut::#{__callee__}"
     vv  = OpenStudio::Point3dVectorVector.new
@@ -2611,8 +2612,7 @@ module OSut
   #
   # @param pts [OpenStudio::Point3dVector] 3D points
   #
-  # @return [true] if sequence is clockwise
-  # @return [false] if sequence is counterclockwise
+  # @return [Bool] if sequence is clockwise
   # @return [false] if invalid input (see logs)
   def clockwise?(pts = nil)
     mth = "OSut::#{__callee__}"
@@ -2630,8 +2630,7 @@ module OSut
   #
   # @param pts [Set<OpenStudio::Point3d>] aligned 3D points
   #
-  # @return [OpenStudio::Point3dVector] ULC points
-  # @return [OpenStudio::Point3dVector] empty points if failed (see logs)
+  # @return [OpenStudio::Point3dVector] ULC points (see logs if empty)
   def ulc(pts = nil)
     mth = "OSut::#{__callee__}"
     pts = to_p3Dv(pts)
@@ -2669,14 +2668,13 @@ module OSut
   # counterclockwise sequence, or in clockwise sequence.
   #
   # @param pts [Set<OpenStudio::Point3d>] 3D points
-  # @param vx [Bool] true to check for convexity
-  # @param uq [Bool] true to ensure uniqueness
-  # @param co [Bool] false to ensure non-collinearity
-  # @param tt [true, false, OpenStudio::Transformation] to 'align' or not
-  # @param sq [:no, :ulc, :cw] unaltered, ULC or clockwise final sequence
+  # @param vx [Bool] whether to check for convexity
+  # @param uq [Bool] whether to ensure uniqueness
+  # @param co [Bool] whether to ensure non-collinearity
+  # @param tt [Bool, OpenStudio::Transformation] whether to 'align'
+  # @param sq [:no, :ulc, :cw] unaltered, ULC or clockwise sequence
   #
-  # @return [OpenStudio::Point3dVector] original or transformed points
-  # @return [OpenStudio::Point3dVector] empty if invalid input (see logs)
+  # @return [OpenStudio::Point3dVector] 3D points (see logs if empty)
   def poly(pts = nil, vx = false, uq = false, co = true, tt = false, sq = :no)
     mth = "OSut::#{__callee__}"
     pts = to_p3Dv(pts)
@@ -2798,8 +2796,8 @@ module OSut
   #
   # @param pts [Set<OpenStudio::Point3d>] 3D points
   #
-  # @return [Double] left-to-right width
-  # @return [Double] 0 if invalid inputs (see logs)
+  # @return [Float] left-to-right width
+  # @return [0.0] if invalid inputs (see logs)
   def width(pts = nil)
     mth = "OSut::#{__callee__}"
 
@@ -2811,8 +2809,8 @@ module OSut
   #
   # @param pts [Set<OpenStudio::Point3d>] 3D points
   #
-  # @return [Double] top-to-bottom height
-  # @return [Double] 0 if invalid inputs (see logs)
+  # @return [Float] top-to-bottom height
+  # @return [0.0] if invalid inputs (see logs)
   def height(pts = nil)
     mth = "OSut::#{__callee__}"
 
@@ -2820,14 +2818,14 @@ module OSut
   end
 
   ##
-  # Determines whether 1st OpenStudio polygon fits in 2nd polygon.
+  # Determines whether a 1st OpenStudio polygon fits in a 2nd polygon.
   #
   # @param p1 [Set<OpenStudio::Point3d>] 1st set of 3D points
   # @param p2 [Set<OpenStudio::Point3d>] 2nd set of 3D points
-  # @param flat [Bool] true if points are to be pre-flattened (Z=0)
+  # @param flat [Bool] whether points are to be pre-flattened (Z=0)
   #
-  # @return [Bool] true if 1st polygon fits within the 2nd polygon
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if 1st polygon fits within the 2nd polygon
+  # @return [false] false if invalid input (see logs)
   def fits?(p1 = nil, p2 = nil, flat = true)
     mth  = "OSut::#{__callee__}"
     flat = true  unless [true, false].include?(flat)
@@ -2872,10 +2870,10 @@ module OSut
   #
   # @param p1 [Set<OpenStudio::Point3d>] 1st set of 3D points
   # @param p2 [Set<OpenStudio::Point3d>] 2nd set of 3D points
-  # @param flat [Bool] true if points are to be pre-flattened (Z=0)
+  # @param flat [Bool] whether points are to be pre-flattened (Z=0)
   #
-  # @return [Bool] true if polygons overlaps (or either fits into the other)
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] if polygons overlap (or either fit into one another)
+  # @return [false] if invalid input (see logs)
   def overlaps?(p1 = nil, p2 = nil, flat = true)
     mth  = "OSut::#{__callee__}"
     flat = true unless [true, false].include?(flat)
@@ -2919,11 +2917,10 @@ module OSut
   # Generates offset vertices (by width) for a 3- or 4-sided, convex polygon.
   #
   # @param p1 [Set<OpenStudio::Point3d>] OpenStudio 3D points
-  # @param w [Numeric] offset width (min: 0.0254m)
-  # @param v [Integer] OpenStudio SDK version, eg '321' for 'v3.2.1' (optional)
+  # @param w [#to_f] offset width (min: 0.0254m)
+  # @param v [#to_i] OpenStudio SDK version, eg '321' for "v3.2.1" (optional)
   #
-  # @return [OpenStudio::Point3dVector] offset points if successful
-  # @return [OpenStudio::Point3dVector] original points if invalid input
+  # @return [OpenStudio::Point3dVector] offset points (see logs if unaltered)
   def offset(p1 = nil, w = 0, v = 0)
     mth = "OSut::#{__callee__}"
     pts = poly(p1, true, true, false, true, :cw)
@@ -3140,7 +3137,7 @@ module OSut
   # @param bfr [Numeric] an optional buffer size (min: 0.0254m)
   # @param flat [Bool] true if points are to be pre-flattened (Z=0)
   #
-  # @return [OpenStudio::Point3dVector] generated ULC outline (empty if failed)
+  # @return [OpenStudio::Point3dVector] ULC outline (see logs if empty)
   def outline(a = [], bfr = 0, flat = true)
     mth  = "OSut::#{__callee__}"
     flat = true unless [true, false].include?(flat)
@@ -3231,7 +3228,7 @@ module OSut
   # @param type [String] OpenStudio surface type
   # @param sides [Arrayl<Symbols>] direction keys, e.g. :north, :top, :bottom
   #
-  # @return [Array<OpenStudio::Model::Surface>] surfaces (see logs if empty)
+  # @return [Array<OpenStudio::Model::Surface>] surfaces (may be empty)
   def facets(spaces = [], boundary = "Outdoors", type = "Wall", sides = [])
     return [] unless spaces.respond_to?(:&)
     return [] unless boundary.respond_to?(:to_s)
@@ -3263,7 +3260,9 @@ module OSut
         sidez << :south  if s.outwardNormal.y < -TOL
         sidez << :west   if s.outwardNormal.x < -TOL
         ok = true
+
         orientations.each { |o| ok = false unless sidez.include?(o) }
+
         faces << s if ok
       end
     end
@@ -3275,14 +3274,14 @@ module OSut
   # Generates an OpenStudio 3D point vector of a composite floor "slab", a
   # 'union' of multiple rectangular, horizontal floor "plates". Each plate
   # must either share an edge with (or encompass or overlap) any of the
-  # preceding plates in the array. The generated slab may be non-convex.
+  # preceding plates in the array. The generated slab may not be convex.
   #
   # @param [Array<Hash>] pltz individual floor plates, each holding:
-  # @option pltz [Float] :x left corner of plate origin (bird's eye view)
-  # @option pltz [Float] :y bottom corner of plate origin (bird's eye view)
-  # @option pltz [Float] :dx plate width (bird's eye view)
-  # @option pltz [Float] :dy plate depth (bird's eye view)
-  # @param z [Double] Z-axis coordinate
+  # @option pltz [Numeric] :x left corner of plate origin (bird's eye view)
+  # @option pltz [Numeric] :y bottom corner of plate origin (bird's eye view)
+  # @option pltz [Numeric] :dx plate width (bird's eye view)
+  # @option pltz [Numeric] :dy plate depth (bird's eye view)
+  # @param z [Numeric] Z-axis coordinate
   #
   # @return [OpenStudio::Point3dVector] slab vertices (see logs if empty)
   def genSlab(pltz = [], z = 0)
@@ -3295,6 +3294,7 @@ module OSut
 
     # Input validation.
     return mismatch("plates", pltz, cl1, mth, DBG, slb) unless pltz.is_a?(cl1)
+    return mismatch(     "Z",    z, cl3, mth, DBG, slb) unless z.is_a?(cl3)
 
     pltz.each_with_index do |plt, i|
       id = "plate # #{i+1} (index #{i})"
@@ -3363,34 +3363,33 @@ module OSut
   # Adds sub surfaces (e.g. windows, doors, skylights) to surface.
   #
   # @param s [OpenStudio::Model::Surface] a model surface
-  # @param [Array<Hash>] subs requested attributes, each may hold:
-  # @option subs [String] :id identifier e.g. "Window 007"
-  # @option subs [String] :type ("FixedWindow") OpenStudio subsurface type
-  # @option subs [Integer] :count (1) number of individual subs per array
-  # @option subs [Integer] :multiplier (1) OpenStudio subsurface multiplier
+  # @param [Array<Hash>] subs requested attributes
+  # @option subs [#to_s] :id identifier e.g. "Window 007"
+  # @option subs [#to_s] :type ("FixedWindow") OpenStudio subsurface type
+  # @option subs [#to_i] :count (1) number of individual subs per array
+  # @option subs [#to_i] :multiplier (1) OpenStudio subsurface multiplier
   # @option subs [#frameWidth] :frame (nil) OpenStudio frame & divider object
   # @option subs [#isFenestration] :assembly (nil) OpenStudio construction
-  # @option subs [Double] :ratio e.g. %FWR [0.0, 1.0]
-  # @option subs [Numeric] :head (OSut::HEAD) e.g. door height (incl frame)
-  # @option subs [Numeric] :sill (OSut::SILL) e.g. window sill (incl frame)
-  # @option subs [Numeric] :height sill-to-head height
-  # @option subs [Numeric] :width e.g. door width
-  # @option subs [Numeric] :offset left-right centreline dX e.g. 2x doors
-  # @option subs [Numeric] :centreline left-right dX (sub/array vs base)
-  # @option subs [Numeric] :r_buffer gap between sub/array and right corner
-  # @option subs [Numeric] :l_buffer gap between sub/array and left corner
-  # @param clear [Bool] remove current sub surfaces if true
-  # @param bfr [Double] safety buffer (m), when ~aligned along other edges
+  # @option subs [#to_f] :ratio e.g. %FWR [0.0, 1.0]
+  # @option subs [#to_f] :head (OSut::HEAD) e.g. door height (incl frame)
+  # @option subs [#to_f] :sill (OSut::SILL) e.g. window sill (incl frame)
+  # @option subs [#to_f] :height sill-to-head height
+  # @option subs [#to_f] :width e.g. door width
+  # @option subs [#to_f] :offset left-right centreline dX e.g. between doors
+  # @option subs [#to_f] :centreline left-right dX (sub/array vs base)
+  # @option subs [#to_f] :r_buffer gap between sub/array and right corner
+  # @option subs [#to_f] :l_buffer gap between sub/array and left corner
+  # @param clear [Bool] whether to remove current sub surfaces
+  # @param bfr [#to_f] safety buffer, to maintain near other edges
   #
-  # @return [Bool] true if successful
-  # @return [Bool] false if invalid input (see logs)
+  # @return [Bool] whether addition is successful
+  # @return [false] if invalid input (see logs)
   def addSubs(s = nil, subs = [], clear = false, bfr = 0.005)
     mth = "OSut::#{__callee__}"
     v   = OpenStudio.openStudioVersion.split(".").join.to_i
     cl1 = OpenStudio::Model::Surface
     cl2 = Array
     cl3 = Hash
-    cl4 = Numeric
     min = 0.050 # minimum ratio value ( 5%)
     max = 0.950 # maximum ratio value (95%)
     no  = false
@@ -3412,6 +3411,19 @@ module OSut
     end
 
     s.subSurfaces.map(&:remove) if clear
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Ensure minimum safety buffer.
+    if bfr.respond_to?(:to_f)
+      bfr = bfr.to_f
+      return negative("safety buffer", mth, ERR, no) if bfr < 0
+
+      msg = "Safety buffer < 5mm may generate invalid geometry (#{mth})"
+      log(WRN, msg) if bfr < 0.005
+    else
+      log(ERR, "Setting safety buffer to 5mm (#{mth})")
+      bfr = 0.005
+    end
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Allowable sub surface types ... & Frame&Divider enabled
@@ -3440,15 +3452,29 @@ module OSut
       return mismatch("sub", sub, cl4, mth, DBG, no) unless sub.is_a?(cl3)
 
       # Required key:value pairs (either set by the user or defaulted).
-      sub[:id        ] = ""     unless sub.key?(:id        )
-      sub[:type      ] = type   unless sub.key?(:type      )
-      sub[:count     ] = 1      unless sub.key?(:count     )
-      sub[:multiplier] = 1      unless sub.key?(:multiplier)
-      sub[:frame     ] = nil    unless sub.key?(:frame     )
-      sub[:assembly  ] = nil    unless sub.key?(:assembly  )
+      sub[:frame     ] = nil  unless sub.key?(:frame     )
+      sub[:assembly  ] = nil  unless sub.key?(:assembly  )
+      sub[:count     ] = 1    unless sub.key?(:count     )
+      sub[:multiplier] = 1    unless sub.key?(:multiplier)
+      sub[:type      ] = type unless sub.key?(:type      )
+      sub[:id        ] = ""   unless sub.key?(:id        )
 
-      sub[:id] = "OSut|#{nom}|#{index}" if sub[:id].empty?
-      id       = sub[:id]
+      sub[:count     ] = 1    unless sub[:count     ].respond_to?(:to_i)
+      sub[:multiplier] = 1    unless sub[:multiplier].respond_to?(:to_i)
+      sub[:type      ] = type unless sub[:type      ].respond_to?(:to_s)
+      sub[:id        ] = ""   unless sub[:id        ].respond_to?(:to_s)
+
+      sub[:count     ] = sub[:count     ].to_i
+      sub[:multiplier] = sub[:multiplier].to_i
+      sub[:type      ] = sub[:type      ].to_s
+      sub[:id        ] = sub[:id        ].to_s
+
+      sub[:count     ] = 1                      if sub[:count     ] < 1
+      sub[:multiplier] = 1                      if sub[:multiplier] < 1
+      sub[:type      ] = type                   if sub[:type      ].empty?
+      sub[:id        ] = "OSut|#{nom}|#{index}" if sub[:id        ].empty?
+
+      id = sub[:id]
 
       # If sub surface type is invalid, log/reset. Additional corrections may
       # be enabled once a sub surface is actually instantiated.
@@ -3483,14 +3509,17 @@ module OSut
         end
       end
 
-      # Log/reset negative numerical values. Set ~0 values to 0.
+      # Log/reset negative float values. Set ~0.0 values to 0.0.
       sub.each do |key, value|
-        next if key == :id
+        next if key == :count
+        next if key == :multiplier
         next if key == :type
+        next if key == :id
         next if key == :frame
         next if key == :assembly
 
-        return mismatch(key, value, cl5, mth, DBG, no) unless value.is_a?(cl4)
+        ok = value.respond_to?(:to_f)
+        return mismatch(key, value, Float, mth, DBG, no) unless ok
         next if key == :centreline
 
         negative(key, mth, WRN) if value < 0
@@ -3685,12 +3714,16 @@ module OSut
         end
       end
 
-      # Log/reset "count" if < 1.
-      if sub.key?(:count)
+      # Log/reset "count" if < 1 (or not an Integer)
+      if sub[:count].respond_to?(:to_i)
+        sub[:count] = sub[:count].to_i
+
         if sub[:count] < 1
           sub[:count] = 1
           log(WRN, "Reset '#{id}' count to #{sub[:count]} (#{mth})")
         end
+      else
+        sub[:count] = 1
       end
 
       sub[:count] = 1 unless sub.key?(:count)
