@@ -820,9 +820,9 @@ module OSut
 
     id = s.nameString
     ok = s.isConstructionDefaulted
-    m1 = "'#{id}' construction not defaulted (#{mth})"
-    m2 = "'#{id}' construction"
-    m3 = "'#{id}' space"
+    m1 = "#{id} construction not defaulted (#{mth})"
+    m2 = "#{id} construction"
+    m3 = "#{id} space"
     return mismatch(id, s, cl, mth) unless s.is_a?(cl)
 
     log(ERR, m1)           unless ok
@@ -1299,7 +1299,7 @@ module OSut
     return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
 
     ok = sched.value.is_a?(Numeric)
-    mismatch("'#{id}' value", sched.value, Numeric, mth, ERR, res) unless ok
+    mismatch("#{id} value", sched.value, Numeric, mth, ERR, res) unless ok
     res[:min] = sched.value
     res[:max] = sched.value
 
@@ -1339,7 +1339,7 @@ module OSut
       prev = str.get.downcase unless str.empty?
     end
 
-    return empty("'#{id}' values", mth, ERR, res) if vals.empty?
+    return empty("#{id} values", mth, ERR, res) if vals.empty?
 
     ok = vals.min.is_a?(Numeric) && vals.max.is_a?(Numeric)
     m1 = "Non-numeric values in '#{id}' (#{mth})"
@@ -3222,22 +3222,22 @@ module OSut
   # east-facing would not be returned if 'sides' holds [:north, :east]).
   #
   # @param spaces [Array<OpenStudio::Model::Space>] target spaces
-  # @param boundary [String] OpenStudio outside boundary condition
-  # @param type [String] OpenStudio surface type
+  # @param boundary [#to_s] OpenStudio outside boundary condition
+  # @param type [#to_s] OpenStudio surface type
   # @param sides [Arrayl<Symbols>] direction keys, e.g. :north, :top, :bottom
   #
   # @return [Array<OpenStudio::Model::Surface>] surfaces (may be empty)
   def facets(spaces = [], boundary = "Outdoors", type = "Wall", sides = [])
     return [] unless spaces.respond_to?(:&)
-    return [] unless boundary.respond_to?(:to_s)
-    return [] unless type.respond_to?(:to_s)
     return [] unless sides.respond_to?(:&)
     return []     if sides.empty?
 
-    boundary = trim(boundary).downcase
-    type     = trim(type).downcase
     faces    = []
     list     = [:bottom, :top, :north, :east, :south, :west].freeze
+    boundary = trim(boundary).downcase
+    type     = trim(type).downcase
+    return [] if boundary.empty?
+    return [] if type.empty?
 
     # Keep valid sides.
     orientations = sides.select { |o| list.include?(o) }
@@ -3454,23 +3454,18 @@ module OSut
       sub[:assembly  ] = nil  unless sub.key?(:assembly  )
       sub[:count     ] = 1    unless sub.key?(:count     )
       sub[:multiplier] = 1    unless sub.key?(:multiplier)
-      sub[:type      ] = type unless sub.key?(:type      )
       sub[:id        ] = ""   unless sub.key?(:id        )
-
-      sub[:count     ] = 1    unless sub[:count     ].respond_to?(:to_i)
-      sub[:multiplier] = 1    unless sub[:multiplier].respond_to?(:to_i)
-      sub[:type      ] = type unless sub[:type      ].respond_to?(:to_s)
-      sub[:id        ] = ""   unless sub[:id        ].respond_to?(:to_s)
-
+      sub[:type      ] = type unless sub.key?(:type      )
+      sub[:type      ] = trim(sub[:type])
+      sub[:id        ] = trim(sub[:id])
+      sub[:type      ] = type                   if sub[:type].empty?
+      sub[:id        ] = "OSut|#{nom}|#{index}" if sub[:id  ].empty?
+      sub[:count     ] = 1 unless sub[:count     ].respond_to?(:to_i)
+      sub[:multiplier] = 1 unless sub[:multiplier].respond_to?(:to_i)
       sub[:count     ] = sub[:count     ].to_i
       sub[:multiplier] = sub[:multiplier].to_i
-      sub[:type      ] = sub[:type      ].to_s
-      sub[:id        ] = sub[:id        ].to_s
-
-      sub[:count     ] = 1                      if sub[:count     ] < 1
-      sub[:multiplier] = 1                      if sub[:multiplier] < 1
-      sub[:type      ] = type                   if sub[:type      ].empty?
-      sub[:id        ] = "OSut|#{nom}|#{index}" if sub[:id        ].empty?
+      sub[:count     ] = 1 if sub[:count     ] < 1
+      sub[:multiplier] = 1 if sub[:multiplier] < 1
 
       id = sub[:id]
 
