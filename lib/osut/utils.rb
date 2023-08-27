@@ -1961,13 +1961,13 @@ module OSut
       if cnd.empty?
         cnd = nil
       else
-        cnd = cnd.get.downcase
+        cnd = cnd.get
 
-        if cts.include?(cnd)
-          return res if cnd == "unconditioned"
+        if cts.include?(cnd.downcase)
+          return res if cnd.downcase == "unconditioned"
         else
+          invalid("#{tg1}:#{cnd}", mth, 0, ERR)
           cnd = nil
-          invalid("#{tag}:#{cnd}", mth, 0, ERR)
         end
       end
     end
@@ -2005,13 +2005,13 @@ module OSut
 
     # 4. Reset if AdditionalProperties were found & valid.
     unless cnd.nil?
-      if cnd == "unconditioned"
+      if cnd.downcase == "unconditioned"
         res[:heating] = nil
         res[:cooling] = nil
-      elsif cnd == "semiheated"
+      elsif cnd.downcase == "semiheated"
         res[:heating] = 15.0 if res[:heating].nil?
         res[:cooling] = nil
-      elsif cnd.include?("conditioned")
+      elsif cnd.downcase.include?("conditioned")
         # "nonresconditioned", "resconditioned" or "indirectlyconditioned"
         res[:heating] = 21.0 if res[:heating].nil? # default
         res[:cooling] = 24.0 if res[:cooling].nil? # default

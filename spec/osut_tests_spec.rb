@@ -1188,7 +1188,7 @@ RSpec.describe OSut do
     expect(attic.partofTotalFloorArea).to be(false)
     expect(mod1.status.zero?).to be(true)
 
-    # Tag attic as an INDIRECTLYCONDITIONED space (linked to"Core_ZN").
+    # Tag attic as an INDIRECTLYCONDITIONED space (linked to "Core_ZN").
     key = "indirectlyconditioned"
     val = "Core_ZN"
     expect(attic.additionalProperties.setFeature(key, val)).to be(true)
@@ -1197,10 +1197,30 @@ RSpec.describe OSut do
     expect(mod1.setpoints(attic)[:heating]).to be_within(TOL).of(21.11)
     expect(mod1.setpoints(attic)[:cooling]).to be_within(TOL).of(23.89)
     expect(mod1.status.zero?).to be(true)
-
-    # Tag attic instead as an SEMIHEATED space.
     expect(attic.additionalProperties.resetFeature(key)).to be(true)
+
+    # Tag attic instead as an SEMIHEATED space. First, test an invalid entry.
     key = "space_conditioning_category"
+    val = "Demiheated"
+    msg = "Invalid '#{key}:#{val}' (OSut::setpoints)"
+    expect(attic.additionalProperties.setFeature(key, val)).to be(true)
+    expect(mod1.plenum?(attic)).to be(false)
+    expect(mod1.unconditioned?(attic)).to be(true)
+    expect(mod1.setpoints(attic)[:heating].nil?).to be(true)
+    expect(mod1.setpoints(attic)[:cooling].nil?).to be(true)
+    expect(attic.additionalProperties.hasFeature(key)).to be(true)
+    cnd = attic.additionalProperties.getFeatureAsString(key)
+    expect(cnd.empty?).to be(false)
+    expect(cnd.get).to eq(val)
+    expect(mod1.error?).to be(true)
+
+    # 4x same error, as both plenum? and unconditioned? call setpoints(attic).
+    expect(mod1.logs.size).to eq(4)
+    mod1.logs.each { |l| expect(l[:message]).to eq(msg) }
+
+    # Now test an valid entry.
+    expect(attic.additionalProperties.resetFeature(key)).to be(true)
+    expect(mod1.clean!).to eq(DBG)
     val = "Semiheated"
     expect(attic.additionalProperties.setFeature(key, val)).to be(true)
     expect(mod1.plenum?(attic)).to be(false)
@@ -1208,6 +1228,10 @@ RSpec.describe OSut do
     expect(mod1.setpoints(attic)[:heating]).to be_within(TOL).of(15.00)
     expect(mod1.setpoints(attic)[:cooling].nil?).to be(true)
     expect(mod1.status.zero?).to be(true)
+    expect(attic.additionalProperties.hasFeature(key)).to be(true)
+    cnd = attic.additionalProperties.getFeatureAsString(key)
+    expect(cnd.empty?).to be(false)
+    expect(cnd.get).to eq(val)
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # TO DO: Consider adding LargeOffice model to test SDK's "isPlenum".
