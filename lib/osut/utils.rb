@@ -3360,7 +3360,7 @@ module OSut
   # immediately above (e.g. a plenum) overlapping any of the roof/ceilings
   # of the space itself.
   #
-  # @param [OpenStudio::Model::Space] a space
+  # @param space [OpenStudio::Model::Space] a space
   #
   # @return [Array<OpenStudio::Model::Surface>] surfaces (see logs if empty)
   def getRoofs(space = nil)
@@ -3390,15 +3390,11 @@ module OSut
       rufs = rufs.select { |s| s.outsideBoundaryCondition.downcase == "outdoors" }
       next if rufs.empty?
 
-      # Only keep track of "other" roof(s) that "fit" or "overlap" ceiling
-      # below (Z-axis projection). This involves calling Boost-based methods,
-      # which requires pre-transforms of ceiling and roof surfaces.
+      # Only keep track of "other" roof(s) that "overlap" ceiling below.
       rufs.each do |ruf|
-        if fits?(ceiling, ruf) || fits?(ruf, ceiling)
-          roofs << ruf unless roofs.include?(ruf)
-        elsif overlaps?(ceiling, ruf)
-          roofs << ruf unless roofs.include?(ruf)
-        end
+        next unless overlaps?(ceiling, ruf)
+
+        roofs << ruf unless roofs.include?(ruf)
       end
     end
 
