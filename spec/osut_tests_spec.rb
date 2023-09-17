@@ -25,9 +25,9 @@ RSpec.describe OSut do
     specs[:type  ] = :wall
     specs[:uo    ] = 0.210 # NECB2017
     surface        = cls1.genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(4)
     u = 1 / cls1.rsi(surface, 0.140)
     expect(u).to be_within(TOL).of(specs[:uo])
@@ -35,9 +35,9 @@ RSpec.describe OSut do
     specs[:type  ] = :roof
     specs[:uo    ] = 1 / 5.46 # CCQ I1
     surface        = cls1::genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(4)
     u = 1 / cls1::rsi(surface, 0.140)
     expect(u).to be_within(TOL).of(specs[:uo])
@@ -48,9 +48,9 @@ RSpec.describe OSut do
     specs[:finish] = :heavy
     specs[:uo    ] = 1 / 5.46 # CCQ I1
     surface        = cls1::genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(4)
     u = 1 / cls1::rsi(surface, 0.140)
     expect(u).to be_within(TOL).of(specs[:uo])
@@ -60,9 +60,9 @@ RSpec.describe OSut do
     specs[:frame ] = :medium
     specs[:uo    ] = 1 / 5.46 # CCQ I1
     surface        = cls1::genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(4)
     u = 1 / cls1::rsi(surface, 0.190)
     expect(u).to be_within(TOL).of(specs[:uo])
@@ -72,9 +72,9 @@ RSpec.describe OSut do
     specs[:frame ] = :none
     specs[:finish] = :none
     surface        = cls1::genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(2)
 
     specs          = {}
@@ -82,9 +82,9 @@ RSpec.describe OSut do
     specs[:finish] = :none
     specs[:uo    ] = 0.379 # NECB2020, ZC8
     surface        = cls1::genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(3)
     u = 1 / cls1::rsi(surface, 0.160)
     expect(u).to be_within(TOL).of(specs[:uo])
@@ -93,9 +93,9 @@ RSpec.describe OSut do
     specs[:type  ] = :slab
     specs[:uo    ] = 0.379 # NECB2020, ZC8
     surface        = cls1::genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(4)
     u = 1 / cls1::rsi(surface, 0.160)
     expect(u).to be_within(TOL).of(specs[:uo])
@@ -105,9 +105,9 @@ RSpec.describe OSut do
     specs[:clad  ] = :heavy
     specs[:uo    ] = 1 / 2.64 # CCQ I1
     surface        = cls1::genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(3)
     u = 1 / cls1::rsi(surface, 0.120)
     expect(u).to be_within(TOL).of(specs[:uo])
@@ -118,9 +118,9 @@ RSpec.describe OSut do
     specs[:finish] = :light
     specs[:uo    ] = 1 / 2.64 # CCQ I1
     surface        = cls1::genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(3)
     u = 1 / cls1::rsi(surface, 0.120)
     expect(u).to be_within(TOL).of(specs[:uo])
@@ -130,9 +130,9 @@ RSpec.describe OSut do
     specs[:frame ] = :medium # ... should be ignored
     specs[:uo    ] = 1.8
     surface        = cls1::genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(1)
     u = 1 / cls1::rsi(surface, 0.150)
     expect(u).to be_within(TOL).of(specs[:uo])
@@ -141,9 +141,9 @@ RSpec.describe OSut do
     specs[:type  ] = :door
     specs[:uo    ] = 0.9 # CCQ I1
     surface        = cls1::genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(1)
     u = 1 / cls1::rsi(surface, 0.150)
     expect(u).to be_within(TOL).of(specs[:uo])
@@ -152,9 +152,9 @@ RSpec.describe OSut do
     specs[:type  ] = :window
     specs[:uo    ] = 2.0
     surface        = cls1::genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(1)
     u = 1 / cls1::rsi(surface) # not necessary to specify film
     expect(u).to be_within(TOL).of(specs[:uo])
@@ -163,9 +163,9 @@ RSpec.describe OSut do
     specs[:type  ] = :window
     specs[:uo    ] = 0.9 # CCQ I1
     surface        = cls1::genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(1)
     u = 1 / cls1::rsi(surface)
     expect(u).to be_within(TOL).of(specs[:uo])
@@ -174,9 +174,9 @@ RSpec.describe OSut do
     specs[:type  ] = :skylight
     specs[:uo    ] = 2.8 # CCQ I1
     surface        = cls1::genConstruction(model, specs)
-    expect(surface.nil?).to be(false)
-    expect(cls1.status.zero?).to be(true)
-    expect(surface.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
+    expect(surface).to_not be_nil
+    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(1)
     u = 1 / cls1::rsi(surface)
     expect(u).to be_within(TOL).of(specs[:uo])
@@ -205,8 +205,8 @@ RSpec.describe OSut do
       sps  << space
       ok    = mod1.genMass(sps, ratio) unless ratio.nil?
       ok    = mod1.genMass(sps)            if ratio.nil?
-      expect(ok).to be(true)
-      expect(mod1.status.zero?).to be(true)
+      expect(ok).to be true
+      expect(mod1.status).to be_zero
     end
 
     construction = nil
@@ -217,35 +217,35 @@ RSpec.describe OSut do
       expect(d.designLevelCalculationMethod).to eq("SurfaceArea/Area")
 
       ratio = d.surfaceAreaperSpaceFloorArea
-      expect(ratio.empty?).to be(false)
+      expect(ratio).to_not be_empty
       ratio = ratio.get
 
       case ratio
       when 0.1
         expect(d.nameString).to eq("OSut|InternalMassDefinition|0.10")
-        expect(m.nameString.downcase.include?("entrance")).to be(true)
+        expect(m.nameString.downcase).to include("entrance")
       when 0.3
         expect(d.nameString).to eq("OSut|InternalMassDefinition|0.30")
-        expect(m.nameString.downcase.include?("lobby")).to be(true)
+        expect(m.nameString.downcase).to include("lobby")
       when 1.0
         expect(d.nameString).to eq("OSut|InternalMassDefinition|1.00")
-        expect(m.nameString.downcase.include?("meeting")).to be(true)
+        expect(m.nameString.downcase).to include("meeting")
       else
         expect(d.nameString).to eq("OSut|InternalMassDefinition|2.00")
         expect(ratio).to eq(2.0)
       end
 
       c = d.construction
-      expect(c.empty?).to be(false)
+      expect(c).to_not be_empty
       c = c.get.to_Construction
-      expect(c.empty?).to be(false)
+      expect(c).to_not be_empty
       c = c.get
 
       construction = c if construction.nil?
       expect(construction).to eq(c)
       expect(c.nameString).to eq("OSut|MASS|Construction")
       expect(c.numLayers).to eq(1)
-      
+
       m = c.layers.first
 
       material = m if material.nil?
@@ -260,7 +260,7 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     m  = "OSut::thickness"
@@ -285,16 +285,16 @@ RSpec.describe OSut do
       next if id.include?("Air Wall")
       next if id.include?("Double pane")
 
-      expect(th > 0).to be(true)
+      expect(th > 0).to be true
     end
 
-    cls1.logs.each { |l| expect(l[:message].include?(m1)).to be(true) }
+    cls1.logs.each { |l| expect(l[:message]).to include(m1) }
 
-    expect(cls1.status).to eq(ERR)
-    expect(cls2.status).to eq(ERR)
+    expect(cls1.error?).to be true
+    expect(cls2.error?).to be true
     cls2.clean!
-    expect(cls1.status.zero?).to eq(true)
-    expect(cls1.logs.empty?).to be(true)
+    expect(cls1.status).to be_zero
+    expect(cls1.logs).to be_empty
 
     model.getConstructions.each do |c|
       next if c.to_LayeredConstruction.empty?
@@ -306,13 +306,13 @@ RSpec.describe OSut do
       next if id.include?("Double pane")
 
       th = cls2.thickness(c)
-      expect(th > 0).to be(true)
+      expect(th > 0).to be true
     end
 
-    expect(cls2.status.zero?).to be(true)
-    expect(cls2.logs.empty?).to be(true)
-    expect(cls1.status.zero?).to eq(true)
-    expect(cls1.logs.empty?).to be(true)
+    expect(cls2.status).to be_zero
+    expect(cls2.logs).to be_empty
+    expect(cls1.status).to be_zero
+    expect(cls1.logs).to be_empty
   end
 
   it "checks if a set holds a construction" do
@@ -323,7 +323,7 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     t1  = "roofceiling"
@@ -337,50 +337,50 @@ RSpec.describe OSut do
     m6  = "Invalid 'set' arg #1 (OSut::holdsConstruction?)"
     set = model.getDefaultConstructionSetByName(n1)
     c   = model.getLayeredConstructionByName(n2)
-    expect(set.empty?).to be(false)
-    expect(c.empty?).to be(false)
+    expect(set).to_not be_empty
+    expect(c).to_not be_empty
     set = set.get
     c   = c.get
 
     # TRUE case: 'set' holds 'c' (exterior roofceiling construction)
-    expect(mod1.holdsConstruction?(set, c, false, true, t1)).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.holdsConstruction?(set, c, false, true, t1)).to be true
+    expect(mod1.status).to be_zero
 
     # FALSE case: not ground construction
-    expect(mod1.holdsConstruction?(set, c, true, true, t1)).to be(false)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.holdsConstruction?(set, c, true, true, t1)).to be false
+    expect(mod1.status).to be_zero
 
     # INVALID case: arg #5 : nil (instead of surface type string)
-    expect(mod1.holdsConstruction?(set, c, true, true, nil)).to be(false)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.holdsConstruction?(set, c, true, true, nil)).to be false
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m5)
     expect(mod1.clean!).to eq(DBG)
 
     # INVALID case: arg #5 : empty surface type string
-    expect(mod1.holdsConstruction?(set, c, true, true, "")).to be(false)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.holdsConstruction?(set, c, true, true, "")).to be false
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m5)
     expect(mod1.clean!).to eq(DBG)
 
     # INVALID case: arg #5 : c construction (instead of surface type string)
-    expect(mod1.holdsConstruction?(set, c, true, true, c)).to be(false)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.holdsConstruction?(set, c, true, true, c)).to be false
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m5)
     expect(mod1.clean!).to eq(DBG)
 
     # INVALID case: arg #1 : c construction (instead of surface type string)
-    expect(mod1.holdsConstruction?(c, c, true, true, c)).to be(false)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.holdsConstruction?(c, c, true, true, c)).to be false
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m1)
     expect(mod1.clean!).to eq(DBG)
 
     # INVALID case: arg #1 : model (instead of surface type string)
-    expect(mod1.holdsConstruction?(mdl, c, true, true, t1)).to be(false)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.holdsConstruction?(mdl, c, true, true, t1)).to be false
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m6)
     expect(mod1.clean!).to eq(DBG)
@@ -390,35 +390,35 @@ RSpec.describe OSut do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.clean!).to eq(DBG)
 
-    m = "construction not defaulted (defaultConstructionSet)"
+    m = "construction not defaulted (OSut::defaultConstructionSet)"
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     file  = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     model.getSurfaces.each do |s|
       set = mod1.defaultConstructionSet(s)
-      expect(set.nil?).to be(false)
-      expect(mod1.status.zero?).to be(true)
+      expect(set).to_not be_nil
+      expect(mod1.status).to be_zero
     end
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
     expect(mod1.clean!).to eq(DBG)
 
     model.getSurfaces.each do |s|
       set = mod1.defaultConstructionSet(s)
-      expect(set.nil?).to be(true)
-      expect(mod1.status).to eq(ERR)
+      expect(set).to be_nil
+      expect(mod1.error?).to be true
 
-      mod1.logs.each { |l| expect(l[:message].include?(m)) }
+      mod1.logs.each { |l| expect(l[:message]).to include(m) }
     end
   end
 
@@ -429,7 +429,7 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     m  = "OSut::glazingAirFilmRSi"
@@ -440,26 +440,26 @@ RSpec.describe OSut do
     model.getConstructions.each do |c|
       next unless c.isFenestration
 
-      expect(c.uFactor.empty?).to be(false)
-      expect(c.uFactor.get.is_a?(Numeric)).to be(true)
+      expect(c.uFactor).to_not be_empty
+      expect(c.uFactor.get).to be_a(Numeric)
       expect(mod1.glazingAirFilmRSi(c.uFactor.get)).to be_within(TOL).of(0.17)
-      expect(mod1.status.zero?).to be(true)
+      expect(mod1.status).to be_zero
     end
 
     expect(mod1.glazingAirFilmRSi(9.0)).to be_within(TOL).of(0.1216)
-    expect(mod1.warn?).to be(true)
+    expect(mod1.warn?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m1)
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.glazingAirFilmRSi("")).to be_within(TOL).of(0.1216)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m2)
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.glazingAirFilmRSi(nil)).to be_within(TOL).of(0.1216)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m3)
 
@@ -515,7 +515,7 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     m  = "OSut::rsi"
@@ -529,64 +529,64 @@ RSpec.describe OSut do
       next unless s.isPartOfEnvelope
 
       lc = s.construction
-      expect(lc.empty?).to be(false)
+      expect(lc).to_not be_empty
       lc = lc.get.to_LayeredConstruction
-      expect(lc.empty?).to be(false)
+      expect(lc).to_not be_empty
       lc = lc.get
 
       if s.isGroundSurface # 4x slabs on grade in SEB model
         expect(s.filmResistance).to be_within(TOL).of(0.160)
         expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.448)
-        expect(mod1.status.zero?).to be(true)
+        expect(mod1.status).to be_zero
       else
         if s.surfaceType == "Wall"
           expect(s.filmResistance).to be_within(TOL).of(0.150)
           expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(2.616)
-          expect(mod1.status.zero?).to be(true)
+          expect(mod1.status).to be_zero
         else # RoofCeiling
           expect(s.filmResistance).to be_within(TOL).of(0.136)
           expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(5.631)
-          expect(mod1.status.zero?).to be(true)
+          expect(mod1.status).to be_zero
         end
       end
     end
 
     expect(mod1.rsi("", 0.150)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m1)
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.rsi(nil, 0.150)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m1)
 
     lc = model.getLayeredConstructionByName("SLAB-ON-GRADE-FLOOR")
-    expect(lc.empty?).to be(false)
+    expect(lc).to_not be_empty
     lc = lc.get
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.rsi(lc, -1)).to be_within(TOL).of(0)
-    expect(mod1.error?).to be(true)
+    expect(mod1.error?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m2)
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.rsi(lc, nil)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m3)
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.rsi(lc, 0.150, -300)).to be_within(TOL).of(0)
-    expect(mod1.error?).to be(true)
+    expect(mod1.error?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m4)
 
     expect(mod1.clean!).to eq(DBG)
     expect(mod1.rsi(lc, 0.150, nil)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m5)
   end
@@ -598,7 +598,7 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     m  = "OSut::insulatingLayer"
@@ -606,28 +606,28 @@ RSpec.describe OSut do
 
     model.getLayeredConstructions.each do |lc|
       lyr = mod1.insulatingLayer(lc)
-      expect(lyr.is_a?(Hash)).to be(true)
-      expect(lyr.key?(:index)).to be(true)
-      expect(lyr.key?(:type )).to be(true)
-      expect(lyr.key?(:r    )).to be(true)
+      expect(lyr).to be_a(Hash)
+      expect(lyr).to have_key(:index)
+      expect(lyr).to have_key(:type )
+      expect(lyr).to have_key(:r)
 
       if lc.isFenestration
-        expect(mod1.status.zero?).to be(true)
-        expect(lyr[:index].nil?).to be(true)
-        expect(lyr[:type ].nil?).to be(true)
-        expect(lyr[:r    ].zero?).to be(true)
+        expect(mod1.status).to be_zero
+        expect(lyr[:index]).to be_nil
+        expect(lyr[:type ]).to be_nil
+        expect(lyr[:r    ]).to be_zero
         next
       end
 
       unless [:standard, :massless].include?(lyr[:type]) # air wall mat
-        expect(mod1.status.zero?).to be(true)
-        expect(lyr[:index].nil?).to be(true)
-        expect(lyr[:type ].nil?).to be(true)
-        expect(lyr[:r    ].zero?).to be(true)
+        expect(mod1.status).to be_zero
+        expect(lyr[:index]).to be_nil
+        expect(lyr[:type ]).to be_nil
+        expect(lyr[:r    ]).to be_zero
         next
       end
 
-      expect(lyr[:index] < lc.numLayers).to be(true)
+      expect(lyr[:index] < lc.numLayers).to be true
 
       case lc.nameString
       when "EXTERIOR-ROOF"
@@ -637,43 +637,43 @@ RSpec.describe OSut do
         expect(lyr[:index]).to eq(2)
         expect(lyr[:r    ]).to be_within(TOL).of(1.47)
       when "Default interior ceiling"
-        expect(lyr[:index]).to eq(0)
+        expect(lyr[:index]).to be_zero
         expect(lyr[:r    ]).to be_within(TOL).of(0.12)
       when "INTERIOR-WALL"
         expect(lyr[:index]).to eq(1)
         expect(lyr[:r    ]).to be_within(TOL).of(0.24)
       else
-        expect(lyr[:index]).to eq(0)
+        expect(lyr[:index]).to be_zero
         expect(lyr[:r    ]).to be_within(TOL).of(0.29)
       end
     end
 
     lyr = mod1.insulatingLayer(nil)
-    expect(mod1.debug?).to be(true)
-    expect(lyr[:index].nil?).to be(true)
-    expect(lyr[:type ].nil?).to be(true)
-    expect(lyr[:r    ].zero?).to be(true)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.debug?).to be true
+    expect(lyr[:index]).to be_nil
+    expect(lyr[:type ]).to be_nil
+    expect(lyr[:r    ]).to be_zero
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m1)
 
     expect(mod1.clean!).to eq(DBG)
     lyr = mod1.insulatingLayer("")
-    expect(mod1.debug?).to be(true)
-    expect(lyr[:index].nil?).to be(true)
-    expect(lyr[:type ].nil?).to be(true)
-    expect(lyr[:r    ].zero?).to be(true)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.debug?).to be true
+    expect(lyr[:index]).to be_nil
+    expect(lyr[:type ]).to be_nil
+    expect(lyr[:r    ]).to be_zero
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m1)
 
     expect(mod1.clean!).to eq(DBG)
     lyr = mod1.insulatingLayer(model)
-    expect(mod1.debug?).to be(true)
-    expect(lyr[:index].nil?).to be(true)
-    expect(lyr[:type ].nil?).to be(true)
-    expect(lyr[:r    ].zero?).to be(true)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.debug?).to be true
+    expect(lyr[:index]).to be_nil
+    expect(lyr[:type ]).to be_nil
+    expect(lyr[:r    ]).to be_zero
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m1)
   end
@@ -686,7 +686,7 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     cl1 = OpenStudio::Model::ScheduleRuleset
@@ -697,57 +697,57 @@ RSpec.describe OSut do
     m2  = "'#{sc2}' #{cl2}? expecting #{cl1} (OSut::scheduleRulesetMinMax)"
 
     sched = model.getScheduleRulesetByName(sc1)
-    expect(sched.empty?).to be(false)
+    expect(sched).to_not be_empty
     sched = sched.get
-    expect(sched.is_a?(cl1)).to be(true)
+    expect(sched).to be_a(cl1)
 
     sch = model.getScheduleConstantByName(sc2)
-    expect(sch.empty?).to be(false)
+    expect(sch).to_not be_empty
     sch = sch.get
-    expect(sch.is_a?(cl2)).to be(true)
+    expect(sch).to be_a(cl2)
 
     # Valid case.
     minmax = cls1.scheduleRulesetMinMax(sched)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
+    expect(minmax).to be_a(Hash)
+    expect(minmax).to have_key(:min)
+    expect(minmax).to have_key(:max)
     expect(minmax[:min]).to be_within(TOL).of(23.89)
     expect(minmax[:min]).to be_within(TOL).of(23.89)
-    expect(cls1.status.zero?).to be(true)
-    expect(cls1.logs.empty?).to be(true)
+    expect(cls1.status).to be_zero
+    expect(cls1.logs).to be_empty
 
     # Invalid parameter.
     minmax = cls1.scheduleRulesetMinMax(nil)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(cls1.debug?).to be(true)
+    expect(minmax).to be_a(Hash)
+    expect(minmax).to have_key(:min)
+    expect(minmax).to have_key(:max)
+    expect(minmax[:min]).to be_nil
+    expect(minmax[:max]).to be_nil
+    expect(cls1.debug?).to be true
     expect(cls1.logs.size).to eq(1)
     expect(cls1.logs.first[:message]).to eq(m1)
 
     # Invalid parameter.
     expect(cls1.clean!).to eq(DBG)
     minmax = cls1.scheduleRulesetMinMax(model)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(cls1.debug?).to be(true)
+    expect(minmax).to be_a(Hash)
+    expect(minmax).to have_key(:min)
+    expect(minmax).to have_key(:max)
+    expect(minmax[:min]).to be_nil
+    expect(minmax[:max]).to be_nil
+    expect(cls1.debug?).to be true
     expect(cls1.logs.size).to eq(1)
     expect(cls1.logs.first[:message]).to eq(m1)
 
     # Invalid parameter (wrong schedule type).
     expect(cls1.clean!).to eq(DBG)
     minmax = cls1.scheduleRulesetMinMax(sch)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(cls1.debug?).to be(true)
+    expect(minmax).to be_a(Hash)
+    expect(minmax).to have_key(:min)
+    expect(minmax).to have_key(:max)
+    expect(minmax[:min]).to be_nil
+    expect(minmax[:max]).to be_nil
+    expect(cls1.debug?).to be true
     expect(cls1.logs.size).to eq(1)
     expect(cls1.logs.first[:message]).to eq(m2)
   end
@@ -759,7 +759,7 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     sc1 = "Schedule Constant 1"
@@ -770,57 +770,57 @@ RSpec.describe OSut do
     m2  = "'#{sc2}' #{cl2}? expecting #{cl1} (OSut::scheduleConstantMinMax)"
 
     sched = model.getScheduleConstantByName(sc1)
-    expect(sched.empty?).to be(false)
+    expect(sched).to_not be_empty
     sched = sched.get
-    expect(sched.is_a?(cl1)).to be(true)
+    expect(sched).to be_a(cl1)
 
     sch = model.getScheduleRulesetByName(sc2)
-    expect(sch.empty?).to be(false)
+    expect(sch).to_not be_empty
     sch = sch.get
-    expect(sch.is_a?(cl2)).to be(true)
+    expect(sch).to be_a(cl2)
 
     # Valid case.
     minmax = cls1.scheduleConstantMinMax(sched)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
+    expect(minmax).to be_a(Hash)
+    expect(minmax).to have_key(:min)
+    expect(minmax).to have_key(:max)
     expect(minmax[:min]).to be_within(TOL).of(139.88)
     expect(minmax[:min]).to be_within(TOL).of(139.88)
-    expect(cls1.status.zero?).to be(true)
-    expect(cls1.logs.empty?).to be(true)
+    expect(cls1.status).to be_zero
+    expect(cls1.logs).to be_empty
 
     # Invalid parameter.
     minmax = cls1.scheduleConstantMinMax(nil)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(cls1.debug?).to be(true)
+    expect(minmax).to be_a(Hash)
+    expect(minmax).to have_key(:min)
+    expect(minmax).to have_key(:max)
+    expect(minmax[:min]).to be_nil
+    expect(minmax[:max]).to be_nil
+    expect(cls1.debug?).to be true
     expect(cls1.logs.size).to eq(1)
     expect(cls1.logs.first[:message]).to eq(m1)
 
     # Invalid parameter.
     expect(cls1.clean!).to eq(DBG)
     minmax = cls1.scheduleConstantMinMax(model)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(cls1.debug?).to be(true)
+    expect(minmax).to be_a(Hash)
+    expect(minmax).to have_key(:min)
+    expect(minmax).to have_key(:max)
+    expect(minmax[:min]).to be_nil
+    expect(minmax[:max]).to be_nil
+    expect(cls1.debug?).to be true
     expect(cls1.logs.size).to eq(1)
     expect(cls1.logs.first[:message]).to eq(m1)
 
     # Invalid parameter (wrong schedule type)
     expect(cls1.clean!).to eq(DBG)
     minmax = cls1.scheduleConstantMinMax(sch)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(cls1.debug?).to be(true)
+    expect(minmax).to be_a(Hash)
+    expect(minmax).to have_key(:min)
+    expect(minmax).to have_key(:max)
+    expect(minmax[:min]).to be_nil
+    expect(minmax[:max]).to be_nil
+    expect(cls1.debug?).to be true
     expect(cls1.logs.size).to eq(1)
     expect(cls1.logs.first[:message]).to eq(m2)
   end
@@ -832,7 +832,7 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     spt = 22
@@ -844,31 +844,31 @@ RSpec.describe OSut do
     m2 = "'#{sc2}' #{cl2}? expecting #{cl1} (OSut::scheduleCompactMinMax)"
 
     sched = OpenStudio::Model::ScheduleCompact.new(model, spt)
-    expect(sched.is_a?(OpenStudio::Model::ScheduleCompact)).to be(true)
+    expect(sched).to be_a(OpenStudio::Model::ScheduleCompact)
     sched.setName("compact schedule")
 
     sch = model.getScheduleByName(sc2)
-    expect(sch.empty?).to be(false)
+    expect(sch).to_not be_empty
     sch = sch.get
 
     # Valid case.
     minmax = mod1.scheduleCompactMinMax(sched)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
+    expect(minmax).to be_a(Hash)
+    expect(minmax).to have_key(:min)
+    expect(minmax).to have_key(:max)
     expect(minmax[:min]).to be_within(TOL).of(spt)
     expect(minmax[:min]).to be_within(TOL).of(spt)
-    expect(mod1.status.zero?).to be(true)
-    expect(mod1.logs.empty?).to be(true)
+    expect(mod1.status).to be_zero
+    expect(mod1.logs).to be_empty
 
     # Invalid parameter.
     minmax = mod1.scheduleCompactMinMax(nil)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(mod1.debug?).to be(true)
+    expect(minmax).to be_a(Hash)
+    expect(minmax).to have_key(:min)
+    expect(minmax).to have_key(:max)
+    expect(minmax[:min]).to be_nil
+    expect(minmax[:max]).to be_nil
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m1)
 
@@ -876,12 +876,12 @@ RSpec.describe OSut do
 
     # Invalid parameter.
     minmax = mod1.scheduleCompactMinMax(model)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(mod1.debug?).to be(true)
+    expect(minmax).to be_a(Hash)
+    expect(minmax).to have_key(:min)
+    expect(minmax).to have_key(:max)
+    expect(minmax[:min]).to be_nil
+    expect(minmax[:max]).to be_nil
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m1)
 
@@ -889,12 +889,12 @@ RSpec.describe OSut do
 
     # Invalid parameter (wrong schedule type)
     minmax = mod1.scheduleCompactMinMax(sch)
-    expect(minmax.is_a?(Hash)).to be(true)
-    expect(minmax.key?(:min)).to be(true)
-    expect(minmax.key?(:max)).to be(true)
-    expect(minmax[:min].nil?).to be(true)
-    expect(minmax[:max].nil?).to be(true)
-    expect(mod1.debug?).to be(true)
+    expect(minmax).to be_a(Hash)
+    expect(minmax).to have_key(:min)
+    expect(minmax).to have_key(:max)
+    expect(minmax[:min]).to be_nil
+    expect(minmax[:max]).to be_nil
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m2)
   end
@@ -910,7 +910,7 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     m1 = "OSut::maxHeatScheduledSetpoint"
@@ -920,66 +920,66 @@ RSpec.describe OSut do
 
     model.getThermalZones.each do |z|
       res = M.maxHeatScheduledSetpoint(z)
-      expect(res.is_a?(Hash)).to be(true)
-      expect(res.key?(:spt)).to be(true)
-      expect(res.key?(:dual)).to be(true)
-      expect(res[:spt].nil?).to be(true)            if z.nameString == z1
+      expect(res).to be_a(Hash)
+      expect(res).to have_key(:spt)
+      expect(res).to have_key(:dual)
+      expect(res[:spt]).to be_nil                   if z.nameString == z1
       expect(res[:spt]).to be_within(TOL).of(22.11) if z.nameString == z2
       expect(res[:dual]).to eq(false)               if z.nameString == z1
       expect(res[:dual]).to eq(true)                if z.nameString == z2
-      expect(M.status.zero?).to be(true)
+      expect(M.status).to be_zero
 
       res = M.minCoolScheduledSetpoint(z)
-      expect(res.is_a?(Hash)).to be(true)
-      expect(res.key?(:spt)).to be(true)
-      expect(res.key?(:dual)).to be(true)
-      expect(res[:spt].nil?).to be(true)            if z.nameString == z1
+      expect(res).to be_a(Hash)
+      expect(res).to have_key(:spt)
+      expect(res).to have_key(:dual)
+      expect(res[:spt]).to be_nil                   if z.nameString == z1
       expect(res[:spt]).to be_within(TOL).of(22.78) if z.nameString == z2
       expect(res[:dual]).to eq(false)               if z.nameString == z1
       expect(res[:dual]).to eq(true)                if z.nameString == z2
-      expect(M.status.zero?).to be(true)
+      expect(M.status).to be_zero
     end
 
     res = M.maxHeatScheduledSetpoint(nil) # bad argument
-    expect(res.is_a?(Hash)).to be(true)
-    expect(res.key?(:spt)).to be(true)
-    expect(res.key?(:dual)).to be(true)
-    expect(res[:spt].nil?).to be(true)
+    expect(res).to be_a(Hash)
+    expect(res).to have_key(:spt)
+    expect(res).to have_key(:dual)
+    expect(res[:spt]).to be_nil
     expect(res[:dual]).to eq(false)
-    expect(M.debug?).to be(true)
+    expect(M.debug?).to be true
     expect(M.logs.size).to eq(1)
     expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
     expect(M.clean!).to eq(DBG)
 
     res = M.minCoolScheduledSetpoint(nil) # bad argument
-    expect(res.is_a?(Hash)).to be(true)
-    expect(res.key?(:spt)).to be(true)
-    expect(res.key?(:dual)).to be(true)
-    expect(res[:spt].nil?).to be(true)
+    expect(res).to be_a(Hash)
+    expect(res).to have_key(:spt)
+    expect(res).to have_key(:dual)
+    expect(res[:spt]).to be_nil
     expect(res[:dual]).to eq(false)
-    expect(M.debug?).to be(true)
+    expect(M.debug?).to be true
     expect(M.logs.size).to eq(1)
     expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
     expect(M.clean!).to eq(DBG)
 
     res = M.maxHeatScheduledSetpoint(model) # bad argument
-    expect(res.is_a?(Hash)).to be(true)
-    expect(res.key?(:spt)).to be(true)
-    expect(res.key?(:dual)).to be(true)
-    expect(res[:spt].nil?).to be(true)
+    expect(res).to be_a(Hash)
+    expect(res).to have_key(:spt)
+    expect(res).to have_key(:dual)
+    expect(res[:spt]).to be_nil
     expect(res[:dual]).to eq(false)
-    expect(M.debug?).to be(true)
+    expect(M.debug?).to be true
     expect(M.logs.size).to eq(1)
     expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m1})")
     expect(M.clean!).to eq(DBG)
 
     res = M.minCoolScheduledSetpoint(model) # bad argument
-    expect(res.is_a?(Hash)).to be(true)
-    expect(res.key?(:spt)).to be(true)
-    expect(res.key?(:dual)).to be(true)
-    expect(res[:spt].nil?).to be(true)
+    expect(res).to be_a(Hash)
+    expect(res).to have_key(:spt)
+    expect(res).to have_key(:dual)
+    expect(res[:spt]).to be_nil
     expect(res[:dual]).to eq(false)
-    expect(M.debug?).to be(true)
+    expect(M.debug?).to be true
     expect(M.logs.size).to eq(1)
     expect(M.logs.first[:message]).to eq("Invalid 'zone' arg #1 (#{m2})")
     expect(M.clean!).to eq(DBG)
@@ -987,22 +987,22 @@ RSpec.describe OSut do
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Add electric heating to 1x slab.
     entry = model.getSpaceByName("Entry way 1")
-    expect(entry.empty?).to be(false)
+    expect(entry).to_not be_empty
     entry = entry.get
     floor = entry.surfaces.select{ |s| s.surfaceType == "Floor" }
-    expect(floor.is_a?(Array)).to be(true)
+    expect(floor).to be_a(Array)
     expect(floor.size).to eq(1)
     floor = floor.first
 
-    expect(entry.thermalZone.empty?).to be(false)
+    expect(entry.thermalZone).to_not be_empty
     tzone = entry.thermalZone.get
 
     # Retrieve construction.
-    expect(floor.isConstructionDefaulted).to be(false)
+    expect(floor.isConstructionDefaulted).to be false
     c = floor.construction
-    expect(c.empty?).to be(false)
+    expect(c).to_not be_empty
     c = c.get.to_LayeredConstruction
-    expect(c.empty?).to be(false)
+    expect(c).to_not be_empty
     c = c.get
 
     # Recover single construction layer (concrete slab).
@@ -1014,29 +1014,29 @@ RSpec.describe OSut do
     # Generate construction with internal heat source.
     cc = OpenStudio::Model::ConstructionWithInternalSource.new(model)
     cc.setName("ihs")
-    expect(cc.setLayers(layers)).to be(true)
-    expect(cc.setSourcePresentAfterLayerNumber(1)).to be(true)
-    expect(cc.setTemperatureCalculationRequestedAfterLayerNumber(1)).to be(true)
-    expect(floor.setConstruction(cc)).to be(true)
+    expect(cc.setLayers(layers)).to be true
+    expect(cc.setSourcePresentAfterLayerNumber(1)).to be true
+    expect(cc.setTemperatureCalculationRequestedAfterLayerNumber(1)).to be true
+    expect(floor.setConstruction(cc)).to be true
 
     availability = M.availabilitySchedule(model)
     schedule = OpenStudio::Model::ScheduleConstant.new(model)
-    expect(schedule.setValue(22.78)).to be(true) # reuse cooling setpoint
+    expect(schedule.setValue(22.78)).to be true # reuse cooling setpoint
 
     # Create radiant electric heating.
     ht = OpenStudio::Model::ZoneHVACLowTemperatureRadiantElectric.new(
             model, availability, schedule)
     ht.setName("radiant electric")
-    expect(ht.setRadiantSurfaceType("Floors")).to be(true)
-    expect(ht.addToThermalZone(tzone)).to be(true)
-    expect(tzone.setHeatingPriority(ht, 1)).to be(true)
+    expect(ht.setRadiantSurfaceType("Floors")).to be true
+    expect(ht.addToThermalZone(tzone)).to be true
+    expect(tzone.setHeatingPriority(ht, 1)).to be true
     found = false
 
     tzone.equipment.each do |eq|
       found = true if eq.nameString == "radiant electric"
     end
 
-    expect(found).to be(true)
+    expect(found).to be true
 
     file = File.join(__dir__, "files/osms/out/seb_ihs.osm")
     model.save(file, true)
@@ -1049,15 +1049,15 @@ RSpec.describe OSut do
     # Yet if one were to remove the thermostat altogether ...
     tzone.resetThermostatSetpointDualSetpoint
     res = M.maxHeatScheduledSetpoint(tzone)
-    expect(res.is_a?(Hash)).to be(true)
-    expect(res.key?(:spt)).to be(true)
-    expect(res.key?(:dual)).to be(true)
-    expect(res[:spt ].nil?).to be(false)
+    expect(res).to be_a(Hash)
+    expect(res).to have_key(:spt)
+    expect(res).to have_key(:dual)
+    expect(res[:spt ]).to_not be_nil
     expect(res[:spt]).to be_within(TOL).of(22.78) # radiant heating
     expect(res[:dual]).to eq(false)
 
     stpts = M.setpoints(entry)
-    expect(stpts[:heating].nil?).to be(false)
+    expect(stpts[:heating]).to_not be_nil
     expect(stpts[:heating]).to be_within(TOL).of(22.78) # radiant heating
   end
 
@@ -1072,14 +1072,14 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     expect(mod1.clean!).to eq(DBG)
-    expect(mod1.airLoopsHVAC?(model)).to be(true)
-    expect(mod1.status.zero?).to be(true)
-    expect(mod1.airLoopsHVAC?(nil)).to be(false)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.airLoopsHVAC?(model)).to be true
+    expect(mod1.status).to be_zero
+    expect(mod1.airLoopsHVAC?(nil)).to be false
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m)
 
@@ -1087,14 +1087,14 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     expect(mod1.clean!).to eq(DBG)
-    expect(mod1.airLoopsHVAC?(model)).to be(false)
-    expect(mod1.status.zero?).to be(true)
-    expect(mod1.airLoopsHVAC?(nil)).to be(false)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.airLoopsHVAC?(model)).to be false
+    expect(mod1.status).to be_zero
+    expect(mod1.airLoopsHVAC?(nil)).to be false
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m)
   end
@@ -1107,24 +1107,24 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     tag   = "vestibule"
     entry = model.getSpaceByName("Entry way 1")
-    expect(entry.empty?).to be(false)
+    expect(entry).to_not be_empty
     entry = entry.get
-    expect(entry.additionalProperties.hasFeature(tag)).to be(false)
-    expect(mod1.vestibule?(entry)).to be(false)
-    expect(mod1.status.zero?).to be(true)
+    expect(entry.additionalProperties.hasFeature(tag)).to be false
+    expect(mod1.vestibule?(entry)).to be false
+    expect(mod1.status).to be_zero
 
-    expect(entry.additionalProperties.setFeature(tag, true)).to be(true)
-    expect(entry.additionalProperties.hasFeature(tag)).to be(true)
+    expect(entry.additionalProperties.setFeature(tag, true)).to be true
+    expect(entry.additionalProperties.hasFeature(tag)).to be true
     prop = entry.additionalProperties.getFeatureAsBoolean(tag)
-    expect(prop.empty?).to be(false)
-    expect(prop.get).to be(true)
-    expect(mod1.vestibule?(entry)).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(prop).to_not be_empty
+    expect(prop.get).to be true
+    expect(mod1.vestibule?(entry)).to be true
+    expect(mod1.status).to be_zero
   end
 
   it "checks for setpoints, plenums, attics" do
@@ -1142,20 +1142,20 @@ RSpec.describe OSut do
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Invalid input.
     expect(mod1.clean!).to eq(DBG)
-    expect(mod1.plenum?(nil)).to be(false)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.plenum?(nil)).to be false
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(ms1)
 
     expect(mod1.clean!).to eq(DBG)
-    expect(mod1.heatingTemperatureSetpoints?(nil)).to be(false)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.heatingTemperatureSetpoints?(nil)).to be false
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(ms2)
 
     expect(mod1.clean!).to eq(DBG)
-    expect(mod1.setpoints(nil)[:heating].nil?).to be(true)
-    expect(mod1.debug?).to be(true)
+    expect(mod1.setpoints(nil)[:heating]).to be_nil
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(ms3)
 
@@ -1163,10 +1163,10 @@ RSpec.describe OSut do
     file   = File.join(__dir__, "files/osms/in/seb.osm")
     path   = OpenStudio::Path.new(file)
     model  = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model  = model.get
     plenum = model.getSpaceByName("Level 0 Ceiling Plenum")
-    expect(plenum.empty?).to be(false)
+    expect(plenum).to_not be_empty
     plenum = plenum.get
     expect(mod1.clean!).to eq(DBG)
 
@@ -1174,155 +1174,155 @@ RSpec.describe OSut do
       next if space == plenum
 
       zone = space.thermalZone
-      expect(zone.empty?).to be(false)
+      expect(zone).to_not be_empty
       zone = zone.get
       heat = mod1.maxHeatScheduledSetpoint(zone)
       cool = mod1.minCoolScheduledSetpoint(zone)
 
       expect(heat[:spt]).to be_within(TOL).of(22.11)
       expect(cool[:spt]).to be_within(TOL).of(22.78)
-      expect(heat[:dual]).to be(true)
-      expect(cool[:dual]).to be(true)
+      expect(heat[:dual]).to be true
+      expect(cool[:dual]).to be true
 
-      expect(space.partofTotalFloorArea).to be(true)
-      expect(mod1.plenum?(space)).to be(false)
-      expect(mod1.unconditioned?(space)).to be(false)
+      expect(space.partofTotalFloorArea).to be true
+      expect(mod1.plenum?(space)).to be false
+      expect(mod1.unconditioned?(space)).to be false
       expect(mod1.setpoints(space)[:heating]).to be_within(TOL).of(22.11)
       expect(mod1.setpoints(space)[:cooling]).to be_within(TOL).of(22.78)
     end
 
     zone = plenum.thermalZone
-    expect(zone.empty?).to be(false)
+    expect(zone).to_not be_empty
     zone = zone.get
     heat = mod1.maxHeatScheduledSetpoint(zone) # simply returns model info
     cool = mod1.minCoolScheduledSetpoint(zone) # simply returns model info
 
-    expect(heat[:spt].nil?).to be(true)
-    expect(cool[:spt].nil?).to be(true)
-    expect(heat[:dual]).to be(false)
-    expect(cool[:dual]).to be(false)
+    expect(heat[:spt]).to be_nil
+    expect(cool[:spt]).to be_nil
+    expect(heat[:dual]).to be false
+    expect(cool[:dual]).to be false
 
     # "Plenum" spaceType triggers an INDIRECTLYCONDITIONED status; returns
     # defaulted setpoint temperatures.
-    expect(plenum.partofTotalFloorArea).to be(false)
-    expect(mod1.plenum?(plenum)).to be(true)
-    expect(mod1.unconditioned?(plenum)).to be(false)
+    expect(plenum.partofTotalFloorArea).to be false
+    expect(mod1.plenum?(plenum)).to be true
+    expect(mod1.unconditioned?(plenum)).to be false
     expect(mod1.setpoints(plenum)[:heating]).to be_within(TOL).of(21.00)
     expect(mod1.setpoints(plenum)[:cooling]).to be_within(TOL).of(24.00)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.status).to be_zero
 
     # Tag plenum as an INDIRECTLYCONDITIONED space (linked to "Open area 1");
     # returns "Open area 1" setpoint temperatures.
     key = "indirectlyconditioned"
     val = "Open area 1"
-    expect(plenum.additionalProperties.setFeature(key, val)).to be(true)
-    expect(mod1.plenum?(plenum)).to be(true)
-    expect(mod1.unconditioned?(plenum)).to be(false)
+    expect(plenum.additionalProperties.setFeature(key, val)).to be true
+    expect(mod1.plenum?(plenum)).to be true
+    expect(mod1.unconditioned?(plenum)).to be false
     expect(mod1.setpoints(plenum)[:heating]).to be_within(TOL).of(22.11)
     expect(mod1.setpoints(plenum)[:cooling]).to be_within(TOL).of(22.78)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.status).to be_zero
 
     # Tag plenum instead as an UNCONDITIONED space.
-    expect(plenum.additionalProperties.resetFeature(key)).to be(true)
+    expect(plenum.additionalProperties.resetFeature(key)).to be true
     key = "space_conditioning_category"
     val = "Unconditioned"
-    expect(plenum.additionalProperties.setFeature(key, val)).to be(true)
-    expect(mod1.plenum?(plenum)).to be(true)
-    expect(mod1.unconditioned?(plenum)).to be(true)
-    expect(mod1.setpoints(plenum)[:heating].nil?).to be(true)
-    expect(mod1.setpoints(plenum)[:cooling].nil?).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(plenum.additionalProperties.setFeature(key, val)).to be true
+    expect(mod1.plenum?(plenum)).to be true
+    expect(mod1.unconditioned?(plenum)).to be true
+    expect(mod1.setpoints(plenum)[:heating]).to be_nil
+    expect(mod1.setpoints(plenum)[:cooling]).to be_nil
+    expect(mod1.status).to be_zero
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     file  = File.join(__dir__, "files/osms/in/smalloffice.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
     attic = model.getSpaceByName("Attic")
-    expect(attic.empty?).to be(false)
+    expect(attic).to_not be_empty
     attic = attic.get
 
     model.getSpaces.each do |space|
       next if space == attic
 
       zone = space.thermalZone
-      expect(zone.empty?).to be(false)
+      expect(zone).to_not be_empty
       zone = zone.get
       heat = mod1.maxHeatScheduledSetpoint(zone)
       cool = mod1.minCoolScheduledSetpoint(zone)
 
       expect(heat[:spt]).to be_within(TOL).of(21.11)
       expect(cool[:spt]).to be_within(TOL).of(23.89)
-      expect(heat[:dual]).to be(true)
-      expect(cool[:dual]).to be(true)
+      expect(heat[:dual]).to be true
+      expect(cool[:dual]).to be true
 
-      expect(space.partofTotalFloorArea).to be(true)
-      expect(mod1.plenum?(space)).to be(false)
-      expect(mod1.unconditioned?(space)).to be(false)
+      expect(space.partofTotalFloorArea).to be true
+      expect(mod1.plenum?(space)).to be false
+      expect(mod1.unconditioned?(space)).to be false
       expect(mod1.setpoints(space)[:heating]).to be_within(TOL).of(21.11)
       expect(mod1.setpoints(space)[:cooling]).to be_within(TOL).of(23.89)
     end
 
     zone = attic.thermalZone
-    expect(zone.empty?).to be(false)
+    expect(zone).to_not be_empty
     zone = zone.get
     heat = mod1.maxHeatScheduledSetpoint(zone)
     cool = mod1.minCoolScheduledSetpoint(zone)
 
-    expect(heat[:spt].nil?).to be(true)
-    expect(cool[:spt].nil?).to be(true)
-    expect(heat[:dual]).to be(false)
-    expect(cool[:dual]).to be(false)
+    expect(heat[:spt]).to be_nil
+    expect(cool[:spt]).to be_nil
+    expect(heat[:dual]).to be false
+    expect(cool[:dual]).to be false
 
-    expect(mod1.plenum?(attic)).to be(false)
-    expect(mod1.unconditioned?(attic)).to be(true)
-    expect(attic.partofTotalFloorArea).to be(false)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.plenum?(attic)).to be false
+    expect(mod1.unconditioned?(attic)).to be true
+    expect(attic.partofTotalFloorArea).to be false
+    expect(mod1.status).to be_zero
 
     # Tag attic as an INDIRECTLYCONDITIONED space (linked to "Core_ZN").
     key = "indirectlyconditioned"
     val = "Core_ZN"
-    expect(attic.additionalProperties.setFeature(key, val)).to be(true)
-    expect(mod1.plenum?(attic)).to be(false)
-    expect(mod1.unconditioned?(attic)).to be(false)
+    expect(attic.additionalProperties.setFeature(key, val)).to be true
+    expect(mod1.plenum?(attic)).to be false
+    expect(mod1.unconditioned?(attic)).to be false
     expect(mod1.setpoints(attic)[:heating]).to be_within(TOL).of(21.11)
     expect(mod1.setpoints(attic)[:cooling]).to be_within(TOL).of(23.89)
-    expect(mod1.status.zero?).to be(true)
-    expect(attic.additionalProperties.resetFeature(key)).to be(true)
+    expect(mod1.status).to be_zero
+    expect(attic.additionalProperties.resetFeature(key)).to be true
 
     # Tag attic instead as an SEMIHEATED space. First, test an invalid entry.
     key = "space_conditioning_category"
     val = "Demiheated"
     msg = "Invalid '#{key}:#{val}' (OSut::setpoints)"
-    expect(attic.additionalProperties.setFeature(key, val)).to be(true)
-    expect(mod1.plenum?(attic)).to be(false)
-    expect(mod1.unconditioned?(attic)).to be(true)
-    expect(mod1.setpoints(attic)[:heating].nil?).to be(true)
-    expect(mod1.setpoints(attic)[:cooling].nil?).to be(true)
-    expect(attic.additionalProperties.hasFeature(key)).to be(true)
+    expect(attic.additionalProperties.setFeature(key, val)).to be true
+    expect(mod1.plenum?(attic)).to be false
+    expect(mod1.unconditioned?(attic)).to be true
+    expect(mod1.setpoints(attic)[:heating]).to be_nil
+    expect(mod1.setpoints(attic)[:cooling]).to be_nil
+    expect(attic.additionalProperties.hasFeature(key)).to be true
     cnd = attic.additionalProperties.getFeatureAsString(key)
-    expect(cnd.empty?).to be(false)
+    expect(cnd).to_not be_empty
     expect(cnd.get).to eq(val)
-    expect(mod1.error?).to be(true)
+    expect(mod1.error?).to be true
 
     # 4x same error, as both plenum? and unconditioned? call setpoints(attic).
     expect(mod1.logs.size).to eq(4)
     mod1.logs.each { |l| expect(l[:message]).to eq(msg) }
 
     # Now test a valid entry.
-    expect(attic.additionalProperties.resetFeature(key)).to be(true)
+    expect(attic.additionalProperties.resetFeature(key)).to be true
     expect(mod1.clean!).to eq(DBG)
     val = "Semiheated"
-    expect(attic.additionalProperties.setFeature(key, val)).to be(true)
-    expect(mod1.plenum?(attic)).to be(false)
-    expect(mod1.unconditioned?(attic)).to be(false)
+    expect(attic.additionalProperties.setFeature(key, val)).to be true
+    expect(mod1.plenum?(attic)).to be false
+    expect(mod1.unconditioned?(attic)).to be false
     expect(mod1.setpoints(attic)[:heating]).to be_within(TOL).of(15.00)
-    expect(mod1.setpoints(attic)[:cooling].nil?).to be(true)
-    expect(mod1.status.zero?).to be(true)
-    expect(attic.additionalProperties.hasFeature(key)).to be(true)
+    expect(mod1.setpoints(attic)[:cooling]).to be_nil
+    expect(mod1.status).to be_zero
+    expect(attic.additionalProperties.hasFeature(key)).to be true
     cnd = attic.additionalProperties.getFeatureAsString(key)
-    expect(cnd.empty?).to be(false)
+    expect(cnd).to_not be_empty
     expect(cnd.get).to eq(val)
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
@@ -1338,11 +1338,11 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     year = model.yearDescription
-    expect(year.empty?).to be(false)
+    expect(year).to_not be_empty
     year = year.get
 
     am01 = OpenStudio::Time.new(0, 1)
@@ -1354,94 +1354,94 @@ RSpec.describe OSut do
     oct31 = year.makeDate(OpenStudio::MonthOfYear.new("Oct"), 31)
     nov01 = year.makeDate(OpenStudio::MonthOfYear.new("Nov"),  1)
     dec31 = year.makeDate(OpenStudio::MonthOfYear.new("Dec"), 31)
-    expect(oct31.is_a?(OpenStudio::Date)).to be(true)
+    expect(oct31).to be_a(OpenStudio::Date)
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     sch = mod1.availabilitySchedule(model) # ON (default)
-    expect(sch.is_a?(OpenStudio::Model::ScheduleRuleset)).to be(true)
+    expect(sch).to be_a(OpenStudio::Model::ScheduleRuleset)
     expect(sch.nameString).to eq("ON Availability SchedRuleset")
 
     limits = sch.scheduleTypeLimits
-    expect(limits.empty?).to be(false)
+    expect(limits).to_not be_empty
     limits = limits.get
     expect(limits.nameString).to eq("HVAC Operation ScheduleTypeLimits")
 
     default = sch.defaultDaySchedule
     expect(default.nameString).to eq("ON Availability dftDaySched")
-    expect(default.times.empty?).to be(false)
-    expect(default.values.empty?).to be(false)
+    expect(default.times).to_not be_empty
+    expect(default.values).to_not be_empty
     expect(default.times.size).to eq(1)
     expect(default.values.size).to eq(1)
     expect(default.getValue(am01).to_i).to eq(1)
     expect(default.getValue(pm11).to_i).to eq(1)
 
-    expect(sch.isWinterDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isSummerDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isHolidayScheduleDefaulted).to be(true)
-    expect(sch.isCustomDay1ScheduleDefaulted).to be(true) unless v < 330
-    expect(sch.isCustomDay2ScheduleDefaulted).to be(true) unless v < 330
+    expect(sch.isWinterDesignDayScheduleDefaulted).to be true
+    expect(sch.isSummerDesignDayScheduleDefaulted).to be true
+    expect(sch.isHolidayScheduleDefaulted).to be true
+    expect(sch.isCustomDay1ScheduleDefaulted).to be true unless v < 330
+    expect(sch.isCustomDay2ScheduleDefaulted).to be true unless v < 330
     expect(sch.summerDesignDaySchedule).to eq(default)
     expect(sch.winterDesignDaySchedule).to eq(default)
     expect(sch.holidaySchedule).to eq(default)
     expect(sch.customDay1Schedule).to eq(default) unless v < 330
     expect(sch.customDay2Schedule).to eq(default) unless v < 330
-    expect(sch.scheduleRules.empty?).to be(true)
+    expect(sch.scheduleRules).to be_empty
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     sch = mod1.availabilitySchedule(model, "Off")
-    expect(sch.is_a?(OpenStudio::Model::ScheduleRuleset)).to be(true)
+    expect(sch).to be_a(OpenStudio::Model::ScheduleRuleset)
     expect(sch.nameString).to eq("OFF Availability SchedRuleset")
 
     limits = sch.scheduleTypeLimits
-    expect(limits.empty?).to be(false)
+    expect(limits).to_not be_empty
     limits = limits.get
     expect(limits.nameString).to eq("HVAC Operation ScheduleTypeLimits")
 
     default = sch.defaultDaySchedule
     expect(default.nameString).to eq("OFF Availability dftDaySched")
-    expect(default.times.empty?).to be(false)
-    expect(default.values.empty?).to be(false)
+    expect(default.times).to_not be_empty
+    expect(default.values).to_not be_empty
     expect(default.times.size).to eq(1)
     expect(default.values.size).to eq(1)
-    expect(default.getValue(am01).to_i).to eq(0)
-    expect(default.getValue(pm11).to_i).to eq(0)
+    expect(default.getValue(am01).to_i).to be_zero
+    expect(default.getValue(pm11).to_i).to be_zero
 
-    expect(sch.isWinterDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isSummerDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isHolidayScheduleDefaulted).to be(true)
-    expect(sch.isCustomDay1ScheduleDefaulted).to be(true) unless v < 330
-    expect(sch.isCustomDay2ScheduleDefaulted).to be(true) unless v < 330
+    expect(sch.isWinterDesignDayScheduleDefaulted).to be true
+    expect(sch.isSummerDesignDayScheduleDefaulted).to be true
+    expect(sch.isHolidayScheduleDefaulted).to be true
+    expect(sch.isCustomDay1ScheduleDefaulted).to be true unless v < 330
+    expect(sch.isCustomDay2ScheduleDefaulted).to be true unless v < 330
     expect(sch.summerDesignDaySchedule).to eq(default)
     expect(sch.winterDesignDaySchedule).to eq(default)
     expect(sch.holidaySchedule).to eq(default)
     expect(sch.customDay1Schedule).to eq(default) unless v < 330
     expect(sch.customDay2Schedule).to eq(default) unless v < 330
-    expect(sch.scheduleRules.empty?).to be(true)
+    expect(sch.scheduleRules).to be_empty
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     sch = mod1.availabilitySchedule(model, "Winter")
-    expect(sch.is_a?(OpenStudio::Model::ScheduleRuleset)).to be(true)
+    expect(sch).to be_a(OpenStudio::Model::ScheduleRuleset)
     expect(sch.nameString).to eq("WINTER Availability SchedRuleset")
 
     limits = sch.scheduleTypeLimits
-    expect(limits.empty?).to be(false)
+    expect(limits).to_not be_empty
     limits = limits.get
     expect(limits.nameString).to eq("HVAC Operation ScheduleTypeLimits")
 
     default = sch.defaultDaySchedule
     expect(default.nameString).to eq("WINTER Availability dftDaySched")
-    expect(default.times.empty?).to be(false)
-    expect(default.values.empty?).to be(false)
+    expect(default.times).to_not be_empty
+    expect(default.values).to_not be_empty
     expect(default.times.size).to eq(1)
     expect(default.values.size).to eq(1)
     expect(default.getValue(am01).to_i).to eq(1)
     expect(default.getValue(pm11).to_i).to eq(1)
 
-    expect(sch.isWinterDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isSummerDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isHolidayScheduleDefaulted).to be(true)
-    expect(sch.isCustomDay1ScheduleDefaulted).to be(true) unless v < 330
-    expect(sch.isCustomDay2ScheduleDefaulted).to be(true) unless v < 330
+    expect(sch.isWinterDesignDayScheduleDefaulted).to be true
+    expect(sch.isSummerDesignDayScheduleDefaulted).to be true
+    expect(sch.isHolidayScheduleDefaulted).to be true
+    expect(sch.isCustomDay1ScheduleDefaulted).to be true unless v < 330
+    expect(sch.isCustomDay2ScheduleDefaulted).to be true unless v < 330
     expect(sch.summerDesignDaySchedule).to eq(default)
     expect(sch.winterDesignDaySchedule).to eq(default)
     expect(sch.holidaySchedule).to eq(default)
@@ -1450,8 +1450,8 @@ RSpec.describe OSut do
     expect(sch.scheduleRules.size).to eq(1)
 
     sch.getDaySchedules(jan01, apr30).each do |day_schedule|
-      expect(day_schedule.times.empty?).to be(false)
-      expect(day_schedule.values.empty?).to be(false)
+      expect(day_schedule.times).to_not be_empty
+      expect(day_schedule.values).to_not be_empty
       expect(day_schedule.times.size).to eq(1)
       expect(day_schedule.values.size).to eq(1)
       expect(day_schedule.getValue(am01).to_i).to eq(1)
@@ -1459,17 +1459,17 @@ RSpec.describe OSut do
     end
 
     sch.getDaySchedules(may01, oct31).each do |day_schedule|
-      expect(day_schedule.times.empty?).to be(false)
-      expect(day_schedule.values.empty?).to be(false)
+      expect(day_schedule.times).to_not be_empty
+      expect(day_schedule.values).to_not be_empty
       expect(day_schedule.times.size).to eq(1)
       expect(day_schedule.values.size).to eq(1)
-      expect(day_schedule.getValue(am01).to_i).to eq(0)
-      expect(day_schedule.getValue(pm11).to_i).to eq(0)
+      expect(day_schedule.getValue(am01).to_i).to be_zero
+      expect(day_schedule.getValue(pm11).to_i).to be_zero
     end
 
     sch.getDaySchedules(nov01, dec31).each do |day_schedule|
-      expect(day_schedule.times.empty?).to be(false)
-      expect(day_schedule.values.empty?).to be(false)
+      expect(day_schedule.times).to_not be_empty
+      expect(day_schedule.values).to_not be_empty
       expect(day_schedule.times.size).to eq(1)
       expect(day_schedule.values.size).to eq(1)
       expect(day_schedule.getValue(am01).to_i).to eq(1)
@@ -1482,28 +1482,28 @@ RSpec.describe OSut do
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     sch = mod1.availabilitySchedule(model, "Summer")
-    expect(sch.is_a?(OpenStudio::Model::ScheduleRuleset)).to be(true)
+    expect(sch).to be_a(OpenStudio::Model::ScheduleRuleset)
     expect(sch.nameString).to eq("SUMMER Availability SchedRuleset")
 
     limits = sch.scheduleTypeLimits
-    expect(limits.empty?).to be(false)
+    expect(limits).to_not be_empty
     limits = limits.get
     expect(limits.nameString).to eq("HVAC Operation ScheduleTypeLimits")
 
     default = sch.defaultDaySchedule
     expect(default.nameString).to eq("SUMMER Availability dftDaySched")
-    expect(default.times.empty?).to be(false)
-    expect(default.values.empty?).to be(false)
+    expect(default.times).to_not be_empty
+    expect(default.values).to_not be_empty
     expect(default.times.size).to eq(1)
     expect(default.values.size).to eq(1)
-    expect(default.getValue(am01).to_i).to eq(0)
-    expect(default.getValue(pm11).to_i).to eq(0)
+    expect(default.getValue(am01).to_i).to be_zero
+    expect(default.getValue(pm11).to_i).to be_zero
 
-    expect(sch.isWinterDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isSummerDesignDayScheduleDefaulted).to be(true)
-    expect(sch.isHolidayScheduleDefaulted).to be(true)
-    expect(sch.isCustomDay1ScheduleDefaulted).to be(true) unless v < 330
-    expect(sch.isCustomDay2ScheduleDefaulted).to be(true) unless v < 330
+    expect(sch.isWinterDesignDayScheduleDefaulted).to be true
+    expect(sch.isSummerDesignDayScheduleDefaulted).to be true
+    expect(sch.isHolidayScheduleDefaulted).to be true
+    expect(sch.isCustomDay1ScheduleDefaulted).to be true unless v < 330
+    expect(sch.isCustomDay2ScheduleDefaulted).to be true unless v < 330
     expect(sch.summerDesignDaySchedule).to eq(default)
     expect(sch.winterDesignDaySchedule).to eq(default)
     expect(sch.holidaySchedule).to eq(default)
@@ -1512,17 +1512,17 @@ RSpec.describe OSut do
     expect(sch.scheduleRules.size).to eq(1)
 
     sch.getDaySchedules(jan01, apr30).each do |day_schedule|
-      expect(day_schedule.times.empty?).to be(false)
-      expect(day_schedule.values.empty?).to be(false)
+      expect(day_schedule.times).to_not be_empty
+      expect(day_schedule.values).to_not be_empty
       expect(day_schedule.times.size).to eq(1)
       expect(day_schedule.values.size).to eq(1)
-      expect(day_schedule.getValue(am01).to_i).to eq(0)
-      expect(day_schedule.getValue(pm11).to_i).to eq(0)
+      expect(day_schedule.getValue(am01).to_i).to be_zero
+      expect(day_schedule.getValue(pm11).to_i).to be_zero
     end
 
     sch.getDaySchedules(may01, oct31).each do |day_schedule|
-      expect(day_schedule.times.empty?).to be(false)
-      expect(day_schedule.values.empty?).to be(false)
+      expect(day_schedule.times).to_not be_empty
+      expect(day_schedule.values).to_not be_empty
       expect(day_schedule.times.size).to eq(1)
       expect(day_schedule.values.size).to eq(1)
       expect(day_schedule.getValue(am01).to_i).to eq(1)
@@ -1530,12 +1530,12 @@ RSpec.describe OSut do
     end
 
     sch.getDaySchedules(nov01, dec31).each do |day_schedule|
-      expect(day_schedule.times.empty?).to be(false)
-      expect(day_schedule.values.empty?).to be(false)
+      expect(day_schedule.times).to_not be_empty
+      expect(day_schedule.values).to_not be_empty
       expect(day_schedule.times.size).to eq(1)
       expect(day_schedule.values.size).to eq(1)
-      expect(day_schedule.getValue(am01).to_i).to eq(0)
-      expect(day_schedule.getValue(pm11).to_i).to eq(0)
+      expect(day_schedule.getValue(am01).to_i).to be_zero
+      expect(day_schedule.getValue(pm11).to_i).to be_zero
     end
   end
 
@@ -1550,28 +1550,28 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     model.getSpaces.each do |space|
       tr = mod1.transforms(space)
-      expect(tr.is_a?(Hash)).to be(true)
-      expect(tr.key?(:t)).to be(true)
-      expect(tr.key?(:r)).to be(true)
-      expect(tr[:t].is_a?(OpenStudio::Transformation)).to be(true)
+      expect(tr).to be_a(Hash)
+      expect(tr).to have_key(:t)
+      expect(tr).to have_key(:r)
+      expect(tr[:t]).to be_a(OpenStudio::Transformation)
       expect(tr[:r]).to within(TOL).of(0)
     end
 
     # Invalid input test.
     m1 = "Invalid 'group' arg #2 (OSut::transforms)"
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.status).to be_zero
     tr = mod1.transforms(nil)
-    expect(tr.is_a?(Hash)).to be(true)
-    expect(tr.key?(:t)).to be(true)
-    expect(tr.key?(:r)).to be(true)
-    expect(tr[:t].nil?).to be(true)
-    expect(tr[:r].nil?).to be(true)
-    expect(mod1.debug?).to be(true)
+    expect(tr).to be_a(Hash)
+    expect(tr).to have_key(:t)
+    expect(tr).to have_key(:r)
+    expect(tr[:t]).to be_nil
+    expect(tr[:r]).to be_nil
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m1)
   end
@@ -1598,28 +1598,29 @@ RSpec.describe OSut do
     model.getSurfaces.each do |s|
       next unless s.isPartOfEnvelope
       next unless s.surfaceType == "RoofCeiling"
+
       flat = mod1.flatten(s)
-      expect(flat.is_a?(cl2)).to be(true)
-      expect(mod1.xyz?(flat, :z, 0)).to be(true)
+      expect(flat).to be_a(cl2)
+      expect(mod1.xyz?(flat, :z, 0)).to be true
       expect(s.vertices.first.x).to be_within(TOL).of(flat.first.x)
       expect(s.vertices.first.y).to be_within(TOL).of(flat.first.y)
     end
 
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.status).to be_zero
     flat = mod1.flatten(nil)
-    expect(flat.is_a?(cl2)).to be(true)
-    expect(flat.empty?).to be(true)
-    expect(mod1.debug?).to be(true)
+    expect(flat).to be_a(cl2)
+    expect(flat).to be_empty
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to be(1)
-    expect(mod1.logs.first[:message].include?(m1)).to be(true)
+    expect(mod1.logs.first[:message]).to include(m1)
 
     expect(mod1.clean!).to eq(DBG)
     flat = mod1.flatten(model)
-    expect(flat.is_a?(cl2)).to be(true)
-    expect(flat.empty?).to be(true)
-    expect(mod1.debug?).to be(true)
+    expect(flat).to be_a(cl2)
+    expect(flat).to be_empty
+    expect(mod1.debug?).to be true
     expect(mod1.logs.size).to be(1)
-    expect(mod1.logs.first[:message].include?(m2)).to be(true)
+    expect(mod1.logs.first[:message]).to include(m2)
   end
 
   it "checks surface fits? & overlaps?" do
@@ -1655,15 +1656,15 @@ RSpec.describe OSut do
     vec << OpenStudio::Point3d.new(  1,  0,  2)
     door1 = OpenStudio::Model::SubSurface.new(vec, model)
 
-    expect(mod1.fits?(door1, wall)).to be(true)
-    expect(mod1.status.zero?).to be(true)
-    expect(mod1.overlaps?(door1, wall)).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.fits?(door1, wall)).to be true
+    expect(mod1.status).to be_zero
+    expect(mod1.overlaps?(door1, wall)).to be true
+    expect(mod1.status).to be_zero
 
     # Order of arguments matter.
-    expect(mod1.fits?(wall, door1)).to be(false)
-    expect(mod1.overlaps?(wall, door1)).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.fits?(wall, door1)).to be false
+    expect(mod1.overlaps?(wall, door1)).to be true
+    expect(mod1.status).to be_zero
 
     # Another 1m x 2m corner door, yet entirely beyond the wall surface.
     vec = OpenStudio::Point3dVector.new
@@ -1674,14 +1675,14 @@ RSpec.describe OSut do
     door2 = OpenStudio::Model::SubSurface.new(vec, model)
 
     # Door2 fits?, overlaps?
-    expect(mod1.fits?(door2, wall)).to be(false)
-    expect(mod1.overlaps?(door2, wall)).to be(false)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.fits?(door2, wall)).to be false
+    expect(mod1.overlaps?(door2, wall)).to be false
+    expect(mod1.status).to be_zero
 
     # Order of arguments doesn't matter.
-    expect(mod1.fits?(wall, door2)).to be(false)
-    expect(mod1.overlaps?(wall, door2)).to be(false)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.fits?(wall, door2)).to be false
+    expect(mod1.overlaps?(wall, door2)).to be false
+    expect(mod1.status).to be_zero
 
     # Top-right corner 2m x 2m window, overlapping top-right corner of wall.
     vec = OpenStudio::Point3dVector.new
@@ -1692,13 +1693,13 @@ RSpec.describe OSut do
     window = OpenStudio::Model::SubSurface.new(vec, model)
 
     # Window fits?, overlaps?
-    expect(mod1.fits?(window, wall)).to be(false)
-    expect(mod1.overlaps?(window, wall)).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.fits?(window, wall)).to be false
+    expect(mod1.overlaps?(window, wall)).to be true
+    expect(mod1.status).to be_zero
 
-    expect(mod1.fits?(wall, window)).to be(false)
-    expect(mod1.overlaps?(wall, window)).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.fits?(wall, window)).to be false
+    expect(mod1.overlaps?(wall, window)).to be true
+    expect(mod1.status).to be_zero
 
     # A glazed surface, entirely encompassing the wall.
     vec = OpenStudio::Point3dVector.new
@@ -1709,13 +1710,13 @@ RSpec.describe OSut do
     glazing = OpenStudio::Model::SubSurface.new(vec, model)
 
     # Glazing fits?, overlaps?
-    expect(mod1.fits?(glazing, wall)).to be(true)
-    expect(mod1.overlaps?(glazing, wall)).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.fits?(glazing, wall)).to be true
+    expect(mod1.overlaps?(glazing, wall)).to be true
+    expect(mod1.status).to be_zero
 
-    expect(mod1.fits?(wall, glazing)).to be(true)
-    expect(mod1.overlaps?(wall, glazing)).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.fits?(wall, glazing)).to be true
+    expect(mod1.overlaps?(wall, glazing)).to be true
+    expect(mod1.status).to be_zero
   end
 
   it "checks triangulation" do
@@ -1768,29 +1769,29 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new( 0, 0,  0)
 
     segments = mod1.getSegments(vtx)
-    expect(segments.is_a?(OpenStudio::Point3dVectorVector)).to be(true)
+    expect(segments).to be_a(OpenStudio::Point3dVectorVector)
     expect(segments.size).to eq(3)
 
     segments.each_with_index do |segment, i|
-      expect(mod1.yy?(segment.first, segment.last)).to be(false)
-      expect(mod1.yy?(segment.first, segment.last, false)).to be(false)
+      expect(mod1.yy?(segment.first, segment.last)).to be false
+      expect(mod1.yy?(segment.first, segment.last, false)).to be false
 
       case i
       when 0
-        expect(mod1.xx?(segment.first, segment.last)).to be(true)
-        expect(mod1.xx?(segment.first, segment.last, false)).to be(true)
-        expect(mod1.zz?(segment.first, segment.last)).to be(false)
-        expect(mod1.zz?(segment.first, segment.last, false)).to be(false)
+        expect(mod1.xx?(segment.first, segment.last)).to be true
+        expect(mod1.xx?(segment.first, segment.last, false)).to be true
+        expect(mod1.zz?(segment.first, segment.last)).to be false
+        expect(mod1.zz?(segment.first, segment.last, false)).to be false
       when 1
-        expect(mod1.zz?(segment.first, segment.last)).to be(true)
-        expect(mod1.zz?(segment.first, segment.last, false)).to be(true)
-        expect(mod1.xx?(segment.first, segment.last)).to be(false)
-        expect(mod1.xx?(segment.first, segment.last, false)).to be(false)
+        expect(mod1.zz?(segment.first, segment.last)).to be true
+        expect(mod1.zz?(segment.first, segment.last, false)).to be true
+        expect(mod1.xx?(segment.first, segment.last)).to be false
+        expect(mod1.xx?(segment.first, segment.last, false)).to be false
       else
-        expect(mod1.xx?(segment.first, segment.last)).to be(false)
-        expect(mod1.xx?(segment.first, segment.last, false)).to be(true)
-        expect(mod1.zz?(segment.first, segment.last)).to be(false)
-        expect(mod1.zz?(segment.first, segment.last, false)).to be(true)
+        expect(mod1.xx?(segment.first, segment.last)).to be false
+        expect(mod1.xx?(segment.first, segment.last, false)).to be true
+        expect(mod1.zz?(segment.first, segment.last)).to be false
+        expect(mod1.zz?(segment.first, segment.last, false)).to be true
       end
     end
 
@@ -1801,9 +1802,9 @@ RSpec.describe OSut do
     # poly method (convex = true, uniqueness = true, collinearity = false).
     expect(vtx.size).to eq(3)
     expect(mod1.poly(vtx, true, true, false).size).to eq(3)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.status).to be_zero
     triads = mod1.getTriads(vtx)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.status).to be_zero
     expect(triads.size).to eq(3)
 
     # TO DO ... in progress.
@@ -1840,7 +1841,7 @@ RSpec.describe OSut do
     # 2. OSut ULC reordering.
     ulc_a_vtx = mod1.ulc(a_vtx)
     ulc_vtx   = t * ulc_a_vtx
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.status).to be_zero
     expect(ulc_vtx[1].x.abs).to be < TOL
     expect(ulc_vtx[1].y.abs).to be < TOL
     expect(ulc_vtx[1].z.abs).to be < TOL
@@ -1873,7 +1874,7 @@ RSpec.describe OSut do
     # 2. OSut ULC reordering.
     ulc_a_vtx = mod1.ulc(a_vtx)
     ulc_vtx   = t * ulc_a_vtx
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.status).to be_zero
     expect(ulc_vtx[1].x.abs).to be < TOL
     expect(ulc_vtx[1].y.abs).to be < TOL
     expect(ulc_vtx[1].z.abs).to be < TOL
@@ -1910,7 +1911,7 @@ RSpec.describe OSut do
     # 2. OSut ULC reordering.
     ulc_a_vtx = mod1.ulc(a_vtx)
     ulc_vtx   = t * ulc_a_vtx
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.status).to be_zero
     expect(ulc_vtx[1].x.abs).to be < TOL
     expect(ulc_vtx[1].y.abs).to be < TOL
     expect(ulc_vtx[1].z.abs).to be > TOL
@@ -1934,11 +1935,11 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new( 0, 0,10)
 
     v = mod1.poly(vtx)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
-    expect(v.empty?).to be(true)
-    expect(mod1.error?).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
+    expect(v).to be_empty
+    expect(mod1.error?).to be true
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message].include?("Empty 'polygon'")).to be(true)
+    expect(mod1.logs.first[:message]).to include("Empty 'polygon'")
     expect(mod1.clean!).to eq(INF)
 
     # 3x non-unique points (not a polygon).
@@ -1948,11 +1949,11 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new( 0, 0,10)
 
     v = mod1.poly(vtx)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
-    expect(v.empty?).to be(true)
-    expect(mod1.error?).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
+    expect(v).to be_empty
+    expect(mod1.error?).to be true
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message].include?("Empty 'polygon'")).to be(true)
+    expect(mod1.logs.first[:message]).to include("Empty 'polygon'")
     expect(mod1.clean!).to eq(INF)
 
     # 4th non-planar point (not a polygon).
@@ -1963,11 +1964,11 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new( 0,10,10)
 
     v = mod1.poly(vtx)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
-    expect(v.empty?).to be(true)
-    expect(mod1.error?).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
+    expect(v).to be_empty
+    expect(mod1.error?).to be true
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message].include?("plane")).to be(true)
+    expect(mod1.logs.first[:message]).to include("plane")
     expect(mod1.clean!).to eq(INF)
 
     # 3x unique points (a valid polygon).
@@ -1977,16 +1978,16 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(10, 0, 0)
 
     v = mod1.poly(vtx)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
     expect(v.size).to eq(3)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.status).to be_zero
 
     # 4th collinear point (collinear permissive).
     vtx << OpenStudio::Point3d.new(20, 0, 0)
     v = mod1.poly(vtx)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
     expect(v.size).to eq(4)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.status).to be_zero
 
     # Intersecting points, e.g. a 'bowtie' (not a valid Openstudio polygon).
     vtx  = OpenStudio::Point3dVector.new
@@ -1996,11 +1997,11 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new( 0,10, 0)
 
     v = mod1.poly(vtx)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
-    expect(v.empty?).to be(true)
-    expect(mod1.error?).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
+    expect(v).to be_empty
+    expect(mod1.error?).to be true
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message].include?("Empty 'plane'")).to be(true)
+    expect(mod1.logs.first[:message]).to include("Empty 'plane'")
     expect(mod1.clean!).to eq(INF)
 
     # Ensure uniqueness & OpenStudio's counterclockwise ULC sequence.
@@ -2011,12 +2012,12 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(10, 0, 0)
 
     v = mod1.poly(vtx, false, true, true, false, :ulc)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
     expect(v.size).to eq(3)
-    expect(mod1.same?(vtx[0], v[0])).to be(true)
-    expect(mod1.same?(vtx[1], v[1])).to be(true)
-    expect(mod1.same?(vtx[2], v[2])).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.same?(vtx[0], v[0])).to be true
+    expect(mod1.same?(vtx[1], v[1])).to be true
+    expect(mod1.same?(vtx[2], v[2])).to be true
+    expect(mod1.status).to be_zero
     expect(mod1.clean!).to eq(INF)
 
     # Ensure strict non-collinearity (ULC).
@@ -2027,12 +2028,12 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(20, 0, 0)
 
     v = mod1.poly(vtx, false, false, false, false, :ulc)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
     expect(v.size).to eq(3)
-    expect(mod1.same?(vtx[0], v[0])).to be(true)
-    expect(mod1.same?(vtx[1], v[1])).to be(true)
-    expect(mod1.same?(vtx[3], v[2])).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.same?(vtx[0], v[0])).to be true
+    expect(mod1.same?(vtx[1], v[1])).to be true
+    expect(mod1.same?(vtx[3], v[2])).to be true
+    expect(mod1.status).to be_zero
     expect(mod1.clean!).to eq(INF)
 
     # Ensuring strict non-collinearity also ensures uniqueness (ULC).
@@ -2044,12 +2045,12 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(20, 0, 0)
 
     v = mod1.poly(vtx, false, false, false, false, :ulc)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
     expect(v.size).to eq(3)
-    expect(mod1.same?(vtx[0], v[0])).to be(true)
-    expect(mod1.same?(vtx[1], v[1])).to be(true)
-    expect(mod1.same?(vtx[4], v[2])).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.same?(vtx[0], v[0])).to be true
+    expect(mod1.same?(vtx[1], v[1])).to be true
+    expect(mod1.same?(vtx[4], v[2])).to be true
+    expect(mod1.status).to be_zero
     expect(mod1.clean!).to eq(INF)
 
     # Check for (valid) convexity.
@@ -2059,18 +2060,18 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(20, 0, 0)
 
     v = mod1.poly(vtx, true)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
     expect(v.size).to eq(3)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.status).to be_zero
 
     # Check for (invalid) convexity.
     vtx << OpenStudio::Point3d.new(1, 0, 1)
     v = mod1.poly(vtx, true)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
-    expect(v.empty?).to be(true)
-    expect(mod1.error?).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
+    expect(v).to be_empty
+    expect(mod1.error?).to be true
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message].include?("non-convex")).to be(true)
+    expect(mod1.logs.first[:message]).to include("non-convex")
     expect(mod1.clean!).to eq(INF)
 
     # 2nd check for (valid) convexity (with collinear points).
@@ -2081,22 +2082,22 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(20, 0, 0)
 
     v = mod1.poly(vtx, true, false, true, false, :ulc)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
     expect(v.size).to eq(4)
-    expect(mod1.same?(vtx[0], v[0])).to be(true)
-    expect(mod1.same?(vtx[1], v[1])).to be(true)
-    expect(mod1.same?(vtx[2], v[2])).to be(true)
-    expect(mod1.same?(vtx[3], v[3])).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.same?(vtx[0], v[0])).to be true
+    expect(mod1.same?(vtx[1], v[1])).to be true
+    expect(mod1.same?(vtx[2], v[2])).to be true
+    expect(mod1.same?(vtx[3], v[3])).to be true
+    expect(mod1.status).to be_zero
 
     # 2nd check for (invalid) convexity (with collinear points).
     vtx << OpenStudio::Point3d.new(1, 0, 1)
     v = mod1.poly(vtx, true, false, true, false, :ulc)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
-    expect(v.empty?).to be(true)
-    expect(mod1.error?).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
+    expect(v).to be_empty
+    expect(mod1.error?).to be true
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message].include?("non-convex")).to be(true)
+    expect(mod1.logs.first[:message]).to include("non-convex")
     expect(mod1.clean!).to eq(INF)
 
     # 3rd check for (valid) convexity (with collinear points), yet returned
@@ -2108,11 +2109,11 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(20, 0, 0)
 
     v = mod1.poly(vtx, true, false, true, true, :cw)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
     expect(v.size).to eq(4)
-    expect(mod1.xyz?(v, :z, 0)).to be(true)
-    expect(mod1.clockwise?(v)).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.xyz?(v, :z, 0)).to be true
+    expect(mod1.clockwise?(v)).to be true
+    expect(mod1.status).to be_zero
 
     # Ensure returned vector remains in original sequence (if unaltered).
     vtx  = OpenStudio::Point3dVector.new
@@ -2122,13 +2123,13 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(20, 0, 0)
 
     v = mod1.poly(vtx, true, false, true, false, :no)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
     expect(v.size).to eq(4)
-    expect(mod1.same?(vtx[0], v[0])).to be(true)
-    expect(mod1.same?(vtx[1], v[1])).to be(true)
-    expect(mod1.same?(vtx[2], v[2])).to be(true)
-    expect(mod1.same?(vtx[3], v[3])).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.same?(vtx[0], v[0])).to be true
+    expect(mod1.same?(vtx[1], v[1])).to be true
+    expect(mod1.same?(vtx[2], v[2])).to be true
+    expect(mod1.same?(vtx[3], v[3])).to be true
+    expect(mod1.status).to be_zero
 
     # Sequence of returned vector if altered (avoid collinearity).
     vtx  = OpenStudio::Point3dVector.new
@@ -2138,12 +2139,12 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(20, 0, 0)
 
     v = mod1.poly(vtx, true, false, false, false, :no)
-    expect(v.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(v).to be_a(OpenStudio::Point3dVector)
     expect(v.size).to eq(3)
-    expect(mod1.same?(vtx[0], v[0])).to be(true)
-    expect(mod1.same?(vtx[1], v[1])).to be(true)
-    expect(mod1.same?(vtx[3], v[2])).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.same?(vtx[0], v[0])).to be true
+    expect(mod1.same?(vtx[1], v[1])).to be true
+    expect(mod1.same?(vtx[3], v[2])).to be true
+    expect(mod1.status).to be_zero
   end
 
   it "checks subsurface insertions on (seb) tilted surfaces" do
@@ -2160,25 +2161,25 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/seb.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     openarea = model.getSpaceByName("Open area 1")
-    expect(openarea.empty?).to be(false)
+    expect(openarea).to_not be_empty
     openarea = openarea.get
 
     unless v < 350
-      expect(openarea.isEnclosedVolume).to be(true)
-      expect(openarea.isVolumeDefaulted).to be(true)
-      expect(openarea.isVolumeAutocalculated).to be(true)
+      expect(openarea.isEnclosedVolume).to be true
+      expect(openarea.isVolumeDefaulted).to be true
+      expect(openarea.isVolumeAutocalculated).to be true
     end
 
     w5 = model.getSurfaceByName("Openarea 1 Wall 5")
-    expect(w5.empty?).to be(false)
+    expect(w5).to_not be_empty
     w5 = w5.get
 
     w5_space = w5.space
-    expect(w5_space.empty?).to be(false)
+    expect(w5_space).to_not be_empty
     w5_space = w5_space.get
     expect(w5_space).to eq(openarea)
     expect(w5.vertices.size).to eq(4)
@@ -2206,27 +2207,27 @@ RSpec.describe OSut do
     vec << w5_3
     roof = OpenStudio::Model::Surface.new(vec, model)
     roof.setName("Openarea slanted roof")
-    expect(roof.setSurfaceType("RoofCeiling")).to be(true)
-    expect(roof.setSpace(openarea)).to be(true)
+    expect(roof.setSurfaceType("RoofCeiling")).to be true
+    expect(roof.setSpace(openarea)).to be true
 
     # Side-note test: genConstruction --- --- --- --- --- --- --- --- --- --- #
-    expect(roof.isConstructionDefaulted).to be(true)
+    expect(roof.isConstructionDefaulted).to be true
     lc = roof.construction
-    expect(lc.empty?).to be(false)
+    expect(lc).to_not be_empty
     lc = lc.get.to_LayeredConstruction
-    expect(lc.empty?).to be(false)
+    expect(lc).to_not be_empty
     lc = lc.get
     c  = mod1.genConstruction(model, {type: :roof, uo: 1 / 5.46})
-    expect(mod1.status.zero?).to be(true)
-    expect(c.is_a?(OpenStudio::Model::LayeredConstruction)).to be(true)
-    expect(roof.setConstruction(c)).to be(true)
-    expect(roof.isConstructionDefaulted).to be(false)
+    expect(mod1.status).to be_zero
+    expect(c).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(roof.setConstruction(c)).to be true
+    expect(roof.isConstructionDefaulted).to be false
     r1 = mod1.rsi(lc)
     r2 = mod1.rsi(c)
     d1 = mod1.rsi(lc)
     d2 = mod1.rsi(c)
-    expect((r1 - r2).abs > 0).to be(true)
-    expect((d1 - d2).abs > 0).to be(true)
+    expect((r1 - r2).abs > 0).to be true
+    expect((d1 - d2).abs > 0).to be true
     # ... end of genConstruction test --- --- --- --- --- --- --- --- --- --- #
 
     # New, inverse-tilted wall (i.e. cantilevered), under new slanted roof.
@@ -2243,8 +2244,8 @@ RSpec.describe OSut do
     vec << w5_1       # BOTTOMLEFT
     tilt_wall = OpenStudio::Model::Surface.new(vec, model)
     tilt_wall.setName("Openarea tilted wall")
-    expect(tilt_wall.setSurfaceType("Wall")).to be(true)
-    expect(tilt_wall.setSpace(openarea)).to be(true)
+    expect(tilt_wall.setSurfaceType("Wall")).to be true
+    expect(tilt_wall.setSpace(openarea)).to be true
 
     # New, left side wall.
     vec  = OpenStudio::Point3dVector.new
@@ -2253,7 +2254,7 @@ RSpec.describe OSut do
     vec << roof_left
     left_wall = OpenStudio::Model::Surface.new(vec, model)
     left_wall.setName("Openarea left side wall")
-    expect(left_wall.setSpace(openarea)).to be(true)
+    expect(left_wall.setSpace(openarea)).to be true
 
     # New, right side wall.
     vec  = OpenStudio::Point3dVector.new
@@ -2262,12 +2263,12 @@ RSpec.describe OSut do
     vec << w5_2
     right_wall = OpenStudio::Model::Surface.new(vec, model)
     right_wall.setName("Openarea right side wall")
-    expect(right_wall.setSpace(openarea)).to be(true)
+    expect(right_wall.setSpace(openarea)).to be true
 
     unless v < 350
-      expect(openarea.isEnclosedVolume).to be(true)
-      expect(openarea.isVolumeDefaulted).to be(true)
-      expect(openarea.isVolumeAutocalculated).to be(true)
+      expect(openarea.isEnclosedVolume).to be true
+      expect(openarea.isVolumeDefaulted).to be true
+      expect(openarea.isVolumeAutocalculated).to be true
     end
 
     file = File.join(__dir__, "files/osms/out/seb_mod.osm")
@@ -2283,7 +2284,7 @@ RSpec.describe OSut do
     #   - Z-axis values are represented as Y-axis values
     tr = OpenStudio::Transformation.alignFace(tilt_wall.vertices)
     aligned_tilt_wall = tr.inverse * tilt_wall.vertices
-    expect(aligned_tilt_wall.is_a?(Array)).to be(true)
+    expect(aligned_tilt_wall).to be_a(Array)
     # puts aligned_tilt_wall
     # [4.89, 0.00, 0.00] # if BOTTOMRIGHT, i.e. upside-down "U"
     # [5.89, 3.09, 0.00]
@@ -2330,8 +2331,8 @@ RSpec.describe OSut do
 
     tilt_window1 = OpenStudio::Model::SubSurface.new(tr * vec, model)
     tilt_window1.setName("Tilted window (center)")
-    expect(tilt_window1.setSubSurfaceType("FixedWindow")).to be(true)
-    expect(tilt_window1.setSurface(tilt_wall)).to be(true)
+    expect(tilt_window1.setSubSurfaceType("FixedWindow")).to be true
+    expect(tilt_window1.setSurface(tilt_wall)).to be true
 
     x    = centerline - 3*width/2 - 0.15 # window to the left of the first one
     vec  = OpenStudio::Point3dVector.new
@@ -2342,8 +2343,8 @@ RSpec.describe OSut do
 
     tilt_window2 = OpenStudio::Model::SubSurface.new(tr * vec, model)
     tilt_window2.setName("Tilted window (left)")
-    expect(tilt_window2.setSubSurfaceType("FixedWindow")).to be(true)
-    expect(tilt_window2.setSurface(tilt_wall)).to be(true)
+    expect(tilt_window2.setSubSurfaceType("FixedWindow")).to be true
+    expect(tilt_window2.setSurface(tilt_wall)).to be true
 
     x    = centerline + width/2 + 0.15 # window to the right of the first one
     vec  = OpenStudio::Point3dVector.new
@@ -2354,8 +2355,8 @@ RSpec.describe OSut do
 
     tilt_window3 = OpenStudio::Model::SubSurface.new(tr * vec, model)
     tilt_window3.setName("Tilted window (right)")
-    expect(tilt_window3.setSubSurfaceType("FixedWindow")).to be(true)
-    expect(tilt_window3.setSurface(tilt_wall)).to be(true)
+    expect(tilt_window3.setSubSurfaceType("FixedWindow")).to be true
+    expect(tilt_window3.setSurface(tilt_wall)).to be true
 
     # file = File.join(__dir__, "files/osms/out/seb_fen.osm")
     # model.save(file, true)
@@ -2363,14 +2364,14 @@ RSpec.describe OSut do
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Repeat for 3x skylights. Fetch transform if slanted roof vertices were
     # also to "align". Recover the (default) window construction.
-    expect(tilt_window1.isConstructionDefaulted).to be(true)
+    expect(tilt_window1.isConstructionDefaulted).to be true
     construction = tilt_window1.construction
-    expect(construction.empty?).to be(false)
+    expect(construction).to_not be_empty
     construction = construction.get
 
     tr = OpenStudio::Transformation.alignFace(roof.vertices)
     aligned_roof = tr.inverse * roof.vertices
-    expect(aligned_roof.is_a?(Array)).to be(true)
+    expect(aligned_roof).to be_a(Array)
 
     # Find centerline along "aligned" X-axis, and lower Y-axis limit.
     min_x = 0
@@ -2399,9 +2400,9 @@ RSpec.describe OSut do
 
     skylight1 = OpenStudio::Model::SubSurface.new(tr * vec, model)
     skylight1.setName("Skylight (center)")
-    expect(skylight1.setSubSurfaceType("Skylight")).to be(true)
-    expect(skylight1.setConstruction(construction)).to be(true)
-    expect(skylight1.setSurface(roof)).to be(true)
+    expect(skylight1.setSubSurfaceType("Skylight")).to be true
+    expect(skylight1.setConstruction(construction)).to be true
+    expect(skylight1.setSurface(roof)).to be true
 
     x    = centerline - 3*width/2 - 0.15 # skylight to the left of center
     vec  = OpenStudio::Point3dVector.new
@@ -2412,9 +2413,9 @@ RSpec.describe OSut do
 
     skylight2 = OpenStudio::Model::SubSurface.new(tr * vec, model)
     skylight2.setName("Skylight (left)")
-    expect(skylight2.setSubSurfaceType("Skylight")).to be(true)
-    expect(skylight2.setConstruction(construction)).to be(true)
-    expect(skylight2.setSurface(roof)).to be(true)
+    expect(skylight2.setSubSurfaceType("Skylight")).to be true
+    expect(skylight2.setConstruction(construction)).to be true
+    expect(skylight2.setSurface(roof)).to be true
 
     x    = centerline + width/2 + 0.15 # skylight to the right of center
     vec  = OpenStudio::Point3dVector.new
@@ -2425,9 +2426,9 @@ RSpec.describe OSut do
 
     skylight3 = OpenStudio::Model::SubSurface.new(tr * vec, model)
     skylight3.setName("Skylight (right)")
-    expect(skylight3.setSubSurfaceType("Skylight")).to be(true)
-    expect(skylight3.setConstruction(construction)).to be(true)
-    expect(skylight3.setSurface(roof)).to be(true)
+    expect(skylight3.setSubSurfaceType("Skylight")).to be true
+    expect(skylight3.setConstruction(construction)).to be true
+    expect(skylight3.setSurface(roof)).to be true
 
     file = File.join(__dir__, "files/osms/out/seb_ext1.osm")
     model.save(file, true)
@@ -2437,15 +2438,15 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/out/seb_mod.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     roof = model.getSurfaceByName("Openarea slanted roof")
-    expect(roof.empty?).to be(false)
+    expect(roof).to_not be_empty
     roof = roof.get
 
     tilt_wall = model.getSurfaceByName("Openarea tilted wall")
-    expect(tilt_wall.empty?).to be(false)
+    expect(tilt_wall).to_not be_empty
     tilt_wall = tilt_wall.get
 
     head   = max_y - 0.005
@@ -2460,30 +2461,30 @@ RSpec.describe OSut do
     sub[:count ] = 3
     sub[:offset] = offset
     # sub[:type  ] = "FixedWindow" # defaulted if not specified.
-    expect(mod1.addSubs(tilt_wall, [sub])).to be(true)
-    expect(mod1.status.zero?).to be(true)
-    expect(mod1.logs.size.zero?).to be(true)
+    expect(mod1.addSubs(tilt_wall, [sub])).to be true
+    expect(mod1.status).to be_zero
+    expect(mod1.logs.size).to be_zero
 
     tilted = model.getSubSurfaceByName("Tilted window|0")
-    expect(tilted.empty?).to be(false)
+    expect(tilted).to_not be_empty
     tilted = tilted.get
 
     construction   = tilted.construction
-    expect(construction.empty?).to be(false)
+    expect(construction).to_not be_empty
     construction   = construction.get
     sub[:assembly] = construction
 
     sub.delete(:head)
-    expect(sub.key?(:head)).to be(false)
+    expect(sub).to_not have_key(:head)
     sub[:id  ] = ""
     sub[:sill] = 0.0 # will be reset to 5mm
     sub[:type] = "Skylight"
-    expect(mod1.addSubs(roof, [sub])).to be(true)
-    expect(mod1.warn?).to be(true)
+    expect(mod1.addSubs(roof, [sub])).to be true
+    expect(mod1.warn?).to be true
     expect(mod1.logs.size).to eq(1)
 
     message = "' sill height to 0.005 m (OSut::addSubs)"
-    expect(mod1.logs.first[:message].include?(message)).to be(true)
+    expect(mod1.logs.first[:message]).to include(message)
 
     file = File.join(__dir__, "files/osms/out/seb_ext2.osm")
     model.save(file, true)
@@ -2498,11 +2499,11 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/out/seb_ext2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     tilted = model.getSurfaceByName("Openarea tilted wall")
-    expect(tilted.empty?).to be(false)
+    expect(tilted).to_not be_empty
     tilted = tilted.get
 
     w1 = mod1.width(tilted)
@@ -2511,7 +2512,7 @@ RSpec.describe OSut do
     expect(h1).to be_within(TOL).of(3.09)
 
     left = model.getSurfaceByName("Openarea left side wall")
-    expect(left.empty?).to be(false)
+    expect(left).to_not be_empty
     left = left.get
 
     w2 = mod1.width(left)
@@ -2520,7 +2521,7 @@ RSpec.describe OSut do
     expect(h2).to be_within(TOL).of(3.35)
 
     right = model.getSurfaceByName("Openarea right side wall")
-    expect(right.empty?).to be(false)
+    expect(right).to_not be_empty
     right = right.get
 
     w3 = mod1.width(right)
@@ -2535,7 +2536,7 @@ RSpec.describe OSut do
     vec << tilted.vertices[0]
     vec << tilted.vertices[1]
     vec << tilted.vertices[2]
-    expect(tilted.setVertices(vec)).to be(true)
+    expect(tilted.setVertices(vec)).to be true
     expect(mod1.width(tilted)).to be_within(TOL).of(w1)  # same result
     expect(mod1.height(tilted)).to be_within(TOL).of(h1) # same result
 
@@ -2553,18 +2554,18 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/out/seb_ext2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     # Fetch "Openarea Wall 3".
     wall3 = model.getSurfaceByName("Openarea 1 Wall 3")
-    expect(wall3.empty?).to be(false)
+    expect(wall3).to_not be_empty
     wall3 = wall3.get
     area  = wall3.grossArea * wwr
 
     # Fetch "Openarea Wall 4".
     wall4 = model.getSurfaceByName("Openarea 1 Wall 4")
-    expect(wall4.empty?).to be(false)
+    expect(wall4).to_not be_empty
     wall4 = wall4.get
 
     # Fetch transform if wall3 vertices were to 'align'.
@@ -2576,7 +2577,7 @@ RSpec.describe OSut do
 
     # Fetch 'head'/'sill' heights of nearby "Sub Surface 1".
     sub1 = model.getSubSurfaceByName("Sub Surface 1")
-    expect(sub1.empty?).to be(false)
+    expect(sub1).to_not be_empty
     sub1 = sub1.get
 
     sub1_min = sub1.vertices.map(&:z).min
@@ -2597,8 +2598,8 @@ RSpec.describe OSut do
     wwr2[:sill ] = wwr1[:head] + 0.1
 
     sbz = [wwr1, wwr2]
-    expect(mod1.addSubs(wall3, sbz)).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.addSubs(wall3, sbz)).to be true
+    expect(mod1.status).to be_zero
     sbz = wall3.subSurfaces
     expect(sbz.size).to eq(2)
 
@@ -2643,8 +2644,8 @@ RSpec.describe OSut do
     frames = 2 * frame
 
     fd = OpenStudio::Model::WindowPropertyFrameAndDivider.new(model)
-    expect(fd.setFrameWidth(frame)).to be(true)
-    expect(fd.setFrameConductance(2.500)).to be(true)
+    expect(fd.setFrameWidth(frame)).to be true
+    expect(fd.setFrameConductance(2.500)).to be true
 
     w1              = {}
     w1[:id        ] = "OA1 W4 w1"
@@ -2679,24 +2680,24 @@ RSpec.describe OSut do
     t2[:centreline] = w2[:centreline]
 
     sbz = [w1, w2, t1, t2]
-    expect(mod1.addSubs(wall4, sbz)).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.addSubs(wall4, sbz)).to be true
+    expect(mod1.status).to be_zero
 
 
     # Add another 5x (frame&divider-enabled) fixed windows, from either
     # left- or right-corner of base surfaces. Fetch "Openarea Wall 6".
     wall6 = model.getSurfaceByName("Openarea 1 Wall 6")
-    expect(wall6.empty?).to be(false)
+    expect(wall6).to_not be_empty
     wall6 = wall6.get
 
     # Fetch "Openarea Wall 7".
     wall7 = model.getSurfaceByName("Openarea 1 Wall 7")
-    expect(wall7.empty?).to be(false)
+    expect(wall7).to_not be_empty
     wall7 = wall7.get
 
     # Fetch 'head'/'sill' heights of nearby "Sub Surface 6".
     sub6 = model.getSubSurfaceByName("Sub Surface 6")
-    expect(sub6.empty?).to be(false)
+    expect(sub6).to_not be_empty
     sub6 = sub6.get
 
     sub6_min = sub6.vertices.map(&:z).min
@@ -2713,8 +2714,8 @@ RSpec.describe OSut do
     a6[:offset    ] = a6[:width] + gap
     a6[:l_buffer  ] = gap
 
-    expect(mod1.addSubs(wall6, [a6])).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.addSubs(wall6, [a6])).to be true
+    expect(mod1.status).to be_zero
 
     # 1x Array of 2x square windows, 8" from the right corner of wall7.
     a7              = {}
@@ -2727,8 +2728,8 @@ RSpec.describe OSut do
     a7[:offset    ] = a7[:width] + gap
     a7[:r_buffer  ] = gap
 
-    expect(mod1.addSubs(wall7, [a7])).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.addSubs(wall7, [a7])).to be true
+    expect(mod1.status).to be_zero
 
     file = File.join(__dir__, "files/osms/out/seb_ext3.osm")
     model.save(file, true)
@@ -2744,23 +2745,23 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/smalloffice.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
     core  = nil
     attic = nil
 
     model.getSpaces.each do |space|
       id = space.nameString
-      expect(space.isVolumeAutocalculated).to be(true)        unless v < 350
-      expect(space.isCeilingHeightAutocalculated).to be(true) unless v < 350
-      expect(space.isPartofTotalFloorAreaDefaulted).to be(false)
-      expect(space.isFloorAreaDefaulted).to be(true)          unless v < 350
-      expect(space.isFloorAreaAutocalculated).to be(true)     unless v < 350
-      expect(space.partofTotalFloorArea).to be(false)         if id == "Attic"
+      expect(space.isVolumeAutocalculated).to be true        unless v < 350
+      expect(space.isCeilingHeightAutocalculated).to be true unless v < 350
+      expect(space.isPartofTotalFloorAreaDefaulted).to be false
+      expect(space.isFloorAreaDefaulted).to be true          unless v < 350
+      expect(space.isFloorAreaAutocalculated).to be true     unless v < 350
+      expect(space.partofTotalFloorArea).to be false         if id == "Attic"
       attic = space                                           if id == "Attic"
       next                                                    if id == "Attic"
 
-      expect(space.partofTotalFloorArea).to be(true)
+      expect(space.partofTotalFloorArea).to be true
       # Isolate core as being part of the total floor area (occupied zone) and
       # not having sidelighting.
       next unless space.exteriorWallArea < TOL
@@ -2776,10 +2777,10 @@ RSpec.describe OSut do
     core_floor   = core_floor.first
     core_ceiling = core_ceiling.first
     attic_floor  = core_ceiling.adjacentSurface
-    expect(attic_floor.empty?).to be(false)
+    expect(attic_floor).to_not be_empty
     attic_floor  = attic_floor.get
 
-    expect(core.nameString.include?("Core")).to be(true)
+    expect(core.nameString).to include("Core")
     # 22.69, 13.46, 0,                        !- X,Y,Z Vertex 1 {m}
     # 22.69,  5.00, 0,                        !- X,Y,Z Vertex 2 {m}
     #  5.00,  5.00, 0,                        !- X,Y,Z Vertex 3 {m}
@@ -2796,17 +2797,17 @@ RSpec.describe OSut do
     expect(attic.volume).to be_within(TOL).of(798.41)     if v < 350
     expect(attic.floorArea).to be_within(TOL).of(567.98) # includes overhangs
 
-    expect(mod1.poly(core_floor, true).empty?).to be(false)   # convex
-    expect(mod1.poly(core_ceiling, true).empty?).to be(false) # convex
-    expect(mod1.poly(attic_floor, true).empty?).to be(false)  # convex
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.poly(core_floor, true)).to_not be_empty   # convex
+    expect(mod1.poly(core_ceiling, true)).to_not be_empty # convex
+    expect(mod1.poly(attic_floor, true)).to_not be_empty  # convex
+    expect(mod1.status).to be_zero
 
     # Insert new 'mini' (2m x 2m) floor/ceiling at the centre of the existing
     # core space. Initial insertion resorting strictly to adding leader lines
     # from the initial core floor/ceiling vertices to the new 'mini'
     # floor/ceiling.
     centre = OpenStudio::getCentroid(core_floor.vertices)
-    expect(centre.empty?).to be(false)
+    expect(centre).to_not be_empty
     centre = centre.get
     mini_w = centre.x - 1 # 12.845
     mini_e = centre.x + 1 # 14.845
@@ -2820,7 +2821,7 @@ RSpec.describe OSut do
     mini_floor = OpenStudio::Model::Surface.new(mini_floor_vtx, model)
     mini_floor.setName("Mini floor")
     expect(mini_floor.outsideBoundaryCondition).to eq("Ground")
-    expect(mini_floor.setSpace(core)).to be(true)
+    expect(mini_floor.setSpace(core)).to be true
 
     mini_ceiling_vtx = OpenStudio::Point3dVector.new
     mini_ceiling_vtx << OpenStudio::Point3d.new(mini_w, mini_n, 3.05)
@@ -2829,7 +2830,7 @@ RSpec.describe OSut do
     mini_ceiling_vtx << OpenStudio::Point3d.new(mini_e, mini_n, 3.05)
     mini_ceiling = OpenStudio::Model::Surface.new(mini_ceiling_vtx, model)
     mini_ceiling.setName("Mini ceiling")
-    expect(mini_ceiling.setSpace(core)).to be(true)
+    expect(mini_ceiling.setSpace(core)).to be true
 
     mini_attic_vtx = OpenStudio::Point3dVector.new
     mini_attic_vtx << OpenStudio::Point3d.new(mini_e, mini_n, 3.05)
@@ -2838,15 +2839,15 @@ RSpec.describe OSut do
     mini_attic_vtx << OpenStudio::Point3d.new(mini_w, mini_n, 3.05)
     mini_attic = OpenStudio::Model::Surface.new(mini_attic_vtx, model)
     mini_attic.setName("Mini attic")
-    expect(mini_attic.setSpace(attic)).to be(true)
+    expect(mini_attic.setSpace(attic)).to be true
 
-    expect(mini_ceiling.setAdjacentSurface(mini_attic)).to be(true)
+    expect(mini_ceiling.setAdjacentSurface(mini_attic)).to be true
     expect(mini_ceiling.outsideBoundaryCondition).to eq("Surface")
     expect(mini_attic.outsideBoundaryCondition).to eq("Surface")
     expect(mini_ceiling.outsideBoundaryCondition).to eq("Surface")
     expect(mini_ceiling.outsideBoundaryCondition).to eq("Surface")
-    expect(mini_ceiling.adjacentSurface.empty?).to be(false)
-    expect(mini_attic.adjacentSurface.empty?).to be(false)
+    expect(mini_ceiling.adjacentSurface).to_not be_empty
+    expect(mini_attic.adjacentSurface).to_not be_empty
     expect(mini_ceiling.adjacentSurface.get).to eq(mini_attic)
     expect(mini_attic.adjacentSurface.get).to eq(mini_ceiling)
 
@@ -2867,7 +2868,7 @@ RSpec.describe OSut do
     vtx << mini_floor_vtx[0]
     vtx << mini_floor_vtx[3]
     vtx << vtx[3]
-    expect(core_floor.setVertices(vtx)).to be(true)
+    expect(core_floor.setVertices(vtx)).to be true
 
     vtx = OpenStudio::Point3dVector.new
     core_ceiling.vertices.each {|v| vtx << v}
@@ -2877,7 +2878,7 @@ RSpec.describe OSut do
     vtx << mini_ceiling_vtx[2]
     vtx << mini_ceiling_vtx[1]
     vtx << vtx[3]
-    expect(core_ceiling.setVertices(vtx)).to be(true)
+    expect(core_ceiling.setVertices(vtx)).to be true
 
     vtx = OpenStudio::Point3dVector.new
     attic_floor.vertices.each {|v| vtx << v}
@@ -2887,11 +2888,11 @@ RSpec.describe OSut do
     vtx << mini_attic_vtx[0]
     vtx << mini_attic_vtx[3]
     vtx << vtx[3]
-    expect(attic_floor.setVertices(vtx)).to be(true)
+    expect(attic_floor.setVertices(vtx)).to be true
 
     # Add 2x skylights to attic.
     attic_south = model.getSurfaceByName("Attic_roof_south")
-    expect(attic_south.empty?).to be(false)
+    expect(attic_south).to_not be_empty
     attic_south = attic_south.get
 
     side   = 1.2
@@ -2907,8 +2908,8 @@ RSpec.describe OSut do
     sub[:head  ] = head
     sub[:count ] = 2
     sub[:offset] = offset
-    expect(mod1.addSubs(attic_south, [sub])).to be(true)
-    expect(mod1.status.zero?).to be(true)
+    expect(mod1.addSubs(attic_south, [sub])).to be true
+    expect(mod1.status).to be_zero
 
     # Re-validating pre-tested areas + volumes, as well as convexity.
     expect(core.floorArea).to be_within(TOL).of(149.66)
@@ -2918,12 +2919,12 @@ RSpec.describe OSut do
     expect(attic.volume).to be_within(TOL).of(798.41)     if v < 350
     expect(attic.floorArea).to be_within(TOL).of(567.98) # includes overhangs
 
-    expect(mod1.poly(core_floor, true).empty?).to be(true)   # now concave
-    expect(mod1.poly(core_ceiling, true).empty?).to be(true) # now concave
-    expect(mod1.poly(attic_floor, true).empty?).to be(true)  # now concave
+    expect(mod1.poly(core_floor, true)).to be_empty   # now concave
+    expect(mod1.poly(core_ceiling, true)).to be_empty # now concave
+    expect(mod1.poly(attic_floor, true)).to be_empty  # now concave
     expect(mod1.logs.size).to eq(3)
-    expect(mod1.error?).to be(true)
-    mod1.logs.each {|l| expect(l[:message].include?("non-convex")).to be(true)}
+    expect(mod1.error?).to be true
+    mod1.logs.each { |l| expect(l[:message]).to include("non-convex") }
     expect(mod1.clean!).to eq(DBG)
 
     shd = model.getShadowCalculation
@@ -2948,7 +2949,7 @@ RSpec.describe OSut do
     #   - "FullExteriorWithReflections"
     #   - "FullInteriorAndExteriorWithReflections"
     expect(ctl.solarDistribution).to eq("FullInteriorAndExterior")
-    expect(ctl.isSolarDistributionDefaulted).to be(false)
+    expect(ctl.isSolarDistributionDefaulted).to be false
     expect(ctl.shadowCalculation.get).to eq(shd)
 
     file = File.join(__dir__, "files/osms/out/mini.osm")
@@ -2973,7 +2974,7 @@ RSpec.describe OSut do
     vtx << mini_ceiling_vtx[3]
     mini_north = OpenStudio::Model::Surface.new(vtx, model)
     mini_north.setName("Mini north")
-    expect(mini_north.setSpace(core)).to be(true)
+    expect(mini_north.setSpace(core)).to be true
     expect(mini_north.outsideBoundaryCondition).to eq("Outdoors")
 
     vtx = OpenStudio::Point3dVector.new
@@ -2983,7 +2984,7 @@ RSpec.describe OSut do
     vtx << mini_ceiling_vtx[2]
     mini_east = OpenStudio::Model::Surface.new(vtx, model)
     mini_east.setName("Mini east")
-    expect(mini_east.setSpace(core)).to be(true)
+    expect(mini_east.setSpace(core)).to be true
     expect(mini_east.outsideBoundaryCondition).to eq("Outdoors")
 
     vtx = OpenStudio::Point3dVector.new
@@ -2993,7 +2994,7 @@ RSpec.describe OSut do
     vtx << mini_ceiling_vtx[1]
     mini_south = OpenStudio::Model::Surface.new(vtx, model)
     mini_south.setName("Mini south")
-    expect(mini_south.setSpace(core)).to be(true)
+    expect(mini_south.setSpace(core)).to be true
     expect(mini_south.outsideBoundaryCondition).to eq("Outdoors")
 
     vtx = OpenStudio::Point3dVector.new
@@ -3003,12 +3004,12 @@ RSpec.describe OSut do
     vtx << mini_ceiling_vtx[0]
     mini_west = OpenStudio::Model::Surface.new(vtx, model)
     mini_west.setName("Mini west")
-    expect(mini_west.setSpace(core)).to be(true)
+    expect(mini_west.setSpace(core)).to be true
     expect(mini_west.outsideBoundaryCondition).to eq("Outdoors")
 
     mini_floor.remove
     mini_ceiling.remove
-    expect(mini_attic.setOutsideBoundaryCondition("Outdoors")).to be(true)
+    expect(mini_attic.setOutsideBoundaryCondition("Outdoors")).to be true
 
     # Re-validating pre-tested areas + volumes.
     expect(core.floorArea).to be_within(TOL).of(149.66 - 4) # -mini m2
@@ -3018,12 +3019,12 @@ RSpec.describe OSut do
     expect(attic.volume).to be_within(TOL).of(798.41)     if v < 350
     expect(attic.floorArea).to be_within(TOL).of(567.98) # includes overhangs
 
-    expect(mod1.poly(core_floor, true).empty?).to be(true)   # now concave
-    expect(mod1.poly(core_ceiling, true).empty?).to be(true) # now concave
-    expect(mod1.poly(attic_floor, true).empty?).to be(true)  # now concave
+    expect(mod1.poly(core_floor, true)).to be_empty   # now concave
+    expect(mod1.poly(core_ceiling, true)).to be_empty # now concave
+    expect(mod1.poly(attic_floor, true)).to be_empty  # now concave
     expect(mod1.logs.size).to eq(3)
-    expect(mod1.error?).to be(true)
-    mod1.logs.each {|l| expect(l[:message].include?("non-convex")).to be(true)}
+    expect(mod1.error?).to be true
+    mod1.logs.each { |l| expect(l[:message]).to include("non-convex") }
     expect(mod1.clean!).to eq(DBG)
 
     file = File.join(__dir__, "files/osms/out/mini2.osm")
@@ -3044,7 +3045,7 @@ RSpec.describe OSut do
     mini_floor = OpenStudio::Model::Surface.new(mini_floor_vtx, model)
     mini_floor.setName("Mini floor")
     expect(mini_floor.outsideBoundaryCondition).to eq("Ground")
-    expect(mini_floor.setSpace(attic)).to be(true)
+    expect(mini_floor.setSpace(attic)).to be true
 
     mini_attic.remove
 
@@ -3055,7 +3056,7 @@ RSpec.describe OSut do
     vtx << mini_ceiling_vtx[2]
     well_north = OpenStudio::Model::Surface.new(vtx, model)
     well_north.setName("Well north")
-    expect(well_north.setSpace(attic)).to be(true)
+    expect(well_north.setSpace(attic)).to be true
 
     vtx = OpenStudio::Point3dVector.new
     vtx << mini_ceiling_vtx[0]
@@ -3064,7 +3065,7 @@ RSpec.describe OSut do
     vtx << mini_ceiling_vtx[1]
     well_east = OpenStudio::Model::Surface.new(vtx, model)
     well_east.setName("Well east")
-    expect(well_east.setSpace(attic)).to be(true)
+    expect(well_east.setSpace(attic)).to be true
 
     vtx = OpenStudio::Point3dVector.new
     vtx << mini_ceiling_vtx[3]
@@ -3073,7 +3074,7 @@ RSpec.describe OSut do
     vtx << mini_ceiling_vtx[0]
     well_south = OpenStudio::Model::Surface.new(vtx, model)
     well_south.setName("Well south")
-    expect(well_south.setSpace(attic)).to be(true)
+    expect(well_south.setSpace(attic)).to be true
 
     vtx = OpenStudio::Point3dVector.new
     vtx << mini_ceiling_vtx[2]
@@ -3082,12 +3083,12 @@ RSpec.describe OSut do
     vtx << mini_ceiling_vtx[3]
     well_west = OpenStudio::Model::Surface.new(vtx, model)
     well_west.setName("Well west")
-    expect(well_west.setSpace(attic)).to be(true)
+    expect(well_west.setSpace(attic)).to be true
 
-    expect(mini_north.setAdjacentSurface(well_south)).to be(true)
-    expect(mini_east.setAdjacentSurface(well_west)).to be(true)
-    expect(mini_south.setAdjacentSurface(well_north)).to be(true)
-    expect(mini_west.setAdjacentSurface(well_east)).to be(true)
+    expect(mini_north.setAdjacentSurface(well_south)).to be true
+    expect(mini_east.setAdjacentSurface(well_west)).to be true
+    expect(mini_south.setAdjacentSurface(well_north)).to be true
+    expect(mini_west.setAdjacentSurface(well_east)).to be true
     expect(mini_north.outsideBoundaryCondition).to eq("Surface")
     expect(mini_east.outsideBoundaryCondition).to eq("Surface")
     expect(mini_south.outsideBoundaryCondition).to eq("Surface")
@@ -3096,14 +3097,14 @@ RSpec.describe OSut do
     expect(well_west.outsideBoundaryCondition).to eq("Surface")
     expect(well_south.outsideBoundaryCondition).to eq("Surface")
     expect(well_east.outsideBoundaryCondition).to eq("Surface")
-    expect(mini_north.adjacentSurface.empty?).to be(false)
-    expect(mini_east.adjacentSurface.empty?).to be(false)
-    expect(mini_south.adjacentSurface.empty?).to be(false)
-    expect(mini_west.adjacentSurface.empty?).to be(false)
-    expect(well_south.adjacentSurface.empty?).to be(false)
-    expect(well_west.adjacentSurface.empty?).to be(false)
-    expect(well_north.adjacentSurface.empty?).to be(false)
-    expect(well_east.adjacentSurface.empty?).to be(false)
+    expect(mini_north.adjacentSurface).to_not be_empty
+    expect(mini_east.adjacentSurface).to_not be_empty
+    expect(mini_south.adjacentSurface).to_not be_empty
+    expect(mini_west.adjacentSurface).to_not be_empty
+    expect(well_south.adjacentSurface).to_not be_empty
+    expect(well_west.adjacentSurface).to_not be_empty
+    expect(well_north.adjacentSurface).to_not be_empty
+    expect(well_east.adjacentSurface).to_not be_empty
     expect(mini_north.adjacentSurface.get).to eq(well_south)
     expect(mini_east.adjacentSurface.get).to eq(well_west)
     expect(mini_south.adjacentSurface.get).to eq(well_north)
@@ -3124,12 +3125,12 @@ RSpec.describe OSut do
     expect(attic.volume).to be_within(TOL).of(720.19 + 4 * 3.05) unless v < 350
     expect(attic.floorArea).to be_within(TOL).of(567.98) # includes overhangs
 
-    expect(mod1.poly(core_floor, true).empty?).to be(true)   # now concave
-    expect(mod1.poly(core_ceiling, true).empty?).to be(true) # now concave
-    expect(mod1.poly(attic_floor, true).empty?).to be(true)  # now concave
+    expect(mod1.poly(core_floor, true)).to be_empty   # now concave
+    expect(mod1.poly(core_ceiling, true)).to be_empty # now concave
+    expect(mod1.poly(attic_floor, true)).to be_empty  # now concave
     expect(mod1.logs.size).to eq(3)
-    expect(mod1.error?).to be(true)
-    mod1.logs.each {|l| expect(l[:message].include?("non-convex")).to be(true)}
+    expect(mod1.error?).to be true
+    mod1.logs.each { |l| expect(l[:message]).to include("non-convex") }
     expect(mod1.clean!).to eq(DBG)
 
     file = File.join(__dir__, "files/osms/out/mini3.osm")
@@ -3142,6 +3143,175 @@ RSpec.describe OSut do
     # mini2.osm C  FullInteriorAndExteriorWithReflections  253 GJ 3.5 UMH cool
   end
 
+  it "checks for outdoor-facing roofs" do
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # CASE 1: Each space has 1x outdoor-facing roof.
+    file  = File.join(__dir__, "files/osms/in/5ZoneNoHVAC.osm")
+    path  = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model).to_not be_empty
+    model = model.get
+
+    spaces = {}
+    roofs  = {}
+
+    model.getSpaces.each do |space|
+      space.surfaces.each do |s|
+        next unless s.surfaceType.downcase == "roofceiling"
+        next unless s.outsideBoundaryCondition.downcase == "outdoors"
+
+        expect(spaces).to_not have_key(space.nameString)
+        spaces[space.nameString] = s.nameString
+      end
+    end
+
+    expect(spaces.size).to eq(5)
+    # puts spaces
+    # "Story 1 East Perimeter Space"  : "Surface 18"
+    # "Story 1 North Perimeter Space" : "Surface 12"
+    # "Story 1 Core Space"            : "Surface 30"
+    # "Story 1 South Perimeter Space" : "Surface 24"
+    # "Story 1 West Perimeter Space"  : "Surface 6"
+
+    model.getSpaces.each do |space|
+      rufs = mod1.getRoofs(space)
+      expect(rufs.size).to eq(1)
+      ruf = rufs.first
+      expect(ruf).to be_a(OpenStudio::Model::Surface)
+      roofs[space.nameString] = ruf.nameString
+    end
+
+    expect(roofs.size).to eq(spaces.size)
+    expect(mod1.status).to be_zero
+    # puts roofs
+    # "Story 1 East Perimeter Space"  : "Surface 18"
+    # "Story 1 North Perimeter Space" : "Surface 12"
+    # "Story 1 Core Space"            : "Surface 30"
+    # "Story 1 South Perimeter Space" : "Surface 24"
+    # "Story 1 West Perimeter Space"  : "Surface 6"
+
+    spaces.each do |id, surface|
+      expect(roofs.keys).to include(id)
+      expect(roofs[id]).to eq(surface)
+    end
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # CASE 2: None of the occupied spaces have outdoor-facing roofs, yet the
+    # plenum above has 4x outdoor-facing roofs (each matches 1x space ceiling).
+    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    path  = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model).to_not be_empty
+    model = model.get
+
+    occupied = []
+    spaces   = {}
+    roofs    = {}
+
+    model.getSpaces.each do |space|
+      next unless space.partofTotalFloorArea
+
+      occupied << space.nameString
+
+      space.surfaces.each do |s|
+        next unless s.surfaceType.downcase == "roofceiling"
+        next unless s.outsideBoundaryCondition.downcase == "outdoors"
+
+        expect(spaces).to_not have_key(space.nameString)
+        spaces[space.nameString] = s.nameString
+      end
+    end
+
+    expect(occupied.size).to eq(4)
+    expect(spaces).to be_empty
+
+    model.getSpaces.each do |space|
+      next unless space.partofTotalFloorArea
+
+      rufs = mod1.getRoofs(space)
+      expect(rufs.size).to eq(1)
+      ruf = rufs.first
+      expect(ruf).to be_a(OpenStudio::Model::Surface)
+      roofs[space.nameString] = ruf.nameString
+    end
+
+    expect(roofs.size).to eq(4)
+    expect(mod1.status).to be_zero
+
+    occupied.each do |o|
+      expect(roofs.keys).to include(o)
+      expect(roofs[o].downcase).to include("plenum")
+    end
+
+    # puts roofs
+    # "Utility 1"      : "Level 0 Utility 1 Ceiling Plenum RoofCeiling"
+    # "Open area 1"    : "Level 0 Open area 1 Ceiling Plenum RoofCeiling"
+    # "Small office 1" : "Level 0 Small office 1 Ceiling Plenum RoofCeiling"
+    # "Entry way 1"    : "Level 0 Entry way  Ceiling Plenum RoofCeiling"
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # CASE 3: 5x spaces under 4x attic roofs; none "fit", many "overlap".
+    file  = File.join(__dir__, "files/osms/in/smalloffice.osm")
+    path  = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model).to_not be_empty
+    model = model.get
+
+    occupied   = []
+    spaces     = {}
+    perimeters = {}
+    core       = []
+
+    model.getSpaces.each do |space|
+      next unless space.partofTotalFloorArea
+
+      occupied << space.nameString
+
+      space.surfaces.each do |s|
+        next unless s.surfaceType.downcase == "roofceiling"
+        next unless s.outsideBoundaryCondition.downcase == "outdoors"
+
+        expect(spaces).to_not have_key(space.nameString)
+        spaces[space.nameString] = s.nameString
+      end
+    end
+
+    expect(spaces).to be_empty
+    expect(occupied.size).to eq(5)
+
+    model.getSpaces.each do |space|
+      id = space.nameString
+      next unless space.partofTotalFloorArea
+
+      rufs = mod1.getRoofs(space)
+
+      if id.include?("Perimeter")
+        expect(rufs.size).to eq(1)
+        ruf = rufs.first
+        expect(ruf).to be_a(OpenStudio::Model::Surface)
+        perimeters[id] = ruf.nameString
+      else
+        expect(id).to include("Core")
+        expect(rufs.size).to eq(4)
+        core = rufs
+      end
+    end
+
+    expect(mod1.status).to be_zero
+    expect(perimeters.size).to eq(4)
+    expect(core.size).to eq(4)
+    expect(perimeters.values.all? { |s| s.include?("Attic") }).to be true
+    expect(core.all? { |s| s.nameString.include?("Attic") }).to be true
+    core.each { |s| expect(s).to be_a(OpenStudio::Model::Surface) }
+
+    expect(perimeters.keys.all? { |s| occupied.include?(s) }).to be true
+  end
+
   it "checks for candidate toplit spaces" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.reset(DBG)).to eq(DBG)
@@ -3152,7 +3322,7 @@ RSpec.describe OSut do
     file  = File.join(__dir__, "files/osms/in/smalloffice.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model = model.get
 
     # TO DO ...
@@ -3168,7 +3338,7 @@ RSpec.describe OSut do
       file  = File.join(__dir__, "files/osms/in/smalloffice.osm")
       path  = OpenStudio::Path.new(file)
       model = translator.loadModel(path)
-      expect(model.empty?).to be(false)
+      expect(model).to_not be_empty
       model = model.get
 
       # The following tests are a step-by-step, proof of concept demo towards an
@@ -3186,23 +3356,23 @@ RSpec.describe OSut do
       # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
       # 1. Fetch attic space and north-facing roof surface.
       attic = model.getSpaceByName("Attic")
-      expect(attic.empty?).to be(false)
+      expect(attic).to_not be_empty
       attic = attic.get
 
       roof = model.getSurfaceByName("Attic_roof_north")
-      expect(roof.empty?).to be(false)
+      expect(roof).to_not be_empty
       roof = roof.get
 
       core = model.getSpaceByName("Core_ZN")
-      expect(core.empty?).to be(false)
+      expect(core).to_not be_empty
       core = core.get
 
       plafond = model.getSurfaceByName("Perimeter_ZN_1_ceiling")
-      expect(plafond.empty?).to be(false)
+      expect(plafond).to_not be_empty
       plafond = plafond.get
 
       ceiling = model.getSurfaceByName("Core_ZN_ceiling")
-      expect(ceiling.empty?).to be(false)
+      expect(ceiling).to_not be_empty
       ceiling = ceiling.get
 
       minZ = ceiling.vertices.map(&:z).min
@@ -3233,15 +3403,15 @@ RSpec.describe OSut do
       sub[:head  ] = head
       sub[:count ] = 2
       sub[:offset] = offset
-      expect(mod1.addSubs(roof, [sub])).to be(true)
-      expect(mod1.status.zero?).to be(true)
-      expect(mod1.logs.size.zero?).to be(true)
+      expect(mod1.addSubs(roof, [sub])).to be true
+      expect(mod1.status).to be_zero
+      expect(mod1.logs.size).to be_zero
       expect(roof.subSurfaces.size).to eq(2)
       plane = roof.plane
       subs  = roof.subSurfaces
       expect(subs.size).to eq(2)
 
-      subs.each { |sub| expect(sub.plane.equal(plane)).to be(true) }
+      subs.each { |sub| expect(sub.plane.equal(plane)).to be true }
 
       # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
       # 3. Generate a 'buffered' outline around both skylights. The upper edge
@@ -3255,35 +3425,29 @@ RSpec.describe OSut do
       # /__________________\
 
       perimetre = mod1.outline(subs, 0.200)
-      expect(perimetre.is_a?(OpenStudio::Point3dVector)).to be(true)
-      expect(mod1.fits?(perimetre, roof)).to be(true)
+      expect(perimetre).to be_a(OpenStudio::Point3dVector)
+      expect(mod1.fits?(perimetre, roof)).to be true
 
       # Generate a projected 'perimetre' unto the original horizontal core
       # ceiling below. Ensure 'opening' "fits" - a "sine qua non" condition for
       # an eventual general method: a generated 'outline' must neatly fit within
-      # a receiving surface (below). A reminder: "fits?" ensures candidate
-      # polygons share the same 3D plane, yet will emit a warning if the 2nd
-      # polygon doesn't initially share the same plane as the 1st one. One can
-      # alternatively pre-flatten the 'opening' to avoid the warning.
-      expect(mod1.fits?(perimetre, ceiling)).to be(true)
-      expect(mod1.warn?).to be(true)
-      expect(mod1.logs.size).to eq(1)
-      expect(mod1.logs.first[:message].include?(" (non-aligned)")).to be(true)
-      expect(mod1.clean!).to eq(DBG)
+      # a receiving surface (below).
+      expect(mod1.fits?(perimetre, ceiling)).to be true
+      expect(mod1.status).to be_zero
       opening = mod1.flatten(perimetre, :z, minZ)
-      expect(mod1.fits?(opening, ceiling)).to be(true)
-      expect(mod1.status.zero?).to be(true)
+      expect(mod1.fits?(opening, ceiling)).to be true
+      expect(mod1.status).to be_zero
 
       # Polygons below appended with an 'a' designate 'aligned' (or flattened)
       # polygons relying on OpenStudio::Transformation class.
       t     = OpenStudio::Transformation.alignFace(roof.vertices)
       aroof = mod1.poly(roof,     false, true, false, true, :cw)
       aperi = mod1.poly(perimetre, true, true, false,    t, :cw)
-      expect(mod1.clockwise?(aroof)).to be(true)
-      expect(mod1.clockwise?(aperi)).to be(true)
-      expect(mod1.status.zero?).to be(true)
-      expect(mod1.fits?(aperi, aroof)).to be(true)
-      expect(mod1.status.zero?).to be(true)
+      expect(mod1.clockwise?(aroof)).to be true
+      expect(mod1.clockwise?(aperi)).to be true
+      expect(mod1.status).to be_zero
+      expect(mod1.fits?(aperi, aroof)).to be true
+      expect(mod1.status).to be_zero
 
       # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
       # 4. Create a new, clockwise bounding box around aroof.
@@ -3295,7 +3459,7 @@ RSpec.describe OSut do
       # /__________________\
 
       abox = mod1.outline([aroof])
-      expect(mod1.status.zero?).to be(true)
+      expect(mod1.status).to be_zero
       expect(mod1.width(aperi)).to be < mod1.width(abox)
 
       # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
@@ -3327,7 +3491,7 @@ RSpec.describe OSut do
 
       # Split box by intersecting with strip.
       res1 = OpenStudio.intersect(astrip, abox, TOL)
-      expect(res1.empty?).to be(false)
+      expect(res1).to_not be_empty
       res1 = res1.get
       # puts res1.polygon1 # ... == res1.polygon2 (strip)
       # [28.89,  8.76, 0]
@@ -3339,7 +3503,7 @@ RSpec.describe OSut do
       # is however split into 2x (possibly 3x in other cases):
       #   1. the intersecting strip itself
       #   2. a residual, non-intersecting 'box' (smaller than the initial one)
-      expect(res1.newPolygons1.empty?).to be(true)
+      expect(res1.newPolygons1).to be_empty
       expect(res1.newPolygons2.size).to eq(1)
       # res1.newPolygons2.each { |poly, i| puts poly }
       # [28.89, 8.76, 0]
@@ -3363,7 +3527,7 @@ RSpec.describe OSut do
       # /__________________\
 
       res2 = OpenStudio.intersect(res1.newPolygons2.first, aroof, TOL)
-      expect(res2.empty?).to be(false)
+      expect(res2).to_not be_empty
       res2 = res2.get
       # puts res2.polygon1 # ... res2.polygon2 ('x' marks the spot)
       # [28.89, 0.00, 0]
@@ -3390,7 +3554,7 @@ RSpec.describe OSut do
       # [12.55,  8.76, 0]
       # [12.55, 10.36, 0]
       res3 = OpenStudio.intersect(res2.newPolygons2.first, aperi, TOL)
-      expect(res3.empty?).to be(false)
+      expect(res3).to_not be_empty
       res3 = res3.get
       # puts res3.polygon1 # ... res3.polygon2 (i.e. aperi)
       # [16.35,  8.76, 0]
@@ -3399,7 +3563,7 @@ RSpec.describe OSut do
       # [16.35, 10.36, 0]
 
       expect(res3.newPolygons1.size).to eq(2) # 2x polygons, left/right of 'o'
-      expect(res3.newPolygons2.empty?).to be(true) # aperi remains intact
+      expect(res3.newPolygons2).to be_empty   # aperi remains intact
       # res3.newPolygons1.each { |poly| puts poly }
       # [12.55,  8.76, 0]
       # [ 8.31,  8.76, 0]
@@ -3418,12 +3582,12 @@ RSpec.describe OSut do
 
       aroofs.each do |poly|
         area = OpenStudio.getArea(poly)
-        expect(area.empty?).to be(false)
+        expect(area).to_not be_empty
         areas += area.get
       end
 
       area = OpenStudio.getArea(aperi)
-      expect(area.empty?).to be(false)
+      expect(area).to_not be_empty
       areas += area.get
       expect((roof.grossArea - areas).abs).to be < TOL
 
@@ -3433,32 +3597,32 @@ RSpec.describe OSut do
       #      Apply non-defaulted roof parameters. Transfer skylights to skybase.
       skybase = OpenStudio::Model::Surface.new(perimetre, model)
       skybase.setName("#{roof.nameString} | skybase")
-      expect(skybase.setSpace(attic)).to be(true)
+      expect(skybase.setSpace(attic)).to be true
 
       unless roof.isConstructionDefaulted
         construction = roof.construction
-        expect(construction.empty?).to be(false)
+        expect(construction).to_not be_empty
         construction = construction.get.to_LayeredConstruction
-        expect(construction.empty?).to be(false)
+        expect(construction).to_not be_empty
         construction = construction.get
-        expect(skybase.setConstruction(construction)).to be(true)
+        expect(skybase.setConstruction(construction)).to be true
       end
 
       expect(roof.subSurfaces.size).to eq(2)
-      expect(skybase.subSurfaces.empty?).to be(true)
-      subs.each { |sub| expect(sub.setSurface(skybase)).to be(true) }
-      expect(roof.subSurfaces.empty?).to be(true)
+      expect(skybase.subSurfaces).to be_empty
+      subs.each { |sub| expect(sub.setSurface(skybase)).to be true }
+      expect(roof.subSurfaces).to be_empty
       expect(skybase.subSurfaces.size).to eq(2)
 
       #   2. Modify initial roof vertices with the 1° new polygon (redressed).
       poly1 = mod1.to_p3Dv(t * mod1.ulc(aroofs.first))
-      expect(poly1.is_a?(OpenStudio::Point3dVector)).to be(true)
+      expect(poly1).to be_a(OpenStudio::Point3dVector)
       # puts poly1
       # [19.98, 10.75, 5.82]
       # [28.29, 19.06, 3.05]
       # [-0.60, 19.06, 3.05]
       # [ 7.71, 10.75, 5.82]
-      expect(roof.setVertices(poly1)).to be(true)
+      expect(roof.setVertices(poly1)).to be true
 
       #   3. Add subsequent generated roof polygons (also redressed).
       aroofs.each_with_index do |poly, i|
@@ -3467,9 +3631,9 @@ RSpec.describe OSut do
         vtx     = mod1.to_p3Dv(t * mod1.ulc(poly))
         surface = roof.clone
         surface = surface.to_Surface
-        expect(surface.empty?).to be(false)
+        expect(surface).to_not be_empty
         surface = surface.get
-        expect(surface.setVertices(vtx)).to be(true)
+        expect(surface.setVertices(vtx)).to be true
       end
 
       file = File.join(__dir__, "files/osms/out/office.osm")
@@ -3486,7 +3650,7 @@ RSpec.describe OSut do
     file   = File.join(__dir__, "files/osms/out/seb_ext2.osm")
     path   = OpenStudio::Path.new(file)
     model  = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model  = model.get
     spaces = model.getSpaces
 
@@ -3502,7 +3666,7 @@ RSpec.describe OSut do
     #
     # ... yet it offers filters such as surface type and boundary conditions.
     northsouth = mod1.facets(spaces, "Outdoors", "Wall", [:north, :south])
-    expect(northsouth.size).to eq(0)
+    expect(northsouth).to be_empty
 
     north = mod1.facets(spaces, "Outdoors", "Wall", [:north])
     expect(north.size).to eq(14)
@@ -3515,6 +3679,9 @@ RSpec.describe OSut do
 
     roofs = mod1.facets(spaces, "Outdoors", "RoofCeiling", [:top])
     expect(roofs.size).to eq(5)
+
+    roofs = mod1.facets(spaces, "Outdoors", "RoofCeiling", [:foo])
+    expect(roofs).to be_empty
   end
 
   it "checks slab generation" do
@@ -3543,12 +3710,12 @@ RSpec.describe OSut do
     plates << {x: x0, y: y0, dx: w1, dy: d2} # bottom-left XY origin
 
     slab = mod1.genSlab(plates, z0)
-    expect(mod1.status.zero?).to be(true)
-    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(mod1.status).to be_zero
+    expect(slab).to be_a(OpenStudio::Point3dVector)
     expect(slab.size).to eq(4)
 
     surface = OpenStudio::Model::Surface.new(slab, model)
-    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface).to be_a(OpenStudio::Model::Surface)
     expect(surface.grossArea).to be_within(TOL).of(2 * 20)
     expect(surface.vertices.size).to eq(4)
 
@@ -3581,12 +3748,12 @@ RSpec.describe OSut do
     plates << {x: x0 + w1, y: y0 + d1, dx: w1, dy: d1}
 
     slab = mod1.genSlab(plates, z0)
-    expect(mod1.status.zero?).to be(true)
-    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(mod1.status).to be_zero
+    expect(slab).to be_a(OpenStudio::Point3dVector)
     expect(slab.size).to eq(6)
 
     surface = OpenStudio::Model::Surface.new(slab, model)
-    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface).to be_a(OpenStudio::Model::Surface)
     expect(surface.vertices.size).to eq(6)
     expect(surface.grossArea).to be_within(TOL).of(3 * 20)
 
@@ -3604,12 +3771,12 @@ RSpec.describe OSut do
     plates << {x: x0 - w1, y: y0,      dx: w1, dy: d1} # X origin < 0
 
     slab = mod1.genSlab(plates, z0)
-    expect(mod1.status.zero?).to be(true)
-    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(mod1.status).to be_zero
+    expect(slab).to be_a(OpenStudio::Point3dVector)
     expect(slab.size).to eq(8)
 
     surface = OpenStudio::Model::Surface.new(slab, model)
-    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface).to be_a(OpenStudio::Model::Surface)
     expect(surface.vertices.size).to eq(8)
     expect(surface.grossArea).to be_within(TOL).of(4 * 20)
 
@@ -3628,12 +3795,12 @@ RSpec.describe OSut do
     plates << {x: x0 + w2 + 1, y: y0 + d1, dx: w1, dy: d1} # index 3, #4
 
     slab = mod1.genSlab(plates, z0)
-    expect(mod1.error?).to be(true)
+    expect(mod1.error?).to be true
     msg = mod1.logs.first[:message]
     expect(msg).to eq("Invalid 'plate # 4 (index 3)' (OSut::genSlab)")
     expect(mod1.clean!).to eq(DBG)
-    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
-    expect(slab.empty?).to be(true)
+    expect(slab).to be_a(OpenStudio::Point3dVector)
+    expect(slab).to be_empty
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # 3x 'floor' plates + 1x overlapping 'plate'.
@@ -3650,12 +3817,12 @@ RSpec.describe OSut do
     plates << {x: x0 + w2 - 1, y: y0 + 1,  dx: w1, dy: d1}
 
     slab = mod1.genSlab(plates, z0)
-    expect(mod1.status.zero?).to be(true)
-    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(mod1.status).to be_zero
+    expect(slab).to be_a(OpenStudio::Point3dVector)
     expect(slab.size).to eq(12)
 
     surface = OpenStudio::Model::Surface.new(slab, model)
-    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface).to be_a(OpenStudio::Model::Surface)
     expect(surface.vertices.size).to eq(12)
     expect(surface.grossArea).to be_within(TOL).of(5 * 20 - 1)
 
@@ -3675,12 +3842,12 @@ RSpec.describe OSut do
     plates << {x: x0 + 3 * w1 - 1, y: y0 + 1,  dx: -w1, dy: d1}
 
     slab = mod1.genSlab(plates, z0)
-    expect(mod1.status.zero?).to be(true)
-    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(mod1.status).to be_zero
+    expect(slab).to be_a(OpenStudio::Point3dVector)
     expect(slab.size).to eq(12)
 
     surface = OpenStudio::Model::Surface.new(slab, model)
-    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface).to be_a(OpenStudio::Model::Surface)
     expect(surface.vertices.size).to eq(12)
     expect(surface.grossArea).to be_within(TOL).of(5 * 20 - 1)
 
@@ -3700,12 +3867,12 @@ RSpec.describe OSut do
     plates << {x: x0 + 3 * w1 - 1, y: y0 + 1 + d1,  dx: -w1, dy: -d1}
 
     slab = mod1.genSlab(plates, z0)
-    expect(mod1.status.zero?).to be(true)
-    expect(slab.is_a?(OpenStudio::Point3dVector)).to be(true)
+    expect(mod1.status).to be_zero
+    expect(slab).to be_a(OpenStudio::Point3dVector)
     expect(slab.size).to eq(12)
 
     surface = OpenStudio::Model::Surface.new(slab, model)
-    expect(surface.is_a?(OpenStudio::Model::Surface)).to be(true)
+    expect(surface).to be_a(OpenStudio::Model::Surface)
     expect(surface.vertices.size).to eq(12)
     expect(surface.grossArea).to be_within(TOL).of(5 * 20 - 1)
   end
@@ -3719,7 +3886,7 @@ RSpec.describe OSut do
     file   = File.join(__dir__, "files/osms/out/seb_ext4.osm")
     path   = OpenStudio::Path.new(file)
     model  = translator.loadModel(path)
-    expect(model.empty?).to be(false)
+    expect(model).to_not be_empty
     model  = model.get
     spaces = model.getSpaces
 
@@ -3744,12 +3911,12 @@ RSpec.describe OSut do
     windows.each   { |sub| wins  << sub }
 
     if OpenStudio.openStudioVersion.split(".").join.to_i < 321
-      expect(mod1.genShade(skies)).to be(false)
-      expect(mod1.status.zero?).to be(true)
+      expect(mod1.genShade(skies)).to be false
+      expect(mod1.status).to be_zero
     else
-      expect(mod1.genShade(skies)).to be(true)
-      expect(mod1.genShade(wins)).to be(true)
-      expect(mod1.status.zero?).to be(true)
+      expect(mod1.genShade(skies)).to be true
+      expect(mod1.genShade(wins)).to be true
+      expect(mod1.status).to be_zero
       ctls = model.getShadingControls
       expect(ctls.size).to eq(2)
 
@@ -3757,14 +3924,14 @@ RSpec.describe OSut do
         expect(ctl.shadingType).to eq("InteriorShade")
         type = "OnIfHighOutdoorAirTempAndHighSolarOnWindow"
         expect(ctl.shadingControlType).to eq(type)
-        expect(ctl.isControlTypeValueNeedingSetpoint1).to be(true)
-        expect(ctl.isControlTypeValueNeedingSetpoint2).to be(true)
-        expect(ctl.isControlTypeValueAllowingSchedule).to be(true)
-        expect(ctl.isControlTypeValueRequiringSchedule).to be(false)
+        expect(ctl.isControlTypeValueNeedingSetpoint1).to be true
+        expect(ctl.isControlTypeValueNeedingSetpoint2).to be true
+        expect(ctl.isControlTypeValueAllowingSchedule).to be true
+        expect(ctl.isControlTypeValueRequiringSchedule).to be false
         spt1 = ctl.setpoint
         spt2 = ctl.setpoint2
-        expect(spt1.empty?).to be(false)
-        expect(spt2.empty?).to be(false)
+        expect(spt1).to_not be_empty
+        expect(spt2).to_not be_empty
         spt1 = spt1.get
         spt2 = spt2.get
         expect(spt1).to be_within(TOL).of(18)
@@ -3773,9 +3940,9 @@ RSpec.describe OSut do
 
         ctl.subSurfaces.each do |sub|
           surface = sub.surface
-          expect(surface.empty?).to be(false)
+          expect(surface).to_not be_empty
           surface = surface.get
-          expect([slanted, tilted].include?(surface)).to be(true)
+          expect([slanted, tilted]).to include(surface)
         end
       end
     end
