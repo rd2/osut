@@ -2847,11 +2847,12 @@ module OSut
     return false if area.empty?
 
     area = area.get
-    return false if area < TOL
-    return true  if (area - area2).abs < TOL
-    return false if (area - area2).abs > TOL
 
-    true
+    if area > TOL
+      return true if (area - area2).abs < TOL
+    end
+
+    false
   end
 
   ##
@@ -2861,7 +2862,7 @@ module OSut
   # @param p2 [Set<OpenStudio::Point3d>] 2nd set of 3D points
   # @param flat [Bool] whether points are to be pre-flattened (Z=0)
   #
-  # @return [Bool] whether polygons overlap (or either fit into one another)
+  # @return [Bool] whether polygons overlap (or fit)
   # @return [false] if invalid input (see logs)
   def overlaps?(p1 = nil, p2 = nil, flat = true)
     mth  = "OSut::#{__callee__}"
@@ -2880,6 +2881,9 @@ module OSut
     return false     if p1.empty?
     return false     if p2.empty?
 
+    return true if fits?(p1, p2)
+    return true if fits?(p2, p1)
+
     area1 = OpenStudio.getArea(p1)
     area2 = OpenStudio.getArea(p2)
     return empty("points 1 area", mth, ERR, false) if area1.empty?
@@ -2894,12 +2898,17 @@ module OSut
     area  = OpenStudio.getArea(union)
     return false if area.empty?
 
-    area = area.get
-    delta = (area - area1 - area2).abs
-    return false if area  < TOL
-    return false if delta < TOL
+    area  = area.get
+    delta = area1 + area2 - area
 
-    true
+    if area > TOL
+      return false if (area - area1).abs < TOL
+      return false if (area - area2).abs < TOL
+      return false if delta.abs < TOL
+      return true  if delta > TOL
+    end
+
+    false
   end
 
   ##

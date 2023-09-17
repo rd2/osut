@@ -3284,6 +3284,52 @@ RSpec.describe OSut do
     expect(spaces).to be_empty
     expect(occupied.size).to eq(5)
 
+    # In-depth testing, as v3.6.1 Boost-based runs differed from older vintages.
+    p4    = model.getSurfaceByName("Perimeter_ZN_4_ceiling")
+    core  = model.getSurfaceByName("Core_ZN_ceiling")
+    north = model.getSurfaceByName("Attic_roof_north")
+    east  = model.getSurfaceByName("Attic_roof_east")
+    south = model.getSurfaceByName("Attic_roof_south")
+    west  = model.getSurfaceByName("Attic_roof_west")
+
+    expect(p4).to_not be_empty
+    expect(core).to_not be_empty
+    expect(north).to_not be_empty
+    expect(east).to_not be_empty
+    expect(south).to_not be_empty
+    expect(west).to_not be_empty
+
+    p4    = p4.get
+    core  = core.get
+    north = north.get
+    east  = east.get
+    south = south.get
+    west  = west.get
+
+    expect(mod1.fits?(p4, core)).to be false
+    expect(mod1.fits?(p4, north)).to be false
+    expect(mod1.fits?(p4, east)).to be false
+    expect(mod1.fits?(p4, west)).to be true
+    expect(mod1.fits?(p4, south)).to be false
+
+    expect(mod1.fits?(core, p4)).to be false
+    expect(mod1.fits?(core, north)).to be false
+    expect(mod1.fits?(core, east)).to be false
+    expect(mod1.fits?(core, west)).to be false
+    expect(mod1.fits?(core, south)).to be false
+
+    expect(mod1.overlaps?(p4, core)).to be false
+    expect(mod1.overlaps?(p4, north)).to be false
+    expect(mod1.overlaps?(p4, east)).to be false
+    expect(mod1.overlaps?(p4, west)).to be true # ... it fits
+    expect(mod1.overlaps?(p4, south)).to be false
+
+    expect(mod1.overlaps?(core, p4)).to be false
+    expect(mod1.overlaps?(core, north)).to be true
+    expect(mod1.overlaps?(core, east)).to be true
+    expect(mod1.overlaps?(core, west)).to be true
+    expect(mod1.overlaps?(core, south)).to be true
+
     model.getSpaces.each do |space|
       id = space.nameString
       next unless space.partofTotalFloorArea
