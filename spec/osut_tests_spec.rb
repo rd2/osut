@@ -678,6 +678,57 @@ RSpec.describe OSut do
     expect(mod1.logs.first[:message]).to eq(m1)
   end
 
+  it "checks for spandrels" do
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    expect(mod1.clean!).to eq(DBG)
+
+    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    path  = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model).to_not be_empty
+    model = model.get
+
+    office_walls = []
+    # Smalloffice 1 Wall 1
+    # Smalloffice 1 Wall 2
+    # Smalloffice 1 Wall 6
+    plenum_walls = []
+    # Level0 Small office 1 Ceiling Plenum AbvClgPlnmWall 6
+    # Level0 Small office 1 Ceiling Plenum AbvClgPlnmWall 2
+    # Level0 Small office 1 Ceiling Plenum AbvClgPlnmWall 1
+
+    model.getSurfaces.each do |s|
+      next unless s.outsideBoundaryCondition.downcase == "outdoors"
+      next unless s.surfaceType.downcase == "wall"
+
+      expect(mod1.spandrel?(s)).to be false
+
+      if s.nameString.downcase.include?("smalloffice 1")
+        office_walls << s
+      elsif s.nameString.downcase.include?("small office 1 ceiling plenum")
+        plenum_walls << s
+      end
+    end
+
+    expect(office_walls.size).to eq(3)
+    expect(plenum_walls.size).to eq(3)
+    expect(mod1.status).to be_zero
+
+    # Tag Small Office walls (& plenum walls) in SEB as 'spandrels'.
+    tag = "spandrel"
+
+    (office_walls + plenum_walls).each do |wall|
+      expect(wall.additionalProperties.setFeature(tag, true)).to be true
+      expect(wall.additionalProperties.hasFeature(tag)).to be true
+      prop = wall.additionalProperties.getFeatureAsBoolean(tag)
+      expect(prop).to_not be_empty
+      expect(prop.get).to be true
+      expect(mod1.spandrel?(wall)).to be true
+    end
+
+    expect(mod1.status).to be_zero
+  end
+
   it "checks scheduleRulesetMinMax (from within class instances)" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(cls1.level).to eq(DBG)
