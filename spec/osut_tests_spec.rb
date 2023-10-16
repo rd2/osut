@@ -2809,8 +2809,8 @@ RSpec.describe OSut do
       expect(space.isFloorAreaDefaulted).to be true          unless v < 350
       expect(space.isFloorAreaAutocalculated).to be true     unless v < 350
       expect(space.partofTotalFloorArea).to be false         if id == "Attic"
-      attic = space                                           if id == "Attic"
-      next                                                    if id == "Attic"
+      attic = space                                          if id == "Attic"
+      next                                                   if id == "Attic"
 
       expect(space.partofTotalFloorArea).to be true
       # Isolate core as being part of the total floor area (occupied zone) and
@@ -3335,7 +3335,7 @@ RSpec.describe OSut do
     expect(spaces).to be_empty
     expect(occupied.size).to eq(5)
 
-    # In-depth testing, as v3.6.1 Boost-based runs differed from older vintages.
+    # In-depth testing, as v3.6.1 Boost-based runs differ from older versions.
     p4    = model.getSurfaceByName("Perimeter_ZN_4_ceiling")
     core  = model.getSurfaceByName("Core_ZN_ceiling")
     north = model.getSurfaceByName("Attic_roof_north")
@@ -3363,17 +3363,17 @@ RSpec.describe OSut do
     expect(mod1.fits?(p4, west)).to be true
     expect(mod1.fits?(p4, south)).to be false
 
-    expect(mod1.fits?(core, p4)).to be false
-    expect(mod1.fits?(core, north)).to be false
-    expect(mod1.fits?(core, east)).to be false
-    expect(mod1.fits?(core, west)).to be false
-    expect(mod1.fits?(core, south)).to be false
-
     expect(mod1.overlaps?(p4, core)).to be false
     expect(mod1.overlaps?(p4, north)).to be false
     expect(mod1.overlaps?(p4, east)).to be false
     expect(mod1.overlaps?(p4, west)).to be true # ... it fits
     expect(mod1.overlaps?(p4, south)).to be false
+
+    expect(mod1.fits?(core, p4)).to be false
+    expect(mod1.fits?(core, north)).to be false
+    expect(mod1.fits?(core, east)).to be false
+    expect(mod1.fits?(core, west)).to be false
+    expect(mod1.fits?(core, south)).to be false
 
     expect(mod1.overlaps?(core, p4)).to be false
     expect(mod1.overlaps?(core, north)).to be true

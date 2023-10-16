@@ -26,12 +26,12 @@ Gem::Specification.new do |s|
   s.required_ruby_version     = [">= 2.5.0", "< 3"]
   s.metadata                  = {}
 
-  s.add_dependency              "oslg",    "~> 0.2.10"
+  s.add_dependency              "oslg",    ">= 0.2.10"
   s.add_development_dependency  "bundler", "~> 2.1"
   s.add_development_dependency  "rake",    "~> 13.0"
   s.add_development_dependency  "rspec",   "~> 3.11"
 
-  s.metadata["homepage_uri"]    = s.homepage
+  s.metadata["homepage_uri"   ] = s.homepage
   s.metadata["source_code_uri"] = "#{s.homepage}/tree/v#{s.version}"
   s.metadata["bug_tracker_uri"] = "#{s.homepage}/issues"
 end
