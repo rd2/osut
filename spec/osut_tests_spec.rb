@@ -2917,7 +2917,7 @@ RSpec.describe OSut do
     vtx << mini_floor_vtx[2]
     vtx << mini_floor_vtx[1]
     vtx << mini_floor_vtx[0]
-    vtx << mini_floor_vtx[3]
+    vtx << mini_floor_vtx[3] # ?
     vtx << vtx[3]
     expect(core_floor.setVertices(vtx)).to be true
 
@@ -2927,7 +2927,7 @@ RSpec.describe OSut do
     vtx << mini_ceiling_vtx[0]
     vtx << mini_ceiling_vtx[3]
     vtx << mini_ceiling_vtx[2]
-    vtx << mini_ceiling_vtx[1]
+    vtx << mini_ceiling_vtx[1] # ?
     vtx << vtx[3]
     expect(core_ceiling.setVertices(vtx)).to be true
 
@@ -2937,7 +2937,7 @@ RSpec.describe OSut do
     vtx << mini_attic_vtx[2]
     vtx << mini_attic_vtx[1]
     vtx << mini_attic_vtx[0]
-    vtx << mini_attic_vtx[3]
+    vtx << mini_attic_vtx[3] # ?
     vtx << vtx[3]
     expect(attic_floor.setVertices(vtx)).to be true
 
