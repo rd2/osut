@@ -53,7 +53,7 @@ module OSut
             :east, # EAST
            :south, # SOUTH
             :west  # WEST
-          ].freeze
+         ].freeze
 
   # This first set of utilities support OpenStudio materials, constructions,
   # construction sets, etc. If relying on default StandardOpaqueMaterial:
@@ -1099,6 +1099,7 @@ module OSut
     id = s.nameString
     m1  = "#{id}:spandrel"
     m2  = "#{id}:spandrel:boolean"
+    return mismatch(id, s, cl, mth) unless s.is_a?(cl)
 
     if s.additionalProperties.hasFeature("spandrel")
       val = s.additionalProperties.getFeatureAsBoolean("spandrel")
@@ -1110,6 +1111,36 @@ module OSut
     end
 
     id.downcase.include?("spandrel")
+  end
+
+  ##
+  # Validates whether a sub surface is fenestrated.
+  #
+  # @param s [OpenStudio::Model::SubSurface] a sub surface
+  #
+  # @return [Bool] whether subsurface can be considered 'fenestrated'
+  # @return [false] if invalid input (see logs)
+  def fenestration?(s = nil)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::SubSurface
+    return invalid("subsurface", mth, 1, DBG, false) unless s.respond_to?(NS)
+
+    id = s.nameString
+    return mismatch(id, s, cl, mth, false) unless s.is_a?(cl)
+
+    # OpenStudio::Model::SubSurface.validSubSurfaceTypeValues
+    # "FixedWindow"              : fenestration
+    # "OperableWindow"           : fenestration
+    # "Door"
+    # "GlassDoor"                : fenestration
+    # "OverheadDoor"
+    # "Skylight"                 : fenestration
+    # "TubularDaylightDome"      : fenestration
+    # "TubularDaylightDiffuser"  : fenestration
+    return false if s.subSurfaceType.downcase == "door"
+    return false if s.subSurfaceType.downcase == "overheaddoor"
+
+    true
   end
 
   # ---- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---- #
@@ -1881,14 +1912,14 @@ module OSut
     # SDK's "partofTotalFloorArea" would be more suitable in such cases, as
     # long as modellers have, a priori, set this parameter to FALSE.
     #
-    # OpenStudio-Standards' "space_plenum?" catches a MUCH WIDER range of
-    # spaces, which aren't caught by "isPlenum". This includes attics,
-    # crawlspaces, non-plenum air spaces above ceiling tiles, and any other
-    # UNOCCUPIED space in a model. The term "plenum" in this context is more
-    # of a catch-all shorthand - to be used with caution. For instance,
-    # "space_plenum?" shouldn't be used (in isolation) to determine whether an
-    # UNOCCUPIED space should have its envelope insulated ("plenum") or not
-    # ("attic").
+    # By initially relying on the SDK's "partofTotalFloorArea", "space_plenum?"
+    # ends up catching a MUCH WIDER range of spaces, which aren't caught by
+    # "isPlenum". This includes attics, crawlspaces, non-plenum air spaces above
+    # ceiling tiles, and any other UNOCCUPIED space in a model. The term
+    # "plenum" in this context is more of a catch-all shorthand - to be used
+    # with caution. For instance, "space_plenum?" shouldn't be used (in
+    # isolation) to determine whether an UNOCCUPIED space should have its
+    # envelope insulated ("plenum") or not ("attic").
     #
     # In contrast to OpenStudio-Standards' "space_plenum?", this method
     # strictly returns FALSE if a space is indeed "partofTotalFloorArea". It
@@ -1914,10 +1945,6 @@ module OSut
     return mismatch("space", space, cl, mth, DBG, false) unless space.is_a?(cl)
     return false if space.partofTotalFloorArea
     return false if vestibule?(space)
-
-    id = space.nameString
-    m1 = "#{id}:plenum"
-    m1 = "#{id}:plenum boolean"
 
     # CASE A: "plenum" spaceType.
     unless space.spaceType.empty?
@@ -2259,84 +2286,25 @@ module OSut
   end
 
   ##
-  # Returns true if 2 OpenStudio 3D points are nearly equal
+  # Returns the site/true outward normal vector of a surface.
   #
-  # @param p1 [OpenStudio::Point3d] 1st 3D point
-  # @param p2 [OpenStudio::Point3d] 2nd 3D point
+  # @param s [OpenStudio::Model::PlanarSurface] a surface
+  # @param r [#to_f] a group/site rotation angle [0,2PI) radians
   #
-  # @return [Bool] whether equal points (within TOL)
-  # @return [false] if invalid input (see logs)
-  def same?(p1 = nil, p2 = nil)
-    mth = "OSut::#{__callee__}"
-    cl  = OpenStudio::Point3d
-    return mismatch("point 1", p1, cl, mth, DBG, false) unless p1.is_a?(cl)
-    return mismatch("point 2", p2, cl, mth, DBG, false) unless p2.is_a?(cl)
+  # @return [OpenStudio::Vector3d] true normal vector
+  # @return [nil] if invalid input (see logs)
+  def trueNormal(s = nil, r = 0)
+    mth = "TBD::#{__callee__}"
+    cl  = OpenStudio::Model::PlanarSurface
+    return mismatch("surface", s, cl, mth)   unless s.is_a?(cl)
+    return invalid("rotation angle", mth, 2) unless r.respond_to?(:to_f)
 
-    # OpenStudio.isAlmostEqual3dPt(p1, p2, TOL) # ... from v350 onwards.
-    (p1.x-p2.x).abs < TOL && (p1.y-p2.y).abs < TOL && (p1.z-p2.z).abs < TOL
-  end
+    r = -r.to_f * Math::PI / 180.0
+    vx = s.outwardNormal.x * Math.cos(r) - s.outwardNormal.y * Math.sin(r)
+    vy = s.outwardNormal.x * Math.sin(r) + s.outwardNormal.y * Math.cos(r)
+    vz = s.outwardNormal.z
 
-  ##
-  # Returns true if a line segment is along the X-axis.
-  #
-  # @param p1 [OpenStudio::Point3d] 1st 3D point of a line segment
-  # @param p2 [OpenStudio::Point3d] 2nd 3D point of a line segment
-  # @param strict [Bool] whether segment shouldn't hold Y- or Z-axis components
-  #
-  # @return [Bool] whether along the X-axis
-  # @return [false] if invalid input (see logs)
-  def xx?(p1 = nil, p2 = nil, strict = true)
-    mth = "OSut::#{__callee__}"
-    cl  = OpenStudio::Point3d
-    strict = true unless [true, false].include?(strict)
-    return mismatch("point 1", p1, cl, mth, DBG, false) unless p1.is_a?(cl)
-    return mismatch("point 2", p2, cl, mth, DBG, false) unless p2.is_a?(cl)
-    return false if (p1.y - p2.y).abs > TOL && strict
-    return false if (p1.z - p2.z).abs > TOL && strict
-
-    (p1.x - p2.x).abs > TOL
-  end
-
-  ##
-  # Returns true if a line segment is along the Y-axis.
-  #
-  # @param p1 [OpenStudio::Point3d] 1st 3D point of a line segment
-  # @param p2 [OpenStudio::Point3d] 2nd 3D point of a line segment
-  # @param strict [Bool] whether segment shouldn't hold X- or Z-axis components
-  #
-  # @return [Bool] whether along the Y-axis
-  # @return [false] if invalid input (see logs)
-  def yy?(p1 = nil, p2 = nil, strict = true)
-    mth = "OSut::#{__callee__}"
-    cl  = OpenStudio::Point3d
-    strict = true unless [true, false].include?(strict)
-    return mismatch("point 1", p1, cl, mth, DBG, false) unless p1.is_a?(cl)
-    return mismatch("point 2", p2, cl, mth, DBG, false) unless p2.is_a?(cl)
-    return false if (p1.x - p2.x).abs > TOL && strict
-    return false if (p1.z - p2.z).abs > TOL && strict
-
-    (p1.y - p2.y).abs > TOL
-  end
-
-  ##
-  # Returns true if a line segment is along the Z-axis.
-  #
-  # @param p1 [OpenStudio::Point3d] 1st 3D point of a line segment
-  # @param p2 [OpenStudio::Point3d] 2nd 3D point of a line segment
-  # @param strict [Bool] whether segment shouldn't hold X- or Y-axis components
-  #
-  # @return [Bool] whether along the Z-axis
-  # @return [false] if invalid input (see logs)
-  def zz?(p1 = nil, p2 = nil, strict = true)
-    mth = "OSut::#{__callee__}"
-    cl  = OpenStudio::Point3d
-    strict = true unless [true, false].include?(strict)
-    return mismatch("point 1", p1, cl, mth, DBG, false) unless p1.is_a?(cl)
-    return mismatch("point 2", p2, cl, mth, DBG, false) unless p2.is_a?(cl)
-    return false if (p1.x - p2.x).abs > TOL && strict
-    return false if (p1.y - p2.y).abs > TOL && strict
-
-    (p1.z - p2.z).abs > TOL
+    OpenStudio::Point3d.new(vx, vy, vz) - OpenStudio::Point3d.new(0, 0, 0)
   end
 
   ##
@@ -2385,6 +2353,37 @@ module OSut
   end
 
   ##
+  # Returns true if 2 sets of OpenStudio 3D points are nearly equal.
+  #
+  # @param s1 [Set<OpenStudio::Point3d>] 1st set of 3D point(s)
+  # @param s2 [Set<OpenStudio::Point3d>] 2nd set of 3D point(s)
+  #
+  # @return [Bool] whether sets are nearly equal (within TOL)
+  # @return [false] if invalid input (see logs)
+  def same?(s1 = [], s2 = [])
+    mth = "OSut::#{__callee__}"
+    s1  = [s1] if s1.is_a?(OpenStudio::Point3d)
+    s2  = [s2] if s2.is_a?(OpenStudio::Point3d)
+    s1  = to_p3Dv(s1)
+    s2  = to_p3Dv(s2)
+    return false if s1.empty?
+    return false if s2.empty?
+
+    size = s1.size
+    return invalid("set sizes", mth, 0, ERR, false) unless s2.size == size
+
+    # OpenStudio.isAlmostEqual3dPt(p1, p2, TOL) # ... from v350 onwards.
+    size.times.each do |i|
+      xOK = (s1[i].x - s2[i].x).abs < TOL
+      yOK = (s1[i].y - s2[i].y).abs < TOL
+      zOK = (s1[i].z - s2[i].z).abs < TOL
+      return false unless xOK && yOK && zOK
+    end
+
+    true
+  end
+
+  ##
   # Returns true if an OpenStudio 3D point is part of a set of 3D points.
   #
   # @param pts [Set<OpenStudio::Point3dVector>] 3d points
@@ -2401,6 +2400,66 @@ module OSut
     pts.each { |pt| return true if same?(p1, pt) }
 
     false
+  end
+
+  ##
+  # Returns OpenStudio 3D point (of a provided set) nearest to e.g. grid origin.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  # @param p0 [OpenStudio::Point3d] e.g. grid origin coordinates
+  #
+  # @return [Integer] set index of nearest point to e.g. grid origin
+  # @return [nil] if invalid input (see logs)
+  def nearest(pts = nil, p0 = OpenStudio::Point3d.new(0,0,0))
+    mth = "OSut::#{__callee__}"
+    l   = 100000000000
+    idx = nil
+    pts = to_p3Dv(pts)
+    cl  = OpenStudio::Point3d
+    return mismatch("point", p0, cl, mth) unless p0.is_a?(cl)
+
+    pts.each_with_index { |pt, i| return i if same?(pt, p0) }
+
+    pts.each_with_index do |pt, i|
+      length = (pt - p0).length
+
+      if length < l
+        l   = length
+        idx = i
+      end
+    end
+
+    idx
+  end
+
+  ##
+  # Returns OpenStudio 3D point (of a provided set) farthest to e.g. grid origin.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  # @param p0 [OpenStudio::Point3d] e.g. grid origin coordinates
+  #
+  # @return [Integer] set index of farthest point to e.g. grid origin
+  # @return [nil] if invalid input (see logs)
+  def farthest(pts = nil, p0 = OpenStudio::Point3d.new(0,0,0))
+    mth = "OSut::#{__callee__}"
+    l   = 0
+    idx = nil
+    pts = to_p3Dv(pts)
+    cl  = OpenStudio::Point3d
+    return mismatch("point", p0, cl, mth) unless p0.is_a?(cl)
+
+    pts.each_with_index do |pt, i|
+      next if same?(pt, p0)
+
+      length = (pt - p0).length
+
+      if length > l
+        l   = length
+        idx = i
+      end
+    end
+
+    idx
   end
 
   ##
@@ -2435,7 +2494,7 @@ module OSut
   end
 
   ##
-  # Returns true if OpenStudio 3D points share X, Y or Z coordinates.
+  # Validates whether 3D points share X, Y or Z coordinates.
   #
   # @param pts [Set<OpenStudio::Point3d>] OpenStudio 3D points
   # @param axs [Symbol] if potentially along :x, :y or :z axis
@@ -2450,7 +2509,7 @@ module OSut
     ok2 = [:x, :y, :z].include?(axs)
     return false if pts.empty?
     return mismatch("val", val, Numeric, mth,    DBG, false) unless ok1
-    return invalid("axis (XYZ?)",        mth, 2, DBG, false) unless ok2
+    return invalid("axis",               mth, 2, DBG, false) unless ok2
 
     val = val.to_f
 
@@ -2487,6 +2546,88 @@ module OSut
   end
 
   ##
+  # Returns 'width' of a set of OpenStudio 3D points, once re/aligned.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points, once re/aligned
+  #
+  # @return [Float] width along X-axis, once re/aligned
+  # @return [0.0] if invalid inputs
+  def width(pts = nil)
+    pts = to_p3Dv(pts)
+    return 0 if pts.size < 2
+
+    pts.max_by(&:x).x - pts.min_by(&:x).x
+  end
+
+  ##
+  # Returns 'height' of a set of OpenStudio 3D points.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  #
+  # @return [Float] height along Z-axis, or Y-axis if flat
+  # @return [0.0] if invalid inputs
+  def height(pts = nil)
+    pts = to_p3Dv(pts)
+    return 0 if pts.size < 2
+
+    min = pts.min_by(&:z).z
+    max = pts.max_by(&:z).z
+    return max - min if (max - min).abs > TOL
+
+    pts.max_by(&:y).y - pts.min_by(&:y).y
+  end
+
+  ##
+  # Returns midpoint coordinates of line segment.
+  #
+  # @param p1 [OpenStudio::Point3d] 1st 3D point of a line segment
+  # @param p2 [OpenStudio::Point3d] 2nd 3D point of a line segment
+  #
+  # @return [OpenStudio::Point3d] midpoint
+  # @return [nil] if invalid input (see logs)
+  def midpoint(p1 = nil, p2 = nil)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Point3d
+    return mismatch("point 1", p1, cl, mth) unless p1.is_a?(cl)
+    return mismatch("point 2", p2, cl, mth) unless p2.is_a?(cl)
+    return invalid("same points", mth, 0)       if same?(p1, p2)
+
+    midX = p1.x + (p2.x - p1.x)/2
+    midY = p1.y + (p2.y - p1.y)/2
+    midZ = p1.z + (p2.z - p1.z)/2
+
+    OpenStudio::Point3d.new(midX, midY, midZ)
+  end
+
+  ##
+  # Returns a vertical 3D plane from 2x 3D points, right-hand rule. Input points
+  # are considered last 2 (of 3) points forming the plane; the first point is
+  # assumed zenithal. Input points cannot align vertically.
+  #
+  # @param p1 [OpenStudio::Point3d] 1st 3D point of a line segment
+  # @param p2 [OpenStudio::Point3d] 2nd 3D point of a line segment
+  #
+  # @return [OpenStudio::Plane] 3D plane
+  # @return [nil] if invalid input (see logs)
+  def verticalPlane(p1 = nil, p2 = nil)
+    mth = "OSut::#{__callee__}"
+    return mismatch("point 1", p1, cl, mth) unless p1.is_a?(OpenStudio::Point3d)
+    return mismatch("point 2", p2, cl, mth) unless p2.is_a?(OpenStudio::Point3d)
+
+    if (p1.x - p2.x).abs < TOL && (p1.y - p2.y).abs < TOL
+      return invalid("vertically aligned points", mth)
+    end
+
+    zenith = OpenStudio::Point3d.new(p1.x, p1.y, (p2 - p1).length)
+    points = OpenStudio::Point3dVector.new
+    points << zenith
+    points << p1
+    points << p2
+
+    OpenStudio::Plane.new(points)
+  end
+
+  ##
   # Returns unique OpenStudio 3D points from an OpenStudio 3D point vector.
   #
   # @param pts [Set<OpenStudio::Point3d] 3D points
@@ -2512,6 +2653,297 @@ module OSut
   end
 
   ##
+  # Returns paired sequential points as (non-zero length) line segments. If the
+  # set strictly holds 2x unique points, a single segment is returned.
+  # Otherwise, the returned number of segments equals the number of unique
+  # points. If non-collinearity is requested, then the number of returned
+  # segments equals the number of non-colliear points.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  #^
+  # @return [OpenStudio::Point3dVectorVector] line segments (see logs if empty)
+  def getSegments(pts = nil, co = false)
+    mth = "OSut::#{__callee__}"
+    vv  = OpenStudio::Point3dVectorVector.new
+    pts = getUniques(pts)
+    return vv if pts.size < 2
+
+    pts.each_with_index do |p1, i1|
+      i2 = i1 + 1
+      i2 = 0 if i2 == pts.size
+      p2 = pts[i2]
+
+      line = OpenStudio::Point3dVector.new
+      line << p1
+      line << p2
+      vv   << line
+      break if pts.size == 2
+    end
+
+    vv
+  end
+
+  ##
+  # Determines if a set of 3D points if a valid segment.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  #
+  # @return [Bool] whether set is a valid segment
+  # @return [false] if invalid input (see logs)
+  def segment?(pts = nil)
+    pts = to_p3Dv(pts)
+    return false     if pts.empty?
+    return false unless pts.size == 2
+    return false     if same?(pts[0], pts[1])
+
+    true
+  end
+
+  ##
+  # Returns points as (non-zero length) 'triads', i.e. 3x sequential points.
+  # If the set holds less than 3x unique points, an empty triad is
+  # returned. Otherwise, the returned number of triads equals the number of
+  # unique points. If non-collinearity is requested, then the number of
+  # returned triads equals the number of non-collinear points.
+  #
+  # @param pts [OpenStudio::Point3dVector] 3D points
+  #
+  # @return [OpenStudio::Point3dVectorVector] triads (see logs if empty)
+  def getTriads(pts = nil, co = false)
+    mth = "OSut::#{__callee__}"
+    vv  = OpenStudio::Point3dVectorVector.new
+    pts = getUniques(pts)
+    return vv if pts.size < 2
+
+    pts.each_with_index do |p1, i1|
+      i2 = i1 + 1
+      i2 = 0 if i2 == pts.size
+      i3 = i2 + 1
+      i3 = 0 if i3 == pts.size
+      p2 = pts[i2]
+      p3 = pts[i3]
+
+      tri = OpenStudio::Point3dVector.new
+      tri << p1
+      tri << p2
+      tri << p3
+      vv  << tri
+    end
+
+    vv
+  end
+
+  ##
+  # Determines if a set of 3D points if a valid triad.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  #
+  # @return [Bool] whether set is a valid triad (i.e. a trio of 3D points)
+  # @return [false] if invalid input (see logs)
+  def triad?(pts = nil)
+    pts = to_p3Dv(pts)
+    return false     if pts.empty?
+    return false unless pts.size == 3
+    return false     if same?(pts[0], pts[1])
+    return false     if same?(pts[0], pts[2])
+    return false     if same?(pts[1], pts[2])
+
+    true
+  end
+
+  ##
+  # Validates whether a 3D point lies along a set of 3D point segments.
+  #
+  # @param p0 [OpenStudio::Point3d] a 3D point
+  # @param s [Set<OpenStudio::Point3d] 3D point segments
+  #
+  # @return [Bool] whether a 3D point lies along a set of 3D point segments
+  # @return [false] if invalid input (see logs)
+  def pointAlongSegments?(p0 = nil, s = [])
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Point3d
+    cl2 = OpenStudio::Point3dVectorVector
+    sgs = s.is_a?(cl2) ? s : getSegments(s)
+    return empty("segments",         mth, DBG, false)     if sgs.empty?
+    return mismatch("point", p0, cl, mth, DBG, false) unless p0.is_a?(cl1)
+
+    sgs.each_with_index do |s, i|
+      return invalid("segments ##{i}", mth, 1, DBG, false) unless s.size == 2
+    end
+
+    sgs.each { |s| return true if holds?(s, p0) }
+
+    sgs.each do |s|
+      a   = s.first
+      b   = s.last
+      ab  = b - a
+      pa  = a - p0
+      pb  = b - p0
+      abl = ab.length
+      pal = pa.length
+      pbl = pb.length
+      next        if ab.cross(pa).length > 0.001
+      return true if pal < abl && pbl < abl
+    end
+
+    false
+  end
+
+  ##
+  # Returns point of intersection of 2x 3D line segments.
+  #
+  # @param s1 [Set<OpenStudio::Point3d] 1st 3D line segment
+  # @param s2 [Set<OpenStudio::Point3d] 2nd 3D line segment
+  #
+  # @return [OpenStudio::Point3d] point of intersection of both lines
+  # @return [nil] if no intersection, equal, or invalid input (see logs)
+  def getLineIntersection(s1 = [], s2 = [])
+    mth = "OSut::#{__callee__}"
+    s1  = getSegments(s1)
+    s2  = getSegments(s2)
+    return nil if s1.empty?
+    return nil if s2.empty?
+
+    s1 = s1.first
+    s2 = s2.first
+
+    # Matching segments?
+    return nil if same?(s1, s2)
+    return nil if same?(s1, s2.reverse)
+
+    a1 = s1[0]
+    a2 = s1[1]
+    b1 = s2[0]
+    b2 = s2[1]
+
+    # Matching segment endpoints?
+    return a1 if same?(a1, b1)
+    return a2 if same?(a2, b1)
+    return a1 if same?(a1, b2)
+    return a2 if same?(a2, b2)
+
+    # Segment endpoint along opposite segment?
+    return a1 if pointAlongSegments?(a1, s2)
+    return a2 if pointAlongSegments?(a2, s2)
+    return b1 if pointAlongSegments?(b1, s1)
+    return b2 if pointAlongSegments?(b2, s1)
+
+    # Line segments as vectors. Skip if colinear
+    a   = a2 - a1
+    b   = b2 - b1
+    xab = a.cross(b)
+    return nil if xab.length < 0.001
+
+    # Link segment endpoints as vectors. Must be coplanar (re cross products).
+    a1b1  = b1 - a1
+    a1b2  = b2 - a1
+    xa1b1 = a.cross(a1b1)
+    xa1b2 = a.cross(a1b2)
+    return nil unless xab.cross(xa1b1).length < 0.001
+    return nil unless xab.cross(xa1b2).length < 0.001
+
+    lxa1b1 = xa1b1.length
+    lxa1b2 = xa1b2.length
+
+    # Pick 'b' endpoint farthest from 'a' (as 1x could be colinear).
+    c1    = lxa1b1 < lxa1b2 ? b2 : b1
+    c2    = same?(c1, b1)   ? b2 : b1
+    c1a1  = a1 - c1
+    xc1a1 = a.cross(c1a1)
+    d1    = a1 + xc1a1
+    n     = a.cross(xc1a1)
+    dot   = b.dot(n)
+
+    # Precaution, shouldn't be necessary ...
+    return zero("dot product (n, xc1a1)", mth) if dot.abs < 0.001
+
+    n  = n.reverseVector if dot < 0
+    f  = c1a1.dot(n) / b.dot(n)
+    p0 = c1 + scalar(b, f)
+
+    # Ensure intersection is sandwiched between 1st line segment endpoints.
+    return nil unless pointAlongSegments?(p0, s1)
+    return nil unless pointAlongSegments?(p0, s2)
+
+    p0
+  end
+
+  ##
+  # Validates whether 3D line segment intersects 3D segments (e.g. polygon).
+  #
+  # @param l [Set<OpenStudio::Point3d] 3D line segment
+  # @param s [Set<OpenStudio::Point3d] 3D segments
+  #
+  # @return [Bool] whether 3D line intersects 3D segments
+  # @return [false] if invalid input (see logs)
+  def lineIntersects?(l = [], s = [])
+    mth = "OSut::#{__callee__}"
+    l   = getSegments(l)
+    s   = getSegments(s)
+    return nil if l.empty?
+    return nil if s.empty?
+
+    l = l.first
+
+    s.each { |segment| return true unless getLineIntersection(l, segment).nil? }
+
+    false
+  end
+
+  ##
+  # Determines if pre-'aligned' OpenStudio 3D points are listed clockwise.
+  #
+  # @param pts [OpenStudio::Point3dVector] 3D points
+  #
+  # @return [Bool] whether sequence is clockwise
+  # @return [false] if invalid input (see logs)
+  def clockwise?(pts = nil)
+    mth = "OSut::#{__callee__}"
+    pts = to_p3Dv(pts)
+    n   = false
+    return invalid("3+ points"         , mth, 1, DBG, n)     if pts.size < 3
+    return invalid("(unaligned) points", mth, 1, DBG, n) unless xyz?(pts, :z, 0)
+
+    OpenStudio.pointInPolygon(pts.first, pts, TOL)
+  end
+
+  ##
+  # Returns 'aligned' OpenStudio 3D points conforming to Openstudio's
+  # counterclockwise UpperLeftCorner (ULC) convention.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] aligned 3D points
+  #
+  # @return [OpenStudio::Point3dVector] ULC points (see logs if empty)
+  def ulc(pts = nil)
+    mth = "OSut::#{__callee__}"
+    pts = to_p3Dv(pts)
+    v   = OpenStudio::Point3dVector.new
+    p0  = OpenStudio::Point3d.new(0,0,0)
+    i0  = nil
+    return v if pts.empty?
+
+    return invalid("points (3+)",      mth, 1, DBG, v)     if pts.size < 3
+    return invalid("points (aligned)", mth, 1, DBG, v) unless xyz?(pts, :z)
+
+    # Ensure counterclockwise sequence.
+    pts = pts.to_a
+    pts = pts.reverse if clockwise?(pts)
+
+    # Fetch index of candidate (0,0,0) point (i == 1, in most cases). Resort
+    # to last X == 0 point. Leave as is if failed attempts.
+    i0 = pts.index  { |pt| same?(pt, p0) }
+    i0 = pts.rindex { |pt| pt.x.abs < TOL } if i0.nil?
+
+    unless i0.nil?
+      i   = pts.size - 1
+      i   = i0 - 1 unless i0 == 0
+      pts = pts.rotate(i)
+    end
+
+    to_p3Dv(pts)
+  end
+
+  ##
   # Returns sequential non-collinear points in an OpenStudio 3D point vector.
   #
   # @param pts [Set<OpenStudio::Point3d] 3D points
@@ -2524,7 +2956,7 @@ module OSut
     ok  = n.respond_to?(:to_i)
     v   = OpenStudio::Point3dVector.new
     a   = []
-    return pts if pts.size < 2
+    return pts if pts.size < 3
     return mismatch("n non-collinears", n, Integer, mth, DBG, v) unless ok
 
     # Evaluate cross product of vectors of 3x sequential points.
@@ -2554,126 +2986,24 @@ module OSut
   end
 
   ##
-  # Returns paired sequential points as (non-zero length) line segments. If the
-  # set strictly holds 2x unique points, a single segment is returned.
-  # Otherwise, the returned number of segments equals the number of unique
-  # points. If non-collinearity is requested, then the number of returned
-  # segments equals the number of non-colliear points.
+  # Returns sequential collinear points in an OpenStudio 3D point vector.
   #
-  # @param pts [Set<OpenStudio::Point3d>] 3D points
-  # @param co [Bool] whether to keep collinear points
+  # @param pts [Set<OpenStudio::Point3d] 3D points
+  # @param n [#to_i] requested number of collinears (0 returns all)
   #
-  # @return [OpenStudio::Point3dVectorVector] line segments (see logs if empty)
-  def getSegments(pts = nil, co = false)
+  # @return [OpenStudio::Point3dVector] collinears (see logs if empty)
+  def getCollinears(pts = nil, n = 0)
     mth = "OSut::#{__callee__}"
-    vv  = OpenStudio::Point3dVectorVector.new
-    co  = false                 unless [true, false].include?(co)
-    pts = getNonCollinears(pts) unless co
-    pts = getUniques(pts)           if co
-    return vv                       if pts.size < 2
-
-    pts.each_with_index do |p1, i1|
-      i2 = i1 + 1
-      i2 = 0 if i2 == pts.size
-      p2 = pts[i2]
-
-      line = OpenStudio::Point3dVector.new
-      line << p1
-      line << p2
-      vv << line
-      break if pts.size == 2
-    end
-
-    vv
-  end
-
-  ##
-  # Returns points as (non-zero length) 'triads', i.e. 3x sequential points.
-  # If the set holds less than 3x unique points, an empty triad is
-  # returned. Otherwise, the returned number of triads equals the number of
-  # unique points. If non-collinearity is requested, then the number of
-  # returned triads equals the number of non-collinear points.
-  #
-  # @param pts [OpenStudio::Point3dVector] 3D points
-  # @param co [Bool] whether to keep collinear points
-  #
-  # @return [OpenStudio::Point3dVectorVector] triads (see logs if empty)
-  def getTriads(pts = nil, co = false)
-    mth = "OSut::#{__callee__}"
-    vv  = OpenStudio::Point3dVectorVector.new
-    co  = false                 unless [true, false].include?(co)
-    pts = getNonCollinears(pts) unless co
-    pts = getUniques(pts)           if co
-    return vv                       if pts.size < 2
-
-    pts.each_with_index do |p1, i1|
-      i2 = i1 + 1
-      i2 = 0 if i2 == pts.size
-      i3 = i2 + 1
-      i3 = 0 if i3 == pts.size
-      p2 = pts[i2]
-      p3 = pts[i3]
-
-      tri = OpenStudio::Point3dVector.new
-      tri << p1
-      tri << p2
-      tri << p3
-      vv << tri
-    end
-
-    vv
-  end
-
-  ##
-  # Determines if pre-'aligned' OpenStudio 3D points are listed clockwise.
-  #
-  # @param pts [OpenStudio::Point3dVector] 3D points
-  #
-  # @return [Bool] whether sequence is clockwise
-  # @return [false] if invalid input (see logs)
-  def clockwise?(pts = nil)
-    mth = "OSut::#{__callee__}"
-    pts = to_p3Dv(pts)
-    n   = false
-    return invalid("points (3+)",      mth, 1, DBG, n)     if pts.size < 3
-    return invalid("points (aligned)", mth, 1, DBG, n) unless xyz?(pts, :z, 0)
-
-    OpenStudio.pointInPolygon(pts.first, pts, TOL)
-  end
-
-  ##
-  # Returns 'aligned' OpenStudio 3D points conforming to Openstudio's
-  # counterclockwise UpperLeftCorner (ULC) convention.
-  #
-  # @param pts [Set<OpenStudio::Point3d>] aligned 3D points
-  #
-  # @return [OpenStudio::Point3dVector] ULC points (see logs if empty)
-  def ulc(pts = nil)
-    mth = "OSut::#{__callee__}"
-    pts = to_p3Dv(pts)
+    pts = getUniques(pts)
+    ok  = n.respond_to?(:to_i)
     v   = OpenStudio::Point3dVector.new
-    p0  = OpenStudio::Point3d.new(0,0,0)
-    i0  = nil
+    return pts if pts.size < 3
+    return mismatch("n collinears", n, Integer, mth, DBG, v) unless ok
 
-    return invalid("points (3+)",      mth, 1, DBG, v)     if pts.size < 3
-    return invalid("points (aligned)", mth, 1, DBG, v) unless xyz?(pts, :z, 0)
+    ncolls = getNonCollinears(pts)
+    return pts if ncolls.empty?
 
-    # Ensure counterclockwise sequence.
-    pts = pts.to_a
-    pts = pts.reverse if clockwise?(pts)
-
-    # Fetch index of candidate (0,0,0) point (i == 1, in most cases). Resort
-    # to last X == 0 point. Leave as is if failed attempts.
-    i0 = pts.index  { |pt| same?(pt, p0) }
-    i0 = pts.rindex { |pt| pt.x.abs < TOL } if i0.nil?
-
-    unless i0.nil?
-      i   = pts.size - 1
-      i   = i0 - 1 unless i0 == 0
-      pts = pts.rotate(i)
-    end
-
-    to_p3Dv(pts)
+    to_p3Dv( pts.delete_if { |pt| holds?(ncolls, pt) } )
   end
 
   ##
@@ -2692,7 +3022,7 @@ module OSut
   # @param sq [:no, :ulc, :cw] unaltered, ULC or clockwise sequence
   #
   # @return [OpenStudio::Point3dVector] 3D points (see logs if empty)
-  def poly(pts = nil, vx = false, uq = false, co = true, tt = false, sq = :no)
+  def poly(pts = nil, vx = false, uq = false, co = false, tt = false, sq = :no)
     mth = "OSut::#{__callee__}"
     pts = to_p3Dv(pts)
     cl  = OpenStudio::Transformation
@@ -2709,76 +3039,69 @@ module OSut
     return invalid("sequence",       mth, 6, DBG, v) unless ok2
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # Basic tests:
+    # Minimum 3 points?
     p3 = getNonCollinears(pts, 3)
     return empty("polygon", mth, ERR, v) if p3.size < 3
 
+    # Coplanar?
     pln = OpenStudio::Plane.new(p3)
 
     pts.each do |pt|
       return empty("plane", mth, ERR, v) unless pln.pointOnPlane(pt)
     end
 
-    t = tt
-    t = OpenStudio::Transformation.alignFace(pts) unless tt.is_a?(cl)
+    # A self-intersecting polygon will log the following:
+    # [utilities.Transformation] <1> Cannot compute outward normal for vertices
+    t = tt.is_a?(cl) ? tt : OpenStudio::Transformation.alignFace(pts)
     a = (t.inverse * pts).reverse
+
+    # May reactivate the following in the future. For now, OpenStudio's
+    # selfIntersect will correctly catch a typical self-intersecting polygon
+    # (like a "bowtie"), yet unfortunately will also catch a valid polygon that
+    # may surround another (through the use of leader lines).
+    #
+    # acw = clockwise?(a) ? a : a.reverse
+    #
+    # if OpenStudio.selfIntersects(acw, TOL)
+    #   return invalid("polygon", mth, 1, ERR, v)
+    # end
 
     if tt.is_a?(cl)
       # Using a transformation that is most likely not specific to pts. The
-      # most probable reason to retain this option is when testing for polygon
+      # most likely reason to retain this option is when testing for polygon
       # intersections, unions, etc., operations that typically require that
       # points remain nonetheless 'aligned'. If re-activated, this logs a
-      # warning if aligned points aren't @Z =0, before 'flattening'.
+      # warning if aligned points aren't @Z = 0, before 'flattening'.
       #
       #   invalid("points (non-aligned)", mth, 1, WRN) unless xyz?(a, :z, 0)
-      a = flatten(a).to_a unless xyz?(a, :z, 0)
+      a = flatten(a).to_a unless xyz?(a, :z)
+    else
+      return invalid("(unaligned) points", mth, 1, ERR, v) unless xyz?(a, :z, 0)
     end
-
-    # The following 2x lines are commented out. This is a very commnon and very
-    # useful test, yet tested cases are first caught by the 'pointOnPlane'
-    # test above. Keeping it for possible further testing.
-    # bad = OpenStudio.selfIntersects(a, TOL)
-    # return invalid("points (intersecting)", mth, 1, ERR, v) if bad
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Ensure uniqueness and/or non-collinearity. Preserve original sequence.
     p0 = a.first
-    a  = OpenStudio.simplify(a, false, TOL)     if uq
-    a  = OpenStudio.simplify(a, true,  TOL) unless co
+    a  = getUniques(a).to_a       if uq
+    a  = getNonCollinears(a).to_a if co
     i0 = a.index { |pt| same?(pt, p0) }
-    a  = a.rotate(i0)                       unless i0.nil?
+    a  = a.rotate(i0)             unless i0.nil?
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Check for convexity (optional).
-    if vx
-      a1 = OpenStudio.simplify(a, true, TOL).reverse
-      dX = a1.max_by(&:x).x.abs
-      dY = a1.max_by(&:y).y.abs
-      d  = [dX, dY].max
-      return false if d < TOL
+    if vx && p3.size > 3
+      zen = OpenStudio::Point3d.new(0, 0, 1000)
+      acw = clockwise?(a) ? a.clone : a.reverse
+      acw = getNonCollinears(acw)
 
-      u = OpenStudio::Vector3d.new(0, 0, d)
-
-      a1.each_with_index do |p1, i1|
-        i2 = i1 + 1
-        i2 = 0 if i2 == a1.size
-        p2 = a1[i2]
-        pi = p1 + u
-        vi = OpenStudio::Point3dVector.new
-        vi << pi
-        vi << p1
-        vi << p2
-        plane  = OpenStudio::Plane.new(vi)
-        normal = plane.outwardNormal
-
-        a1.each do |p3|
-          next if same?(p1, p3)
-          next if same?(p2, p3)
-          next if plane.pointOnPlane(p3)
-          next if normal.dot(p3 - p1) < 0
-
-          return invalid("points (non-convex)", mth, 1, ERR, v)
-        end
+      getTriads(acw).each do |trio|
+        p1  = trio[0]
+        p2  = trio[1]
+        p3  = trio[2]
+        v12 = p2 - p1
+        v13 = p3 - p1
+        x   = (zen - p1).cross(v12)
+        return invalid("points (non-convex)", mth, 1, ERR, v) if x.dot(v13) > 0
       end
     end
 
@@ -2810,56 +3133,183 @@ module OSut
   end
 
   ##
-  # Returns 'width' of a set of OpenStudio 3D points (perpendicular view).
+  # Validates whether 3D point is entirely within a 3D polygon. False if point
+  # lies along any of the polygon edges, or is near any of its vertices.
   #
-  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  # @param p0 [OpenStudio::Point3d] a 3D point
+  # @param s [Set<OpenStudio::Point3d] a 3D polygon
   #
-  # @return [Float] left-to-right width
-  # @return [0.0] if invalid inputs (see logs)
-  def width(pts = nil)
+  # @return [Bool] whether a 3D point lies entirely within a 3D polygon
+  # @return [false] if invalid input (see logs)
+  def pointWithinPolygon?(p0 = nil, s = [])
     mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Point3d
+    s   = poly(s, false, true)
+    return empty("polygon",          mth, DBG, false)     if s.empty?
+    return mismatch("point", p0, cl, mth, DBG, false) unless p0.is_a?(cl)
 
-    poly(pts, false, true, false, true).max_by(&:x).x
+    # Along polygon edges, or near vertices?
+    sgs = getSegments(s)
+    return false if pointAlongSegments?(p0, sgs)
+
+    sgs.each do |sg|
+      #   - draw vector from segment midpoint to point
+      #   - scale 10000x (assuming no building surface would be 10km wide)
+      #   - convert vector to an independent line segment
+      #   - loop through polygon segments, tally the number of intersections
+      #   - return false if number of intersections is even.
+      mpV = scalar(midpoint(sg.first, sg.last) - p0, 10000)
+      p1  = p0 + mpV
+      ctr = 0
+      pts = []
+
+      # Skip if collinear.
+      next if mpV.cross(sg.last - sg.first).length < TOL
+
+      sgs.each do |sg|
+        intersect = getLineIntersection([p0, p1], sg)
+        next if intersect.nil?
+
+        # If intersection ~= polygon vertex, ignore if already accounted for.
+        if holds?(s, intersect)
+          next if holds?(pts, intersect)
+
+          pts << intersect
+        end
+
+        ctr += 1
+      end
+
+      return false if ctr.even?
+    end
+
+    true
   end
 
   ##
-  # Returns 'height' of a set of OpenStudio 3D points (perpendicular view).
-  #
-  # @param pts [Set<OpenStudio::Point3d>] 3D points
-  #
-  # @return [Float] top-to-bottom height
-  # @return [0.0] if invalid inputs (see logs)
-  def height(pts = nil)
-    mth = "OSut::#{__callee__}"
-
-    poly(pts, false, true, false, true).max_by(&:y).y
-  end
-
-  ##
-  # Determines whether a 1st OpenStudio polygon fits in a 2nd polygon.
+  # Validates whether 2 polygons are parallel, regardless of their direction.
   #
   # @param p1 [Set<OpenStudio::Point3d>] 1st set of 3D points
   # @param p2 [Set<OpenStudio::Point3d>] 2nd set of 3D points
-  # @param flat [Bool] whether points are to be pre-flattened (Z=0)
+  #
+  # @return [Bool] whether 2 polygons are parallel
+  # @return [false] if invalid input (see logs)
+  def parallel?(p1 = nil, p2 = nil)
+    mth = "OSut::#{__callee__}"
+    p1  = poly(p1, false, true, false)
+    p2  = poly(p2, false, true, false)
+    return false if p1.empty?
+    return false if p2.empty?
+
+    p1 = getNonCollinears(p1, 3)
+    p2 = getNonCollinears(p2, 3)
+    return false if p1.empty?
+    return false if p2.empty?
+
+    pl1 = OpenStudio::Plane.new(p1)
+    pl2 = OpenStudio::Plane.new(p2)
+
+    pl1.outwardNormal.dot(pl2.outwardNormal).abs > 0.99
+  end
+
+  ##
+  # Validates whether a polygon faces upwards.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] OpenStudio 3D points
+  #
+  # @return [Bool] if facing upwards
+  # @return [false] if invalid input (see logs)
+  def facingUp?(pts = nil)
+    mth = "OSut::#{__callee__}"
+    up  = OpenStudio::Point3d.new(0,0,1) - OpenStudio::Point3d.new(0,0,0)
+    pts = poly(pts, false, true, false)
+    return false if pts.empty?
+
+    pts = getNonCollinears(pts, 3)
+    return false if pts.empty?
+
+    OpenStudio::Plane.new(pts).outwardNormal.dot(up) > 0.99
+  end
+
+  ##
+  # Validates whether a polygon faces downwards.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] OpenStudio 3D points
+  #
+  # @return [Bool] if facing downwards
+  # @return [false] if invalid input (see logs)
+  def facingDown?(pts = nil)
+    mth = "OSut::#{__callee__}"
+    lo  = OpenStudio::Point3d.new(0,0,-1) - OpenStudio::Point3d.new(0,0,0)
+    pts = poly(pts, false, true, false)
+    return false if pts.empty?
+
+    pts = getNonCollinears(pts, 3)
+    return false if pts.empty?
+
+    OpenStudio::Plane.new(pts).outwardNormal.dot(lo) > 0.99
+  end
+
+  ##
+  # Validates whether an OpenStudio polygon is a rectangle (4x sides + 2x
+  # diagonals of equal length).
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  #
+  # @return [Bool] whether polygon is rectangular
+  # @return [false] if invalid input (see logs)
+  def rectangular?(pts = nil)
+    mth = "OSut::#{__callee__}"
+    pts = poly(pts, false, false, false)
+    return false     if pts.empty?
+    return false unless pts.size == 4
+
+    m1 = midpoint(pts[0], pts[2])
+    m2 = midpoint(pts[1], pts[3])
+    return false unless same?(m1, m2)
+
+    diag1 = pts[2] - pts[0]
+    diag2 = pts[3] - pts[1]
+    return true if (diag1.length - diag2.length).abs < TOL
+
+    false
+  end
+
+  ##
+  # Determines whether a 1st OpenStudio polygon fits in a 2nd polygon. If the
+  # optional 3rd argument is set to false, the 1st polygon may only fit if it
+  # shares the 3D plane equation of the 2nd one. If the 3rd argument instead
+  # remains true (default), then the 1st polygon is first cast onto the 3D plane
+  # of the 2nd one; the method therefore returns true if the projection of the
+  # 1st polygon fits in the 2nd one.
+  #
+  # @param p1 [Set<OpenStudio::Point3d>] 1st set of 3D points
+  # @param p2 [Set<OpenStudio::Point3d>] 2nd set of 3D points
+  # @param flat [Bool] whether to first cast the 1st set onto the 2nd set plane
   #
   # @return [Bool] whether 1st polygon fits within the 2nd polygon
   # @return [false] if invalid input (see logs)
   def fits?(p1 = nil, p2 = nil, flat = true)
     mth  = "OSut::#{__callee__}"
+    flat = true unless [true, false].include?(flat)
     p1   = poly(p1, false, true, false)
     p2   = poly(p2, false, true, false)
-    flat = true  unless [true, false].include?(flat)
-    return false     if p1.empty?
-    return false     if p2.empty?
+    return false if p1.empty?
+    return false if p2.empty?
 
     # Aligned, clockwise points using transformation from 2nd polygon.
     t  = OpenStudio::Transformation.alignFace(p2)
     p1 = poly(p1, false, false, true, t, :cw)
     p2 = poly(p2, false, false, true, t, :cw)
-    p1 = flatten(p1) if flat
-    p2 = flatten(p2) if flat
-    return false     if p1.empty?
-    return false     if p2.empty?
+    return false if p1.empty?
+    return false if p2.empty?
+
+    # If flat == false, return false unless p1 is flat.
+    if flat
+      p1 = flatten(p1)
+    else
+      return false unless xyz?(p1, :z)
+    end
 
     area1 = OpenStudio.getArea(p1)
     area2 = OpenStudio.getArea(p2)
@@ -2885,6 +3335,60 @@ module OSut
   end
 
   ##
+  # Returns largest intersection of overlapping polygons, empty if non
+  # intersecting. If the optional 3rd argument is set to false, the 2nd polygon
+  # may only overlap if it shares the 3D plane equation of the 1st one. If the
+  # 3rd argument instead remains true (default), then the 2nd polygon is first
+  # cast onto the 3D plane of the 1st one; the method therefore returns (as
+  # overlap) the intersection of a projection of the 2nd polygon onto the 1st
+  # one. The method returns the smallest of the 2 polygons if either fits within
+  # the larger one.
+  #
+  # @param p1 [Set<OpenStudio::Point3d>] 1st set of 3D points
+  # @param p2 [Set<OpenStudio::Point3d>] 2nd set of 3D points
+  # @param flat [Bool] whether to first align the 2nd set onto the 1st set plane
+  #
+  # @return [OpenStudio::Point3dVector] largest intersection (see logs if empty)
+  def overlap(p1 = nil, p2 = nil, flat = true)
+    mth  = "OSut::#{__callee__}"
+    flat = true unless [true, false].include?(flat)
+    face = OpenStudio::Point3dVector.new
+    p1   = poly(p1, false, true, false)
+    p2   = poly(p2, false, true, false)
+    return face if p1.empty?
+    return face if p2.empty?
+
+    pl1 = OpenStudio::Plane.new(getNonCollinears(p1, 3))
+    pl2 = OpenStudio::Plane.new(getNonCollinears(p2, 3))
+    n1  = pl1.outwardNormal
+    n2  = pl2.outwardNormal
+    t   = OpenStudio::Transformation.alignFace(p1)
+    a1  = poly(p1, false, false, true, t, :cw)
+    a2  = poly(p2, false, false, true, t, :cw)
+
+    # If flat == false, return face unless a2 is flat.
+    if flat
+      a2 = flatten(a2)
+    else
+      return face unless xyz?(a2, :z)
+    end
+
+    if fits?(a1, a2)
+      return p1
+    elsif fits?(a2, a1)
+      pl02 = OpenStudio::Plane.new(getNonCollinears(a2, 3))
+      n02  = pl02.outwardNormal
+      a2   = to_p3Dv(a2.to_a.reverse) if n1.dot(n02) < 0
+      return to_p3Dv(t * a2)
+    end
+
+    res = OpenStudio.intersect(a1, a2, TOL)
+    return face if res.empty?
+
+    to_p3Dv(t * res.get.polygon1.reverse)
+  end
+
+  ##
   # Determines whether OpenStudio polygons overlap.
   #
   # @param p1 [Set<OpenStudio::Point3d>] 1st set of 3D points
@@ -2894,57 +3398,57 @@ module OSut
   # @return [Bool] whether polygons overlap (or fit)
   # @return [false] if invalid input (see logs)
   def overlaps?(p1 = nil, p2 = nil, flat = true)
-    mth  = "OSut::#{__callee__}"
-    p1   = poly(p1, false, true, false)
-    p2   = poly(p2, false, true, false)
-    flat = true unless [true, false].include?(flat)
-    return false    if p1.empty?
-    return false    if p2.empty?
-
-    # Aligned, clockwise & convex points using transformation from 1st polygon.
-    t  = OpenStudio::Transformation.alignFace(p1)
-    p1 = poly(p1, false, false, true, t, :cw)
-    p2 = poly(p2, false, false, true, t, :cw)
-    p1 = flatten(p1) if flat
-    p2 = flatten(p2) if flat
-    return false     if p1.empty?
-    return false     if p2.empty?
-
-    return true if fits?(p1, p2)
-    return true if fits?(p2, p1)
-
-    area1 = OpenStudio.getArea(p1)
-    area2 = OpenStudio.getArea(p2)
-    return empty("points 1 area", mth, ERR, false) if area1.empty?
-    return empty("points 2 area", mth, ERR, false) if area2.empty?
-
-    area1 = area1.get
-    area2 = area2.get
-    union = OpenStudio.join(p1, p2, TOL2)
-    return false if union.empty?
-
-    union = union.get
-    area  = OpenStudio.getArea(union)
-    return false if area.empty?
-
-    area  = area.get
-    delta = area1 + area2 - area
-
-    if area > TOL
-      return false if (area - area1).abs < TOL
-      return false if (area - area2).abs < TOL
-      return false if delta.abs < TOL
-      return true  if delta > TOL
-    end
-
-    false
+    overlap(p1, p2, flat).empty? ? false : true
   end
 
   ##
-  # Generates offset vertices (by width) for a 3- or 4-sided, convex polygon.
+  # Casts an OpenStudio polygon onto the 3D plane of a 2nd polygon, relying on
+  # an independent 3D ray vector.
+  #
+  # @param p1 [Set<OpenStudio::Point3d>] 1st set of 3D points
+  # @param p2 [Set<OpenStudio::Point3d>] 2nd set of 3D points
+  # @param ray [OpenStudio::Vector3d] a vector
+  #
+  # @return [OpenStudio::Point3dVector] cast of p1 onto p2 (see logs if empty)
+  def cast(p1 = nil, p2 = nil, ray = nil)
+    mth  = "OSut::#{__callee__}"
+    cl   = OpenStudio::Vector3d
+    face = OpenStudio::Point3dVector.new
+    p1   = poly(p1, false, false, false)
+    p2   = poly(p2, false, false, false)
+    return face if p1.empty?
+    return face if p2.empty?
+    return mismatch("ray", ray, cl, mth) unless ray.is_a?(cl)
+
+    # From OpenStudio SDK v3.7.0 onwards, one could/should rely on:
+    #
+    # s3.amazonaws.com/openstudio-sdk-documentation/cpp/OpenStudio-3.7.0-doc/
+    # utilities/html/classopenstudio_1_1_plane.html
+    # #abc4747b1b041a7f09a6887bc0e5abce1
+    #
+    #   e.g. p1.each { |pt| face << pl.rayIntersection(pt, ray) }
+    #
+    # The following +/- replicates the same solution, based on:
+    #   https://stackoverflow.com/a/65832417
+    p0 = p2.first
+    pl = OpenStudio::Plane.new(getNonCollinears(p2, 3))
+    n  = pl.outwardNormal
+    return face if n.dot(ray).abs < TOL
+
+    p1.each do |pt|
+      length = n.dot(pt - p0) / n.dot(ray.reverseVector)
+      face << pt + scalar(ray, length)
+    end
+
+    face
+  end
+
+  ##
+  # Generates offset vertices (by width) for a 3- or 4-sided, convex polygon. If
+  # width is negative, the vertices are contracted inwards.
   #
   # @param p1 [Set<OpenStudio::Point3d>] OpenStudio 3D points
-  # @param w [#to_f] offset width (min: 0.0254m)
+  # @param w [#to_f] offset width (absolute min: 0.0254m)
   # @param v [#to_i] OpenStudio SDK version, eg '321' for "v3.2.1" (optional)
   #
   # @return [OpenStudio::Point3dVector] offset points (see logs if unaltered)
@@ -2956,14 +3460,11 @@ module OSut
     mismatch("width",   w, Numeric, mth) unless w.respond_to?(:to_f)
     mismatch("version", v, Integer, mth) unless v.respond_to?(:to_i)
 
+    iv = pts.size == 4 ? true : false
     vs = OpenStudio.openStudioVersion.split(".").join.to_i
-    iv = true   if pts.size == 4
-    v  = v.to_i if v.respond_to?(:to_i)
-    v  = -1 unless v.respond_to?(:to_i)
-    v  = vs     if v < 0
-    w  = w.to_f if w.respond_to?(:to_f)
-    w  = 0  unless w.respond_to?(:to_f)
-    w  = 0      if w < 0.0254
+    v  = v.respond_to?(:to_i) ? v.to_i : vs
+    w  = w.respond_to?(:to_f) ? w.to_f : 0
+    return p1 if w.abs < 0.0254
 
     unless v < 340
       t      = OpenStudio::Transformation.alignFace(p1)
@@ -2971,7 +3472,7 @@ module OSut
       return p1 if offset.empty?
 
       return to_p3Dv(t * offset.get.reverse)
-    else                                                 # brute force approach
+    else # brute force approach
       pz     = {}
       pz[:A] = {}
       pz[:B] = {}
@@ -3184,8 +3685,9 @@ module OSut
     bfr = 0    unless bfr.respond_to?(:to_f)
     bfr = 0        if bfr < 0.0254
     vtx = poly(a.first)
-    t   = OpenStudio::Transformation.alignFace(vtx) unless vtx.empty?
-    return out                                          if vtx.empty?
+    return out if vtx.empty?
+
+    t = OpenStudio::Transformation.alignFace(vtx)
 
     a.each do |pts|
       points = poly(pts, false, true, false, t)
@@ -3244,22 +3746,922 @@ module OSut
   end
 
   ##
-  # Returns an array of OpenStudio space-specific surfaces that match criteria,
-  # e.g. exterior, north-east facing walls in hotel "lobby". Note 'sides' rely
-  # on space coordinates (not absolute model coordinates). And 'sides' are
-  # exclusive, not inclusive (e.g. walls strictly north-facing or strictly
-  # east-facing would not be returned if 'sides' holds [:north, :east]).
+  # Generates a box from a triad (3D points). Points must be unique and
+  # non-collinear.
   #
-  # @param spaces [Array<OpenStudio::Model::Space>] target spaces
+  # @param [Set<OpenStudio::Point3d>] a triad (3D points)
+  #
+  # @return [Set<OpenStudio::Point3D>] a generated rectangle (see logs if empty)
+  def triadBox(pts = nil)
+    mth = "OSut::#{__callee__}"
+    bkp = OpenStudio::Point3dVector.new
+    box = OpenStudio::Point3dVector.new
+    pts = getNonCollinears(pts)
+    return bkp if pts.empty?
+
+    t   = xyz?(pts, :z) ? nil : OpenStudio::Transformation.alignFace(pts)
+    pts = poly(pts, false, false, false, t) if t
+    return bkp if pts.empty?
+    return invalid("triad", mth, 1, ERR, bkp) unless pts.size == 3
+
+    cw = clockwise?(pts)
+
+    p0 = pts[0]
+    p1 = pts[1]
+    p2 = pts[2]
+
+    # Cast p1 unto vertical plane defined by p1/p2.
+    pp0 = verticalPlane(p1, p2).project(p0)
+    v00 = p0  - pp0
+    v11 = pp0 - p1
+    v10 = p0  - p1
+    v12 = p2  - p1
+
+    # Reset p0 and/or p1 if obtuse or acute.
+    if v12.dot(v10) < 0
+      p0 = p1 + v00
+    elsif v12.dot(v10) > 0
+      if v11.length < v12.length
+        p1 = pp0
+      else
+        p0 = p1 + v00
+      end
+    end
+
+    p3 = p2 + v00
+
+    box << OpenStudio::Point3d.new(p0.x, p0.y, p0.z)
+    box << OpenStudio::Point3d.new(p1.x, p1.y, p1.z)
+    box << OpenStudio::Point3d.new(p2.x, p2.y, p2.z)
+    box << OpenStudio::Point3d.new(p3.x, p3.y, p3.z)
+
+    return invalid("box", mth, 0, ERR, bkp) unless rectangular?(box)
+
+    clockwise = clockwise?(box)
+
+    if cw
+      box = OpenStudio.reverse(box) unless clockwise
+    else
+      box = OpenStudio.reverse(box) if clockwise
+    end
+
+    box = ulc(box) unless cw
+    box = to_p3Dv(t * box) if t
+    box
+  end
+
+  ##
+  # Generates a box bounded within a triangle (midpoint theorem).
+  #
+  # pts [Set<OpenStudio::Point3d>] triangular polygon
+  #
+  # @return [OpenStudio::Point3dVector] medial bounded box (see logs if empty)
+  def medialBox(pts = nil)
+    mth = "OSut::#{__callee__}"
+    bkp = OpenStudio::Point3dVector.new
+    box = OpenStudio::Point3dVector.new
+    pts = poly(pts, true, true, true)
+    return bkp if pts.empty?
+    return invalid("triangle", mth, 1, ERR, bkp) unless pts.size == 3
+
+    t   = xyz?(pts, :z) ? nil : OpenStudio::Transformation.alignFace(pts)
+    pts = poly(pts, false, false, false, t) if t
+    return bkp if pts.empty?
+
+    cw = clockwise?(pts)
+
+    # Generate vertical plane along longest segment.
+    mpoints = []
+    sgs     = getSegments(pts)
+    longest = sgs.max_by { |s| OpenStudio.getDistanceSquared(s.first, s.last) }
+    plane   = verticalPlane(longest.first, longest.last)
+
+    # Fetch midpoints of other 2 segments.
+    sgs.each { |s| mpoints << midpoint(s.first, s.last) unless s == longest }
+
+    return invalid("midpoints", mth, 0, ERR, bkp) unless mpoints.size == 2
+
+    # Generate medial bounded box.
+    box << plane.project(mpoints.first)
+    box << mpoints.first
+    box << mpoints.last
+    box << plane.project(mpoints.last)
+
+    return invalid("box", mth, 0, ERR, bkp) unless rectangular?(box)
+
+    clockwise = clockwise?(box)
+
+    if cw
+      box = OpenStudio.reverse(box) unless clockwise
+    else
+      box = OpenStudio.reverse(box) if clockwise
+    end
+
+    return invalid("unfit medial", mth, 1, ERR, bkp) unless fits?(box, pts)
+
+    box = ulc(box) unless cw
+    box = to_p3Dv(t * box) if t
+    box
+  end
+
+  ##
+  # Generates a bounded box within a polygon. Returns a ULC sequence if original
+  # points are counterclockwise.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] OpenStudio 3D points
+  #
+  # @return [OpenStudio::Point3dVector] bounded box (see logs if empty)
+  def boundedBox(pts = nil)
+    str = ".*(?<!utilities.geometry.join)$"
+    OpenStudio::Logger.instance.standardOutLogger.setChannelRegex(str)
+
+    mth = "OSut::#{__callee__}"
+    bkp = OpenStudio::Point3dVector.new
+    box = OpenStudio::Point3dVector.new
+    pts = poly(pts, false, true)
+    return bkp if pts.empty?
+
+    t   = xyz?(pts, :z) ? nil : OpenStudio::Transformation.alignFace(pts)
+    pts = poly(pts, false, false, false, t) if t
+    return bkp if pts.empty?
+
+    cw = clockwise?(pts)
+
+    # PATH A : Return medial bounded box if polygon is a triangle.
+    if pts.size == 3
+      box = medialBox(pts)
+
+      unless box.empty?
+        box = ulc(box) unless cw
+        box = to_p3Dv(t * box) if t
+        return box
+      end
+    end
+
+    # PATH B : Return polygon itself if already rectangular.
+    if rectangular?(pts)
+      box = ulc(pts) unless cw
+      box = t ? to_p3Dv(t * pts) : pts
+      return box
+    end
+
+    # PATH C : Right-angle, midpoint triad approach.
+    aire = 0
+
+    getSegments(pts).each do |sg|
+      m0 = midpoint(sg.first, sg.last)
+
+      getSegments(pts).each do |seg|
+        p1 = seg.first
+        p2 = seg.last
+        next if same?(p1, sg.first)
+        next if same?(p1, sg.last)
+        next if same?(p2, sg.first)
+        next if same?(p2, sg.first)
+
+        out = triadBox(OpenStudio::Point3dVector.new([m0, p1, p2]))
+        next if out.empty?
+        next unless fits?(out, pts, false)
+
+        area = OpenStudio.getArea(out)
+        next if area.empty?
+
+        area = area.get
+        next if area < TOL
+        next if area < aire
+
+        aire = area
+        box  = out
+      end
+    end
+
+    # PATH D : Right-angle triad approach, may override PATH C boxes.
+    getSegments(pts).each do |sg|
+      p0 = sg.first
+      p1 = sg.last
+
+      pts.each do |p2|
+        next if same?(p2, p0)
+        next if same?(p2, p1)
+
+        out = triadBox(OpenStudio::Point3dVector.new([p0, p1, p2]))
+        next if out.empty?
+        next unless fits?(out, pts, false)
+
+        area = OpenStudio.getArea(out)
+        next if area.empty?
+
+        area = area.get
+        next if area < TOL
+        next if area < aire
+
+        aire = area
+        box  = out
+      end
+    end
+
+    unless aire < TOL
+      box = ulc(box) unless cw
+      box = to_p3Dv(t * box) if t
+      return box
+    end
+
+    # PATH E : Medial box, segment approach.
+    aire = 0
+
+    getSegments(pts).each do |sg|
+      p0 = sg.first
+      p1 = sg.last
+
+      pts.each do |p2|
+        next if same?(p2, p0)
+        next if same?(p2, p1)
+
+        out = medialBox(OpenStudio::Point3dVector.new(p0, p1, p2))
+        next if out.empty?
+        next unless fits?(out, pts, false)
+
+        area = OpenStudio.getArea(box)
+        next if area.empty?
+
+        area = area.get
+        next if area < TOL
+        next if area < aire
+
+        aire = area
+        box  = out
+      end
+    end
+
+    unless aire < TOL
+      box = ulc(box) unless cw
+      box = to_p3Dv(t * box) if t
+      return box
+    end
+
+    # PATH F : Medial box, triad approach.
+    aire = 0
+
+    getTriads(pts).each do |sg|
+      p0 = sg[0]
+      p1 = sg[1]
+      p2 = sg[2]
+
+      out = medialBox(OpenStudio::Point3dVector.new(p0, p1, p2))
+      next if out.empty?
+      next unless fits?(out, pts, false)
+
+      area = OpenStudio.getArea(box)
+      next if area.empty?
+
+      area = area.get
+      next if area < TOL
+      next if area < aire
+
+      aire = area
+      box  = out
+    end
+
+    unless aire < TOL
+      box = ulc(box) unless cw
+      box = to_p3Dv(t * box) if t
+      return box
+    end
+
+    # PATH G : Medial box, triangulated approach.
+    aire  = 0
+    outer = poly(pts, false, true, true, false, :cw)
+    holes = OpenStudio::Point3dVectorVector.new
+
+    OpenStudio.computeTriangulation(outer, holes).each do |triangle|
+      getSegments(triangle).each do |sg|
+        p0 = sg.first
+        p1 = sg.last
+
+        pts.each do |p2|
+          next if same?(p2, p0)
+          next if same?(p2, p1)
+
+          out = medialBox(OpenStudio::Point3dVector.new(p0, p1, p2))
+          next if out.empty?
+          next unless fits?(out, pts, false)
+
+          area = OpenStudio.getArea(out)
+          next if area.empty?
+
+          area = area.get
+          next if area < TOL
+          next if area < aire
+
+          aire = area
+          box  = out
+        end
+      end
+    end
+
+    return bkp if aire < TOL
+
+    clockwise = clockwise?(box)
+
+    if cw
+      box = OpenStudio.reverse(box) unless clockwise
+    else
+      box = OpenStudio.reverse(box) if clockwise
+    end
+
+    box = ulc(box) unless cw
+    box = to_p3Dv(t * box) if t
+    box
+  end
+
+  ##
+  # Generates re-'aligned' polygon vertices wrt main axis of symmetry of its
+  # largest bounded box. A Hash is returned with 6x key:value pairs ...
+  # set: realigned (cloned) polygon vertices, box: its bounded box (wrt to :set),
+  # bbox: its bounding box, t: its translation transformation, r: its rotation
+  # transformation, and o: the origin coordinates of its axis of rotation. First,
+  # cloned polygon vertices are rotated so the longest axis of symmetry of its
+  # bounded box lies parallel to the X-axis; :o being the midpoint of the narrow
+  # side (of the bounded box) nearest to grid origin (0,0,0). Once rotated,
+  # polygon vertices are then translated as to ensure one or more vertices are
+  # aligned along the X-axis and one or more vertices are aligned along the
+  # Y-axis (no vertices with negative X or Y coordinate values). To unalign the
+  # returned set of vertices (or its bounded box, or its bounding box), first
+  # inverse the translation transformation, then inverse the rotation
+  # transformation.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] OpenStudio 3D points
+  #
+  # @return [Hash] :set, :box, :bbox, :t, :r & :o
+  # @return [Hash] :set, :box, :bbox, :t, :r & :o (nil) if invalid (see logs)
+  def getRealignedFace(pts = nil)
+    mth = "OSut::#{__callee__}"
+    out = { set: nil, box: nil, bbox: nil, t: nil, r: nil, o: nil }
+    pts = poly(pts, false, true)
+    return out if pts.empty?
+    return invalid("aligned plane", mth, 1, DBG, out) unless xyz?(pts, :z)
+
+    cw   = clockwise?(pts)
+    w    = width(pts)
+    h    = height(pts)
+    d    = h > w ? h : w
+    box  = boundedBox(pts)
+    return invalid("bounded box" , mth, 0, DBG, out) if box.empty?
+
+    s = getSegments(box)
+    return invalid("bounded box segments", mth, 0, DBG, out) if s.empty?
+
+    i        = ((s[0][1] - s[0][0]).length < (s[1][1] - s[1][0]).length) ? 0 : 1
+    k        = i + 2
+    mid0     = midpoint(s[i][0], s[i][1])
+    mid1     = midpoint(s[k][0], s[k][1])
+    o        = OpenStudio::Point3d.new(0, 0, 0)
+    origin   = ((o - mid0).length < (o - mid1).length) ? mid0 : mid1
+    terminal = ((o - mid0).length < (o - mid1).length) ? mid1 : mid0
+    seg      = terminal - origin
+    right    = OpenStudio::Point3d.new(origin.x + d, origin.y    , 0) - origin
+    north    = OpenStudio::Point3d.new(origin.x,     origin.y + d, 0) - origin
+    axis     = OpenStudio::Point3d.new(origin.x,     origin.y    , d) - origin
+    angle    = OpenStudio::getAngle(right, seg)
+    angle    = -angle if north.dot(seg) < 0
+    r        = OpenStudio.createRotation(origin, axis, angle)
+    pts      = poly(r.inverse * pts)
+    box      = poly(r.inverse * box)
+    dX       = pts.min_by(&:x).x
+    dY       = pts.min_by(&:y).y
+    xy       = OpenStudio::Point3d.new(origin.x + dX, origin.y + dY, 0)
+    origin2  = xy - origin
+    t        = OpenStudio.createTranslation(origin2)
+    set      = poly(t.inverse * pts)
+    box      = poly(t.inverse * box, false, false, false, false, :ulc)
+    bbox     = outline([set])
+    clckwise = clockwise?(bbox)
+
+    if cw
+      bbox = OpenStudio.reverse(bbox) unless clckwise
+    else
+      bbox = OpenStudio.reverse(bbox) if clckwise
+    end
+
+    out[:set ] = set
+    out[:box ] = box
+    out[:bbox] = bbox
+    out[:t   ] = t
+    out[:r   ] = r
+    out[:o   ] = origin
+
+    out
+  end
+
+  ##
+  # Returns 'width' of a set of OpenStudio 3D points, once re/aligned.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points, once re/aligned
+  #
+  # @return [Float] width along X-axis, once re/aligned
+  # @return [0.0] if invalid inputs
+  def alignedWidth(pts = nil)
+    pts = poly(pts, false, true, true, true)
+    return 0 if pts.size < 2
+
+    pts = getRealignedFace(pts)[:set]
+    return 0 if pts.size < 2
+
+    pts.max_by(&:x).x - pts.min_by(&:x).x
+  end
+
+  ##
+  # Returns 'height' of a set of OpenStudio 3D points, once re/aligned.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points, once re/aligned
+  #
+  # @return [Float] height along Y-axis, once re/aligned
+  # @return [0.0] if invalid inputs
+  def alignedHeight(pts = nil)
+    pts   = pts = poly(pts, false, true, true, true)
+    return 0 if pts.size < 2
+
+    pts = getRealignedFace(pts)[:set]
+    return 0 if pts.size < 2
+
+    pts.max_by(&:y).y - pts.min_by(&:y).y
+  end
+
+  ##
+  # Generates leader line anchors, linking polygon vertices to one or more sets
+  # (Hashes) of sequenced vertices. By default, the method seeks to link set
+  # :vtx (key) vertices (users can select another collection of vertices, e.g.
+  # tag == :box). The method does not validate individual sets of vertices (e.g.
+  # non-coplanarity, self-intersecting, inter-set conflicts). Potential leader
+  # lines cannot intersect each other, other 'tagged' set vertices or original
+  # polygon edges. For highly-articulated cases (e.g. a narrow polygon with
+  # multiple concavities, holding multiple sets), such leader line conflicts
+  # will undoubtedly occur. The method relies on a 'first-come-first-served'
+  # approach: sets without leader lines are ignored (check for set :void keys,
+  # see error logs). It is recommended to sort sets prior to calling the method.
+  #
+  # @param s [Set<OpenStudio::Point3d>] a larger (parent) set of points
+  # @param [Array<Hash>] set a collection of sequenced vertices
+  # @option [Symbol] tag sequence of set vertices to target
+  #
+  # @return [Integer] number of successfully-generated anchors (check logs)
+  def genAnchors(s = nil, set = [], tag = :vtx)
+    mth = "OSut::#{__callee__}"
+    id  = s.respond_to?(:nameString) ? "#{s.nameString}: " : ""
+    f   = false
+    pts = poly(s, f, f, f)
+    n   = 0
+    return n if pts.empty?
+    return mismatch("set", set, Array, mth, DBG, n) unless set.respond_to?(:to_a)
+
+    set = set.to_a
+    t   = OpenStudio::Transformation.alignFace(pts)
+    pts = t.inverse * pts
+
+    # Validate individual sets. Purge surface-specific leader line anchors.
+    set.each_with_index do |st, i|
+      str = id + "set ##{i+1}"
+      return mismatch(str, st, Hash,  mth, DBG, a) unless st.respond_to?(:key?)
+      return hashkey( str, st,  tag,  mth, DBG, a) unless st.key?(tag)
+      return empty("#{str} vertices", mth, DBG, a) if st[tag].empty?
+
+      if st.key?(:ld)
+        ld = st[:ld]
+        return invalid("#{id} leaders", mth, 0, DBG, a) unless ld.is_a?(Hash)
+
+        ld.reject! { |k, _| k == s }
+      else
+        st[:ld] = {}
+      end
+    end
+
+    # Set leader lines anchors.
+    pts.each_with_index do |pt, k|
+      set.each_with_index do |st, i|
+        next if st[:ld].key?(s)
+
+        p1 = (t.inverse * st[tag]).first
+        ld = [pt, p1]
+        nb = 0
+
+        # Check for intersections between leader line and polygon edges.
+        getSegments(pts).each do |sg|
+          next unless nb.zero?
+          next if holds?(sg, pt)
+
+          nb += 1 unless getLineIntersection(sg, ld).nil?
+        end
+
+        next unless nb.zero?
+
+        # Check for intersections between candidate leader line and other sets.
+        set.each_with_index do |other, j|
+          next unless nb.zero?
+          next if i == j
+
+          sgj = getSegments(t.inverse * other[tag])
+          sgj.each { |sg| nb += 1 if lineIntersects?(ld, sg) }
+        end
+
+        next unless nb.zero?
+
+        # ... and previous leader lines (first come, first serve basis).
+        set.each_with_index do |other, j|
+          next unless nb.zero?
+          next if i == j
+          next unless other[:ld].key?(s)
+
+          pj  = other[tag].first
+          ldj = [ other[:ld][s], pj ]
+          nb += 1 if lineIntersects?(ld, t.inverse * ldj)
+        end
+
+        next unless nb.zero?
+
+        # Finally, check for self-intersections.
+        getSegments(t.inverse * st[tag]).each do |sg|
+          next unless nb.zero?
+          next if holds?(sg, p1)
+
+          nb += 1 unless getLineIntersection(sg, ld).nil?
+        end
+
+        # Only consider sets with valid leader line anchor points.
+        if nb.zero?
+          st[:ld][s] = t * pt
+          n += 1
+        end
+      end
+    end
+
+    # Log unsuccessful attempts.
+    set.each_with_index do |st, i|
+      unless st[:ld].key?(s)
+        str = id + "set ##{i+1}"
+        log(ERR, "#{str}: unable to anchor leader line (#{mth})")
+        st[:void] = true
+      end
+    end
+
+    n
+  end
+
+  ##
+  # Generates extended polygon vertices to circumscribe one or more sets
+  # (Hashes) of sequenced vertices. The method neither alters the original
+  # polygon vertices, nor validates individual sets of vertices (e.g.
+  # non-coplanarity, self-intersecting, inter-set conflicts). Valid leader line
+  # anchors (set key :ld) need to be generated prior to calling the method (see
+  # genAnchors). By default, the method seeks to link leader line anchors to
+  # set :vtx (key) vertices (users can select another collection of vertices,
+  # e.g. tag == :box).
+  #
+  # @param s [Set<OpenStudio::Point3d>] a larger (parent) set of points
+  # @param [Array<Hash>] set a collection of sequenced vertices
+  # @option set [Hash] :ld a collection of polygon-specific leader line anchors
+  # @option [Symbol] tag sequence of set vertices to target
+  #
+  # @return [OpenStudio::Point3dVector] extended vertices (see logs if empty)
+  def genExtendedVertices(s = nil, set = [], tag = :vtx)
+    mth = "OSut::#{__callee__}"
+    id  = s.respond_to?(:nameString) ? "#{s.nameString}: " : ""
+    f   = false
+    pts = poly(s, f, f, f)
+    cl  = OpenStudio::Point3d
+    a   = OpenStudio::Point3dVector.new
+    v   = []
+    return a if pts.empty?
+    return mismatch("set", set, Array, mth, DBG, a) unless set.respond_to?(:to_a)
+
+    set = set.to_a
+    t   = OpenStudio::Transformation.alignFace(pts)
+
+    # Validate individual sets.
+    set.each_with_index do |st, i|
+      str = id + "set ##{i+1}"
+      return mismatch(str, st, Hash, mth, DBG, a) unless st.respond_to?(:key?)
+      return hashkey( str, st,  :ld, mth, DBG, a) unless st.key?(:ld)
+
+      ld = st[:ld]
+      return mismatch(str, ld,  Hash, mth, DBG, a) unless ld.is_a?(Hash)
+      return hashkey( str, ld,     s, mth, DBG, a) unless ld.key?(s)
+      return mismatch(str, ld[s], cl, mth, DBG, a) unless ld[s].is_a?(cl)
+    end
+
+    # Re-sequence polygon vertices.
+    t.inverse * pts.each do |pt|
+      v << pt
+
+      # Loop through each valid set; concatenate circumscribing vertices.
+      set.each do |st|
+        next unless st.key?(:ld)
+        next unless st[:ld].key?(s)
+        next unless same?(st[:ld][s], pt)
+        next unless st.key?(tag)
+
+        v += st[tag].to_a
+        v << pt
+      end
+    end
+
+    to_p3Dv(v)
+  end
+
+  ##
+  # Generates arrays of rectangular polygon inserts within a larger polygon. If
+  # successful, each set inherits additional key:value pairs: namely :vtx
+  # (subset of polygon circumscribing vertices), and :vts (collection of
+  # indivudual polygon insert vertices). Valid leader line anchors (set key :ld)
+  # need to be generated prior to calling the method (see genAnchors, and
+  # genExtendedvertices).
+  #
+  # @param s [Set<OpenStudio::Point3d>] a larger polygon
+  # @param [Array<Hash>] set a collection of polygon insert instructions
+  # @option set [Set<OpenStudio::Point3d>] :box bounding box of each collection
+  # @option set [Hash] :ld a collection of polygon-specific leader line anchors
+  # @option set [Integer] :rows (1) number of rows of inserts
+  # @option set [Integer] :cols (1) number of columns of inserts
+  # @option set [Numeric] :w0 (1.4) width of individual inserts (wrt cols) min 0.4
+  # @option set [Numeric] :d0 (1.4) depth of individual inserts (wrt rows) min 0.4
+  # @option set [Numeric] :dX (0) optional left/right X-axis buffer
+  # @option set [Numeric] :dY (0) optional top/bottom Y-axis buffer
+  #
+  # @return [OpenStudio::Point3dVector] new polygon vertices (see logs if empty)
+  def genInserts(s = nil, set = [])
+    mth = "OSut::#{__callee__}"
+    id  = s.respond_to?(:nameString) ? "#{s.nameString}:" : ""
+    f   = false
+    pts = poly(s)
+    cl  = OpenStudio::Point3d
+    a   = OpenStudio::Point3dVector.new
+    return a if pts.empty?
+    return mismatch("set", set, Array, mth, DBG, a) unless set.respond_to?(:to_a)
+
+    set  = set.to_a
+    gap  = 0.1
+    gap4 = 0.4 # minimum insert width/depth
+
+    # Validate/reset individual set collections.
+    set.each_with_index do |st, i|
+      str1 = id + "set ##{i+1}"
+      return mismatch(str1, st, Hash, mth, DBG, a) unless st.respond_to?(:key?)
+      return hashkey( str1, st, :box, mth, DBG, a) unless st.key?(:box)
+      return hashkey( str1, st,  :ld, mth, DBG, a) unless st.key?(:ld)
+
+      str2 = str1 + " anchor"
+      ld = st[:ld]
+      return mismatch(str2, ld,  Hash, mth, DBG, a) unless ld.respond_to?(:key?)
+      return hashkey( str2, ld,     s, mth, DBG, a) unless ld.key?(s)
+      return mismatch(str2, ld[s], cl, mth, DBG, a) unless ld[s].is_a?(cl)
+
+      bx = poly(st[:box], true, true)
+      return invalid("#{str1} box",       mth, 0, DBG, a)     if bx.empty?
+      return invalid("#{str1} rectangle", mth, 0, DBG, a) unless rectangular?(bx)
+
+      # Ensure each set bounding box is safely within larger polygon boundaries.
+      # TO DO: In line with related addSkylights "TO DO", expand method to
+      #        safely handle 'side' cutouts (i.e. no need for leader lines). In
+      #        so doing, boxes could eventually align along surface edges.
+      bx.each do |pt|
+        unless pointWithinPolygon?(pt, s)
+          return invalid("#{id} point", mth, 0, DBG, a)
+        end
+      end
+
+      if st.key?(:rows)
+        rws = st[:rows]
+        return invalid("#{id} rows", mth, 0, DBG, a) unless rws.is_a?(Integer)
+        return zero(   "#{id} rows", mth,    DBG, a)     if rws < 1
+      else
+        st[:rows] = 1
+      end
+
+      if st.key?(:cols)
+        cls = st[:cols]
+        return invalid("#{id} cols", mth, 0, DBG, a) unless cls.is_a?(Integer)
+        return zero(   "#{id} cols", mth,    DBG, a)     if cls < 1
+      else
+        st[:cols] = 1
+      end
+
+      if st.key?(:w0)
+        w0 = st[:w0]
+        return invalid("#{id} width", mth, 0, DBG, a) unless w0.is_a?(Numeric)
+
+        w0 = w0.to_f
+        return zero("#{id} width", mth, DBG, a) if w0.round(2) < gap4
+      else
+        st[:w0] = 1.4
+      end
+
+      if st.key?(:d0)
+        d0 = st[:d0]
+        return invalid("#{id} depth", mth, 0, DBG, a) unless d0.is_a?(Numeric)
+
+        d0 = d0.to_f
+        return zero("#{id} depth", mth, DBG, a) if d0.round(2) < gap4
+      else
+        st[:d0] = 1.4
+      end
+
+      if st.key?(:dX)
+        dX = st[:dX]
+        return invalid( "#{id} dX", mth, 0, DBG, a) unless dX.is_a?(Numeric)
+      else
+        st[:dX] = nil
+      end
+
+      if st.key?(:dY)
+        dY = st[:dY]
+        return invalid( "#{id} dY", mth, 0, DBG, a) unless dY.is_a?(Numeric)
+      else
+        st[:dY] = nil
+      end
+    end
+
+    # Flag conflicts between set bounding boxes. TO DO: ease up for ridges.
+    set.each_with_index do |st, i|
+      str = id + "set ##{i+1}"
+      bx  = st[:box]
+
+      set.each_with_index do |other, j|
+        next if i == j
+
+        bx2 = other[:box]
+        sgs = getSegments(bx2)
+
+        bx.each do |pt|
+          if pointAlongSegments?(pt, getSegments(bx2))
+            return invalid("#{str} collinear point", mth, 0, DBG, a)
+          end
+
+          if pointWithinPolygon?(pt, bx2)
+            return invalid("#{str} overlapping point", mth, 0, DBG, a)
+          end
+        end
+      end
+    end
+
+    t   = OpenStudio::Transformation.alignFace(pts)
+    pts = poly(pts, f, f, f, t)
+    sgs = getSegments(pts)
+
+    set.each do |st|
+      bx = t.inverse * poly(st[:box])
+
+      out = getRealignedFace(bx)
+      next unless out[:set]
+
+      # Overwrite original box vertex sequence ... redundant?
+      st[:out] = out
+      st[:bx ] = out[:r] * (out[:t] * out[:set])
+      st[:box] = t * st[:bx]
+    end
+
+    # Loop through each 'valid' set (i.e. linking a valid leader line anchor),
+    # generate set vertex array based on user-provided specs. Reset BLC vertex
+    # coordinates once completed.
+    set.each_with_index do |st, i|
+      str = id + "set ##{i+1}"
+      next unless st.key?(:out)
+
+      vts  = {} # collection of individual (named) polygon insert vertices
+      vtx  = [] # sequence of circumscribing polygon vertices
+      o    = st[:out]
+      bx   = o[:set]
+      w    = width(bx)  # overall sandbox width
+      d    = height(bx) # overall sandbox depth
+      dX   = st[:dX  ]  # left/right buffer (array vs bx)
+      dY   = st[:dY  ]  # top/bottom buffer (array vs bx)
+      cols = st[:cols]  # number of array columns
+      rows = st[:rows]  # number of array rows
+      x    = st[:w0  ]  # width of individual insert
+      y    = st[:d0  ]  # depth of indivual insert
+      gX   = 0          # gap between insert columns
+      gY   = 0          # gap between insert rows
+
+      # Gap between insert columns.
+      if cols > 1
+        dX = ( (w - cols * x) / cols) / 2 unless dX
+        gX = (w - 2 * dX - cols * x) / (cols - 1)
+        gX = gap if gX.round(2) < gap
+        dX = (w - cols * x - (cols - 1) * gX) / 2
+      else
+        dX = (w - x) / 2
+      end
+
+      if dX.round(2) < 0
+        log(ERR, "Skipping #{str}: Negative dX {#{mth}}")
+        next
+      end
+
+      # Gap between insert rows.
+      if rows > 1
+        dY = ( (d - rows * y) / rows) / 2 unless dY
+        gY = (d - 2 * dY - rows * y) / (rows - 1)
+        gY = gap if gY.round(2) < gap
+        dY = (d - rows * y - (rows - 1) * gY) / 2
+      else
+        dY = (d - y) / 2
+      end
+
+      if dY.round(2) < 0
+        log(ERR, "Skipping #{str}: Negative dY {#{mth}}")
+        next
+      end
+
+      st[:dX] = dX
+      st[:gX] = gX
+      st[:dY] = dY
+      st[:gY] = gY
+
+      x0 = bx.min_by(&:x).x + dX # X-axis starting point
+      y0 = bx.min_by(&:y).y + dY # X-axis starting point
+      xC = x0                    # current X-axis position
+      yC = y0                    # current Y-axis position
+
+      # BLC of array.
+      vtx << OpenStudio::Point3d.new(xC, yC, 0)
+
+      # Move up incrementally along left side of sandbox.
+      rows.times.each do |iY|
+        unless iY.zero?
+          yC += gY
+          vtx << OpenStudio::Point3d.new(xC, yC, 0)
+        end
+
+        yC += y
+        vtx << OpenStudio::Point3d.new(xC, yC, 0)
+      end
+
+      # Loop through each row: left-to-right, then right-to-left.
+      rows.times.each do |iY|
+        (cols - 1).times.each do |iX|
+          xC += x
+          vtx << OpenStudio::Point3d.new(xC, yC, 0)
+
+          xC += gX
+          vtx << OpenStudio::Point3d.new(xC, yC, 0)
+        end
+
+        # Generate individual polygon inserts, left-to-right.
+        cols.times.each do |iX|
+          nom  = "#{i}:#{iX}:#{iY}"
+          vec  = []
+          vec << OpenStudio::Point3d.new(xC    , yC    , 0)
+          vec << OpenStudio::Point3d.new(xC    , yC - y, 0)
+          vec << OpenStudio::Point3d.new(xC + x, yC - y, 0)
+          vec << OpenStudio::Point3d.new(xC + x, yC    , 0)
+
+          # Store.
+          vertices = o[:r] * (o[:t] * vec)
+          vts[nom] = to_p3Dv(t * vertices)
+
+          # Add reverse vertices, circumscribing each insert.
+          vec.reverse!
+          vec.pop if iX == cols - 1
+          vtx += vec
+
+          xC -= gX + x unless iX == cols - 1
+        end
+
+        unless iY == rows - 1
+          yC -= gY + y
+          vtx << OpenStudio::Point3d.new(xC, yC, 0)
+        end
+      end
+
+      vtx = o[:r] * (o[:t] * vtx)
+      vtx = to_p3Dv(t * vtx)
+
+      st[:vts] = vts
+      st[:vtx] = vtx
+    end
+
+    # Extended vertex sequence of the larger polygon.
+    genExtendedVertices(s, set)
+  end
+
+  ##
+  # Returns an array of OpenStudio space surfaces or subsurfaces that match
+  # criteria, e.g. exterior, north-east facing walls in hotel "lobby". Note that
+  # 'sides' rely on space coordinates (not absolute model coordinates). Also,
+  # 'sides' are exclusive (not inclusive), e.g. walls strictly north-facing or
+  # strictly east-facing would not be returned if 'sides' holds [:north, :east].
+  #
+  # @param spaces [Set<OpenStudio::Model::Space>] target spaces
   # @param boundary [#to_s] OpenStudio outside boundary condition
-  # @param type [#to_s] OpenStudio surface type
-  # @param sides [Array<Symbols>] direction keys, e.g. :north (see OSut::SIDZ)
+  # @param type [#to_s] OpenStudio surface (or subsurface) type
+  # @param sides [Set<Symbols>] direction keys, e.g. :north (see OSut::SIDZ)
   #
-  # @return [Array<OpenStudio::Model::Surface>] surfaces (may be empty)
+  # @return [Array<OpenStudio::Model::Surface>] surfaces (may be empty, no logs)
   def facets(spaces = [], boundary = "Outdoors", type = "Wall", sides = [])
-    return [] unless spaces.respond_to?(:&)
-    return [] unless sides.respond_to?(:&)
-    return []     if sides.empty?
+    spaces = spaces.is_a?(OpenStudio::Model::Space) ? [spaces] : spaces
+    spaces = spaces.respond_to?(:to_a) ? spaces.to_a : []
+    return [] if spaces.empty?
+
+    sides = sides.respond_to?(:to_sym) ? [sides] : sides
+    sides = sides.respond_to?(:to_a) ? sides.to_a : []
 
     faces    = []
     boundary = trim(boundary).downcase
@@ -3267,9 +4669,12 @@ module OSut
     return [] if boundary.empty?
     return [] if type.empty?
 
-    # Keep valid sides.
-    sides = sides.select { |side| SIDZ.include?(side) }
-    return [] if sides.empty?
+    # Filter sides. If sides is initially empty, return all surfaces of matching
+    # type and outside boundary condition.
+    unless sides.empty?
+      sides = sides.select { |side| SIDZ.include?(side) }
+      return [] if sides.empty?
+    end
 
     spaces.each do |space|
       return [] unless space.respond_to?(:setSpaceType)
@@ -3278,15 +4683,46 @@ module OSut
         next unless s.outsideBoundaryCondition.downcase == boundary
         next unless s.surfaceType.downcase == type
 
-        orientations = []
-        orientations << :top    if s.outwardNormal.z >  TOL
-        orientations << :bottom if s.outwardNormal.z < -TOL
-        orientations << :north  if s.outwardNormal.y >  TOL
-        orientations << :east   if s.outwardNormal.x >  TOL
-        orientations << :south  if s.outwardNormal.y < -TOL
-        orientations << :west   if s.outwardNormal.x < -TOL
+        if sides.empty?
+          faces << s
+        else
+          orientations = []
+          orientations << :top    if s.outwardNormal.z >  TOL
+          orientations << :bottom if s.outwardNormal.z < -TOL
+          orientations << :north  if s.outwardNormal.y >  TOL
+          orientations << :east   if s.outwardNormal.x >  TOL
+          orientations << :south  if s.outwardNormal.y < -TOL
+          orientations << :west   if s.outwardNormal.x < -TOL
 
-        faces << s if sides.all? { |o| orientations.include?(o) }
+          faces << s if sides.all? { |o| orientations.include?(o) }
+        end
+      end
+    end
+
+    # SubSurfaces?
+    spaces.each do |space|
+      break unless faces.empty?
+
+      space.surfaces.each do |s|
+        next unless s.outsideBoundaryCondition.downcase == boundary
+
+        s.subSurfaces.each do |sub|
+          next unless sub.subSurfaceType.downcase == type
+
+          if sides.empty?
+            faces << sub
+          else
+            orientations = []
+            orientations << :top    if sub.outwardNormal.z >  TOL
+            orientations << :bottom if sub.outwardNormal.z < -TOL
+            orientations << :north  if sub.outwardNormal.y >  TOL
+            orientations << :east   if sub.outwardNormal.x >  TOL
+            orientations << :south  if sub.outwardNormal.y < -TOL
+            orientations << :west   if sub.outwardNormal.x < -TOL
+
+            faces << sub if sides.all? { |o| orientations.include?(o) }
+          end
+        end
       end
     end
 
@@ -3383,51 +4819,102 @@ module OSut
   end
 
   ##
-  # Returns outdoor-facing, space-(related) roof/ceiling surfaces. These
-  # include outdoor-facing roof/ceilings of the space per se, as well as
-  # any outside-facing roof/ceiling surface of an unoccupied space
-  # immediately above (e.g. a plenum) overlapping any of the roof/ceilings
-  # of the space itself.
+  # Returns outdoor-facing, space-related roof surfaces. These include
+  # outdoor-facing roofs of each space per se, as well as any outdoor-facing
+  # roof surface of unoccupied spaces immediately above (e.g. plenums, attics)
+  # overlapping any of the ceiling surfaces of each space.
   #
-  # @param space [OpenStudio::Model::Space] a space
+  # @param spaces [Set<OpenStudio::Model::Space>] target spaces
   #
-  # @return [Array<OpenStudio::Model::Surface>] surfaces (see logs if empty)
-  def getRoofs(space = nil)
-    mth = "OSut::#{__callee__}"
-    cl  = OpenStudio::Model::Space
-    return mismatch("space", space, cl, mth, DBG, []) unless space.is_a?(cl)
+  # @return [Array<OpenStudio::Model::Surface>] roofs (may be empty)
+  def getRoofs(spaces = [])
+    mth    = "OSut::#{__callee__}"
+    up     = OpenStudio::Point3d.new(0,0,1) - OpenStudio::Point3d.new(0,0,0)
+    roofs  = []
+    spaces = spaces.is_a?(OpenStudio::Model::Space) ? [spaces] : spaces
+    spaces = spaces.respond_to?(:to_a) ? spaces.to_a : []
 
-    roofs = space.surfaces # outdoor-facing roofs of the space
-    clngs = space.surfaces # surface-facing ceilings of the space
+    spaces = spaces.select { |space| space.is_a?(OpenStudio::Model::Space) }
 
-    roofs = roofs.select {|s| s.surfaceType.downcase == "roofceiling"}
-    roofs = roofs.select {|s| s.outsideBoundaryCondition.downcase == "outdoors"}
+    # Space-specific outdoor-facing roof surfaces.
+    roofs = facets(spaces, "Outdoors", "RoofCeiling")
 
-    clngs = clngs.select {|s| s.surfaceType.downcase == "roofceiling"}
-    clngs = clngs.select {|s| s.outsideBoundaryCondition.downcase == "surface"}
+    # Outdoor-facing roof surfaces of unoccupied plenums or attics above?
+    spaces.each do |space|
+      # When multiple spaces are involved (e.g. plenums, attics), the target
+      # space may not share the same local transformation as the space(s) above.
+      # Fetching local transformation.
+      t0 = transforms(space)
+      next unless t0[:t]
 
-    clngs.each do |ceiling|
-      floor = ceiling.adjacentSurface
-      next if floor.empty?
+      t0 = t0[:t]
 
-      other = floor.get.space
-      next if other.empty?
+      facets(space, "Surface", "RoofCeiling").each do |ceiling|
+        cv0 = t0 * ceiling.vertices
 
-      rufs = other.get.surfaces
+        floor = ceiling.adjacentSurface
+        next if floor.empty?
 
-      rufs = rufs.select {|s| s.surfaceType.downcase == "roofceiling"}
-      rufs = rufs.select {|s| s.outsideBoundaryCondition.downcase == "outdoors"}
-      next if rufs.empty?
+        other = floor.get.space
+        next if other.empty?
 
-      # Only keep track of "other" roof(s) that "overlap" ceiling below.
-      rufs.each do |ruf|
-        next unless overlaps?(ceiling, ruf)
+        other = other.get
+        next if other.partofTotalFloorArea
 
-        roofs << ruf unless roofs.include?(ruf)
+        ti = transforms(other)
+        next unless ti[:t]
+
+        ti = ti[:t]
+
+        # TO DO: recursive call for stacked spaces as atria (via AirBoundaries).
+        facets(other, "Outdoors", "RoofCeiling").each do |ruf|
+          rvi = ti * ruf.vertices
+          cst = cast(cv0, rvi, up)
+          next unless overlaps?(cst, rvi, false)
+
+          roofs << ruf unless roofs.include?(ruf)
+        end
       end
     end
 
     roofs
+  end
+
+  ##
+  # Validates whether space has outdoor-facing surfaces with fenestration.
+  #
+  # @param space [OpenStudio::Model::Space] a space
+  # @param sidelit [Bool] whether to check for sidelighting, e.g. windows
+  # @param toplit [Bool] whether to check for toplighting, e.g. skylights
+  # @param baselit [Bool] whether to check for baselighting, e.g. glazed floors
+  #
+  # @return [Bool] whether space is daylit
+  # @return [false] if invalid input (see logs)
+  def daylit?(space = nil, sidelit = true, toplit = true, baselit = true)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::Space
+    ck1 = space.is_a?(cl)
+    ck2 = [true, false].include?(sidelit)
+    ck3 = [true, false].include?(toplit)
+    ck4 = [true, false].include?(baselit)
+    return mismatch("space", space, cl, mth,    DBG, false) unless ck1
+    return invalid("sidelit"          , mth, 2, DBG, false) unless ck2
+    return invalid("toplit"           , mth, 3, DBG, false) unless ck3
+    return invalid("baselit"          , mth, 4, DBG, false) unless ck4
+
+    walls  = sidelit ? facets(space, "Outdoors", "Wall")        : []
+    roofs  =  toplit ? facets(space, "Outdoors", "RoofCeiling") : []
+    floors = baselit ? facets(space, "Outdoors", "Floor")       : []
+
+    (walls + roofs + floors).each do |surface|
+      surface.subSurfaces.each do |sub|
+        # All fenestrated subsurface types are considered, as user can set these
+        # explicitely (e.g. skylight in a wall) in OpenStudio.
+        return true if fenestration?(sub)
+      end
+    end
+
+    false
   end
 
   ##
@@ -3487,10 +4974,10 @@ module OSut
     # Ensure minimum safety buffer.
     if bfr.respond_to?(:to_f)
       bfr = bfr.to_f
-      return negative("safety buffer", mth, ERR, no) if bfr < 0
+      return negative("safety buffer", mth, ERR, no) if bfr.round(2) < 0
 
       msg = "Safety buffer < 5mm may generate invalid geometry (#{mth})"
-      log(WRN, msg) if bfr < 0.005
+      log(WRN, msg) if bfr.round(2) < 0.005
     else
       log(ERR, "Setting safety buffer to 5mm (#{mth})")
       bfr = 0.005
@@ -3511,9 +4998,19 @@ module OSut
     stype = s.surfaceType # Wall, RoofCeiling or Floor
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    t     = OpenStudio::Transformation.alignFace(s.vertices)
-    max_x = width(s)
-    max_y = height(s)
+    t   = OpenStudio::Transformation.alignFace(s.vertices)
+    s0  = poly(s, false, false, true, t, :ulc)
+    s00 = nil
+
+    if facingUp?(s) || facingDown?(s) # TODO: redundant check?
+      s00 = getRealignedFace(s0)
+      return false unless s00[:set]
+
+      s0 = s00[:set]
+    end
+
+    max_x = width(s0)
+    max_y = height(s0)
     mid_x = max_x / 2
     mid_y = max_y / 2
 
@@ -3611,13 +5108,11 @@ module OSut
       #   - minimum "clear glazing" limits
       #   - buffers, etc.
       id         = sub[:id]
-      frame      = 0
-      frame      = sub[:frame].frameWidth unless sub[:frame].nil?
+      frame      = sub[:frame] ? sub[:frame].frameWidth : 0
       frames     = 2 * frame
       buffer     = frame + bfr
       buffers    = 2 * buffer
-      dim        = 0.200 unless (3 * frame) > 0.200
-      dim        = 3 * frame if (3 * frame) > 0.200
+      dim        = 3 * frame > 0.200 ? 3 * frame : 0.200
       glass      = dim - frames
       min_sill   = buffer
       min_head   = buffers + glass
@@ -3643,7 +5138,7 @@ module OSut
 
       # Log/reset "height" if beyond min/max.
       if sub.key?(:height)
-        unless sub[:height].between?(glass, max_height)
+        unless sub[:height].between?(glass - TOL2, max_height + TOL2)
           sub[:height] = glass      if sub[:height] < glass
           sub[:height] = max_height if sub[:height] > max_height
           log(WRN, "Reset '#{id}' height to #{sub[:height]} m (#{mth})")
@@ -3652,7 +5147,7 @@ module OSut
 
       # Log/reset "head" height if beyond min/max.
       if sub.key?(:head)
-        unless sub[:head].between?(min_head, max_head)
+        unless sub[:head].between?(min_head - TOL2, max_head + TOL2)
           sub[:head] = max_head if sub[:head] > max_head
           sub[:head] = min_head if sub[:head] < min_head
           log(WRN, "Reset '#{id}' head height to #{sub[:head]} m (#{mth})")
@@ -3661,7 +5156,7 @@ module OSut
 
       # Log/reset "sill" height if beyond min/max.
       if sub.key?(:sill)
-        unless sub[:sill].between?(min_sill, max_sill)
+        unless sub[:sill].between?(min_sill - TOL2, max_sill + TOL2)
           sub[:sill] = max_sill if sub[:sill] > max_sill
           sub[:sill] = min_sill if sub[:sill] < min_sill
           log(WRN, "Reset '#{id}' sill height to #{sub[:sill]} m (#{mth})")
@@ -3674,7 +5169,7 @@ module OSut
       if sub.key?(:head) && sub.key?(:sill) && sub[:head] < sub[:sill] + glass
         sill = sub[:head] - glass
 
-        if sill < min_sill
+        if sill < min_sill - TOL2
           sub[:ratio     ] = 0 if sub.key?(:ratio)
           sub[:count     ] = 0
           sub[:multiplier] = 0
@@ -3693,7 +5188,7 @@ module OSut
       if sub.key?(:head) && sub.key?(:sill)
         height = sub[:head] - sub[:sill]
 
-        if sub.key?(:height) && (sub[:height] - height).abs > TOL
+        if sub.key?(:height) && (sub[:height] - height).abs > TOL2
           log(WRN, "(Re)set '#{id}' height to #{height} m (#{mth})")
         end
 
@@ -3702,7 +5197,7 @@ module OSut
         if sub.key?(:height)
           sill = sub[:head] - sub[:height]
 
-          if sill < min_sill
+          if sill < min_sill - TOL2
             sill   = min_sill
             height = sub[:head] - sill
 
@@ -3730,7 +5225,7 @@ module OSut
         if sub.key?(:height)
           head = sub[:sill] + sub[:height]
 
-          if head > max_head
+          if head > max_head - TOL2
             head   = max_head
             height = head - sub[:sill]
 
@@ -3755,7 +5250,7 @@ module OSut
           sub[:height] = sub[:head] - sub[:sill]
         end
       elsif sub.key?(:height) # neither "head" nor "sill"
-        head = typ_head
+        head = s00 ? mid_y + sub[:height]/2 : typ_head
         sill = head - sub[:height]
 
         if sill < min_sill
@@ -3773,7 +5268,7 @@ module OSut
 
       # Log/reset "width" if beyond min/max.
       if sub.key?(:width)
-        unless sub[:width].between?(glass, max_width)
+        unless sub[:width].between?(glass - TOL2, max_width + TOL2)
           sub[:width] = glass     if sub[:width] < glass
           sub[:width] = max_width if sub[:width] > max_width
           log(WRN, "Reset '#{id}' width to #{sub[:width]} m (#{mth})")
@@ -3796,7 +5291,7 @@ module OSut
 
       # Log/reset if left-sided buffer under min jamb position.
       if sub.key?(:l_buffer)
-        if sub[:l_buffer] < min_ljamb
+        if sub[:l_buffer] < min_ljamb - TOL
           sub[:l_buffer] = min_ljamb
           log(WRN, "Reset '#{id}' left buffer to #{sub[:l_buffer]} m (#{mth})")
         end
@@ -3804,7 +5299,7 @@ module OSut
 
       # Log/reset if right-sided buffer beyond max jamb position.
       if sub.key?(:r_buffer)
-        if sub[:r_buffer] > max_rjamb
+        if sub[:r_buffer] > max_rjamb - TOL
           sub[:r_buffer] = min_rjamb
           log(WRN, "Reset '#{id}' right buffer to #{sub[:r_buffer]} m (#{mth})")
         end
@@ -3868,7 +5363,7 @@ module OSut
         end
 
         # Too wide?
-        if x0 < min_ljamb || xf > max_rjamb
+        if x0 < min_ljamb - TOL2 || xf > max_rjamb - TOL2
           sub[:ratio     ] = 0 if sub.key?(:ratio)
           sub[:count     ] = 0
           sub[:multiplier] = 0
@@ -3932,7 +5427,7 @@ module OSut
         end
 
         # Too wide?
-        if x0 < bfr || xf > max_x - bfr
+        if x0 < bfr - TOL2 || xf > max_x - bfr - TOL2
           sub[:ratio     ] = 0 if sub.key?(:ratio)
           sub[:count     ] = 0
           sub[:multiplier] = 0
@@ -3957,7 +5452,7 @@ module OSut
         vec << OpenStudio::Point3d.new(pos,               sub[:sill], 0)
         vec << OpenStudio::Point3d.new(pos + sub[:width], sub[:sill], 0)
         vec << OpenStudio::Point3d.new(pos + sub[:width], sub[:head], 0)
-        vec = t * vec
+        vec = s00 ? t * (s00[:r] * (s00[:t] * vec)) : t * vec
 
         # Log/skip if conflict between individual sub and base surface.
         vc = vec
@@ -3997,6 +5492,1577 @@ module OSut
     end
 
     true
+  end
+
+  ##
+  # Validates whether surface is considered a sloped roof (outdoor-facing,
+  # 10% < tilt < 90%).
+  #
+  # @param s [OpenStudio::Model::Surface] a model surface
+  #
+  # @return [Bool] whether surface is a sloped roof
+  # @return [false] if invalid input (see logs)
+  def slopedRoof?(s = nil)
+    mth = "OSut::#{__callee__}"
+    cl  = OpenStudio::Model::Surface
+    return mismatch("surface", s, cl, mth, DBG, false) unless s.is_a?(cl)
+
+    return false if facingUp?(s)
+    return false if facingDown?(s)
+
+    true
+  end
+
+  ##
+  # Returns the "gross roof area" above selected conditioned, occupied spaces.
+  # This includes all roof surfaces of indirectly-conditioned, unoccupied spaces
+  # like plenums (if located above any of the selected spaces). This also
+  # includes roof surfaces of unconditioned or unenclosed spaces like attics, if
+  # vertically-overlapping any ceiling of occupied spaces below; attic roof
+  # sections above uninsulated soffits are excluded, for instance.
+  def grossRoofArea(spaces = [])
+    mth = "OSut::#{__callee__}"
+    up  = OpenStudio::Point3d.new(0,0,1) - OpenStudio::Point3d.new(0,0,0)
+    rm2 = 0
+    rfs = {}
+
+    spaces = spaces.is_a?(OpenStudio::Model::Space) ? [spaces] : spaces
+    spaces = spaces.respond_to?(:to_a) ? spaces.to_a : []
+    spaces = spaces.select { |space| space.is_a?(OpenStudio::Model::Space) }
+    spaces = spaces.select { |space| space.partofTotalFloorArea }
+    return invalid("spaces", mth, 1, DBG, 0) if spaces.empty?
+
+    # The method is very similar to OpenStudio-Standards' :
+    #   find_exposed_conditioned_roof_surfaces(model)
+    #
+    # github.com/NREL/openstudio-standards/blob/
+    # be81bd88dc55a44d8cce3ee6daf29c768032df6a/lib/openstudio-standards/
+    # standards/Standards.Surface.rb#L99
+    #
+    # ... yet differs with regards to attics with overhangs/soffits.
+
+    # Start with roof surfaces of occupied spaces.
+    spaces.each do |space|
+      facets(space, "Outdoors", "RoofCeiling").each do |roof|
+        next if rfs.key?(roof)
+
+        rfs[roof] = {m2: roof.grossArea, m: space.multiplier}
+      end
+    end
+
+    # Roof surfaces of unoccupied, conditioned spaces above (e.g. plenums)?
+    # TO DO: recursive call for stacked spaces as atria (via AirBoundaries).
+    spaces.each do |space|
+      facets(space, "Surface", "RoofCeiling").each do |ceiling|
+        floor = ceiling.adjacentSurface
+        next if floor.empty?
+
+        other = floor.get.space
+        next if other.empty?
+
+        other = other.get
+        next if other.partofTotalFloorArea
+        next if unconditioned?(other)
+
+        facets(other, "Outdoors", "RoofCeiling").each do |roof|
+          next if rfs.key?(roof)
+
+          rfs[roof] = {m2: roof.grossArea, m: other.multiplier}
+        end
+      end
+    end
+
+    # Roof surfaces of unoccupied, unconditioned spaces above (e.g. attics)?
+    # TO DO: recursive call for stacked spaces as atria (via AirBoundaries).
+    spaces.each do |space|
+      # When taking overlaps into account, the target space may not share the
+      # same local transformation as the space(s) above.
+      t0 = transforms(space)
+      next unless t0[:t]
+
+      t0 = t0[:t]
+
+      facets(space, "Surface", "RoofCeiling").each do |ceiling|
+        cv0 = t0 * ceiling.vertices
+
+        floor = ceiling.adjacentSurface
+        next if floor.empty?
+
+        other = floor.get.space
+        next if other.empty?
+
+        other = other.get
+        next if other.partofTotalFloorArea
+        next unless unconditioned?(other)
+
+        ti = transforms(other)
+        next unless ti[:t]
+
+        ti = ti[:t]
+
+        facets(other, "Outdoors", "RoofCeiling").each do |roof|
+          rvi  = ti * roof.vertices
+          cst  = cast(cv0, rvi, up)
+
+          # The overlap calculation fails for roof and ceiling surfaces with
+          # previously-added leader lines.
+          #
+          # TODO: revise approach for attics ONCE skylight wells have been added.
+          olap = overlap(cst, rvi, false)
+          next if olap.empty?
+
+          m2 = OpenStudio.getArea(olap)
+          next if m2.empty?
+
+          m2 = m2.get
+          next unless m2.round(2) > 0
+
+          rfs[roof] = {m2: 0, m: other.multiplier} unless rfs.key?(roof)
+
+          rfs[roof][:m2] += m2
+        end
+      end
+    end
+
+    rfs.values.each { |rf| rm2 += rf[:m2] * rf[:m] }
+
+    rm2
+  end
+
+  ##
+  # Identifies horizontal ridges between 2x sloped roof surfaces (same space).
+  # If successful, the returned Array holds 'ridge' Hashes. Each Hash holds: an
+  # :edge (OpenStudio::Point3dVector), the edge :length (Numeric), and :roofs
+  # (Array of 2x linked roof surfaces). Each roof surface may be linked to more
+  # than one horizontal ridge.
+  #
+  # @param roofs [Array<OpenStudio::Model::Surface>] target roof surfaces
+  #
+  # @return [Array] horizontal ridges (see logs if empty)
+  def getHorizontalRidges(roofs = [])
+    mth    = "OSut::#{__callee__}"
+    ridges = []
+    return ridges unless roofs.is_a?(Array)
+
+    roofs = roofs.select { |s| s.is_a?(OpenStudio::Model::Surface) }
+    roofs = roofs.select { |s| slopedRoof?(s) }
+
+    roofs.each do |roof|
+      maxZ = roof.vertices.max_by(&:z).z
+      next if roof.space.empty?
+
+      space = roof.space.get
+
+      getSegments(roof).each do |edge|
+        next unless xyz?(edge, :z, maxZ)
+
+        # Skip if already tracked.
+        match = false
+
+        ridges.each do |ridge|
+          break if match
+
+          edg   = ridge[:edge]
+          match = same?(edge, edg) || same?(edge, edg.reverse)
+          # match = true if same?(edge, edg) || same?(edge, edg.reverse)
+        end
+
+        next if match
+
+        ridge = { edge: edge, length: (edge[1] - edge[0]).length, roofs: [roof] }
+
+        # Links another roof (same space)?
+        match = false
+
+        roofs.each do |ruf|
+          break if match
+          next  if ruf == roof
+          next  if ruf.space.empty?
+          next  unless ruf.space.get == space
+
+          getSegments(ruf).each do |edg|
+            break if match
+            next unless same?(edge, edg) || same?(edge, edg.reverse)
+
+            ridge[:roofs] << ruf
+            ridges << ridge
+            match = true
+          end
+        end
+      end
+    end
+
+    ridges
+  end
+
+  ##
+  # Adds skylights to toplight selected OpenStudio (occupied, conditioned)
+  # spaces, based on requested skylight-to-roof (SRR%) options (max 10%). If the
+  # user selects 0% (0.0) as the :srr while keeping :clear as true, the method
+  # simply purges all pre-existing roof subsurfaces (whether glazed or not) of
+  # selected spaces, and exits while returning 0 (without logging an error or
+  # warning). Pre-toplit spaces are otherwise ignored. Boolean options :attic,
+  # :plenum, :sloped and :sidelit, further restrict candidate roof surfaces. If
+  # applicable, options :attic and :plenum add skylight wells. Option :patterns
+  # restricts preset skylight allocation strategies in order of preference; if
+  # left empty, all preset patterns are considered, also in order of preference
+  # (see examples).
+  #
+  # @param spaces [Array<OpenStudio::Model::Space>] space(s) to toplight
+  # @param [Hash] opts requested skylight attributes
+  # @option opts [#to_f] :srr skylight-to-roof ratio (0.00, 0.10]
+  # @option opts [#to_f] :size (1.22) template skylight width/depth (min 0.4m)
+  # @option opts [#frameWidth] :frame (nil) OpenStudio Frame & Divider (optional)
+  # @option opts [Bool] :clear (true) whether to first purge existing skylights
+  # @option opts [Bool] :sidelit (true) whether to consider sidelit spaces
+  # @option opts [Bool] :sloped (true) whether to consider sloped roof surfaces
+  # @option opts [Bool] :plenum (true) whether to consider plenum wells
+  # @option opts [Bool] :attic (true) whether to consider attic wells
+  # @option opts [Array<#to_s>] :patterns requested skylight allocation (3x)
+  # @example (a) consider 2D array of individual skylights, e.g. n(1.2m x 1.2m)
+  #   opts[:patterns] = ["array"]
+  # @example (b) consider 'a', then array of 1x(size) x n(size) skylight strips
+  #   opts[:patterns] = ["array", "strips"]
+  #
+  # @return [Float] returns gross roof area if successful (see logs if 0 m2)
+  def addSkyLights(spaces = [], opts = {})
+    mth   = "OSut::#{__callee__}"
+    clear = true
+    srr   = 0.0
+    frame = nil   # FrameAndDivider object
+    f     = 0.0   # FrameAndDivider frame width
+    gap   = 0.1   # min 2" around well (2x), as well as max frame width
+    gap2  = 0.2   # 2x gap
+    gap4  = 0.4   # minimum skylight 16" width/depth (excluding frame width)
+    bfr   = 0.005 # minimum array perimeter buffer (no wells)
+    w     = 1.22  # default 48" x 48" skylight base
+    w2    = w * w # m2
+
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Excerpts of ASHRAE 90.1 2022 definitions:
+    #
+    # "ROOF":
+    #
+    #   "the upper portion of the building envelope, including opaque areas and
+    #   fenestration, that is horizontal or tilted at an angle of less than 60
+    #   degrees from horizontal. For the purposes of determining building
+    #   envelope requirements, the classifications are defined as follows
+    #   (inter alia):
+    #
+    #     - attic and other roofs: all other roofs, including roofs with
+    #       insulation ENTIRELY BELOW (inside of) the roof structure (i.e.,
+    #       attics, cathedral ceilings, and single-rafter ceilings), roofs with
+    #       insulation both above and BELOW the roof structure, and roofs
+    #       without insulation but excluding metal building roofs. [...]"
+    #
+    # "ROOF AREA, GROSS":
+    #
+    #   "the area of the roof measured from the EXTERIOR faces of walls or from
+    #   the centerline of party walls."
+    #
+    #
+    # For the simple case below (steep 4-sided hip roof, UNENCLOSED ventilated
+    # attic), 90.1 users typically choose between either:
+    #   1. modelling the ventilated attic explicitely, or
+    #   2. ignoring the ventilated attic altogether.
+    #
+    # If skylights were added to the model, option (1) would require one or more
+    # skylight wells (light shafts leading to occupied spaces below), with
+    # insulated well walls separating CONDITIONED spaces from an UNENCLOSED,
+    # UNCONDITIONED space (i.e. attic).
+    #
+    # Determining which roof surfaces (or which portion of roof surfaces) need
+    # to be considered when calculating "GROSS ROOF AREA" may be subject to some
+    # interpretation. From the above definitions:
+    #
+    #   - the uninsulated, tilted hip-roof attic surfaces are considered "ROOF"
+    #     surfaces, provided they 'shelter' insulation below (i.e. insulated
+    #     attic floor).
+    #   - however, only the 'projected' portion of such "ROOF" surfaces, i.e.
+    #     areas between axes AA` and BB` (along exterior walls)) would be
+    #     considered.
+    #   - the portions above uninsulated soffits (illustrated on the right)
+    #     would be excluded from the "GROSS ROOF AREA" as they are beyond the
+    #     exterior wall projections.
+    #
+    #     A         B
+    #     |         |
+    #      _________
+    #     /          \                  /|        |\
+    #    /            \                / |        | \
+    #   /_  ________  _\    = >       /_ |        | _\   ... excluded portions
+    #     |          |
+    #     |__________|
+    #     .          .
+    #     A`         B`
+    #
+    # If the unoccupied space (directly under the hip roof) were instead an
+    # INDIRECTLY-CONDITIONED plenum (not an attic), then there would be no need
+    # to exclude portions of any roof surface: all plenum roof surfaces (in
+    # addition to soffit surfaces) would need to be insulated). The method takes
+    # such circumstances into account, which requires vertically casting of
+    # surfaces ontoothers, as well as overlap calculations. If successful, the
+    # method returns the "GROSS ROOF AREA" (in m2), based on the above rationale.
+    #
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Excerpts of similar NECB requirements (unchanged from 2011 through 2020):
+    #
+    #   3.2.1.4. 2). "The total skylight area shall be less than 2% of the GROSS
+    #   ROOF AREA as determined in Article 3.1.1.6." (5% in earlier versions)
+    #
+    #   3.1.1.6. 5). "In the calculation of allowable skylight area, the GROSS
+    #   ROOF AREA shall be calculated as the sum of the areas of insulated
+    #   roof including skylights."
+    #
+    # There are NO additional details or NECB appendix notes on the matter. It
+    # is unclear if the NECB's looser definition of GROSS ROOF AREA includes
+    # (uninsulated) sloped roof surfaces above (insulated) flat ceilings (e.g.
+    # attics), as with 90.1. It would be definitely odd if it didn't. For
+    # instance, if the GROSS ROOF AREA were based on insulated ceiling surfaces,
+    # there would be a topological disconnect between flat ceiling and sloped
+    # skylights above. Should NECB users first 'project' (sloped) skylight rough
+    # openings onto flat ceilings when calculating %SRR? Without much needed
+    # clarification, the (clearer) 90.1 rules equally apply here to NECB cases.
+
+    # If skylight wells are indeed required, well wall edges are always vertical
+    # (i.e. never splayed), requiring a vertical ray.
+    origin = OpenStudio::Point3d.new(0,0,0)
+    zenith = OpenStudio::Point3d.new(0,0,1)
+    ray    = zenith - origin
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Accept a single 'OpenStudio::Model::Space' (vs an array of spaces).
+    if spaces.respond_to?(:spaceType) || spaces.respond_to?(:to_a)
+      spaces = spaces.respond_to?(:to_a) ? spaces.to_a : [spaces]
+      spaces = spaces.select { |space| space.respond_to?(:spaceType) }
+      spaces = spaces.select { |space| space.partofTotalFloorArea }
+      spaces = spaces.reject { |space| unconditioned?(space) }
+      return empty("spaces", mth, DBG, 0) if spaces.empty?
+    else
+      return mismatch("spaces", spaces, Array, mth, DBG, 0)
+    end
+
+    mdl = spaces.first.model
+
+    # Exit if mismatched or invalid argument classes/keys.
+    return mismatch("opts", opts, Hash, mth, DBG, 0) unless opts.is_a?(Hash)
+    return  hashkey( "srr", opts, :srr, mth, ERR, 0) unless opts.key?(:srr)
+
+    # Validate requested skylight-to-roof ratio.
+    if opts[:srr].respond_to?(:to_f)
+      srr = opts[:srr].to_f
+      log(WRN, "Resetting srr to 0% (#{mth})")  if srr < 0
+      log(WRN, "Resetting srr to 10% (#{mth})") if srr > 0.10
+      srr = srr.clamp(0.00, 0.10)
+    else
+      return mismatch("srr", opts[:srr], Numeric, mth, DBG, 0)
+    end
+
+    # Validate Frame & Divider object, if provided.
+    if opts.key?(:frame)
+      frame = opts[:frame]
+
+      if frame.respond_to?(:frameWidth)
+        frame = nil if v < 321
+        frame = nil if f.frameWidth.round(2) < 0
+        frame = nil if f.frameWidth.round(2) > gap
+
+        f = f.frameWidth                            if frame
+        log(WRN, "Skip Frame&Divider (#{mth})") unless frame
+      else
+        frame = nil
+        log(ERR, "Skip invalid Frame&Divider object (#{mth})")
+      end
+    end
+
+    # Validate skylight size, if provided.
+    if opts.key?(:size)
+      if opts[:size].respond_to?(:to_f)
+        w  = opts[:size].to_f
+        w2 = w * w
+        return invalid(size, mth, 0, ERR, 0) if w.round(2) < gap4
+      else
+        return mismatch("size", opts[:size], Numeric, mth, DBG, 0)
+      end
+    end
+
+    f2  = 2 * f
+    w0  = w + f2
+    w02 = w0 * w0
+    wl  = w0 + gap
+    wl2 = wl * wl
+
+    # Validate purge request, if provided.
+    if opts.key?(:clear)
+      clear = opts[:clear]
+
+      unless [true, false].include?(clear)
+        log(WRN, "Purging existing skylights by default (#{mth})")
+        clear = true
+      end
+    end
+
+    getRoofs(spaces).each { |s| s.subSurfaces.map(&:remove) } if clear
+
+    # Safely exit, e.g. if strictly called to purge existing roof subsurfaces.
+    return 0 if srr < TOL
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # The method seeks to insert a skylight array within the largest rectangular
+    # 'bounded box' that neatly 'fits' within a given roof surface. This equally
+    # applies to any vertically-cast overlap between roof and plenum (or attic)
+    # floor, which in turn generates skylight wells. Skylight arrays are
+    # inserted from left/right + top/bottom (as illustrated below), once a roof
+    # (or cast 3D overlap) is 'aligned' in 2D (possibly also 'realigned').
+    #
+    # Depending on geometric complexity (e.g. building/roof concavity,
+    # triangulation), the total area of bounded boxes may be significantly less
+    # than the calculated "GROSS ROOF AREA", which can make it challenging to
+    # attain the desired %SRR. If :patterns are left unaltered, the method will
+    # select patterns that maximize the likelihood of attaining the requested
+    # %SRR, to the detriment of spatial distribution of daylighting.
+    #
+    # The default skylight module size is 1.2m x 1.2m (4' x 4'), which be
+    # overridden by the user, e.g. 2.4m x 2.4m (8' x 8').
+    #
+    # Preset skylight allocation patterns (in order of precedence):
+    #    1. "array"
+    #   _____________________
+    #  |   _      _      _   |  - ?x columns ("cols") >= ?x rows (min 2x2)
+    #  |  |_|    |_|    |_|  |  - SRR ~5% (1.2m x 1.2m), as illustrated
+    #  |                     |  - SRR ~19% (2.4m x 2.4m)
+    #  |   _      _      _   |  - +suitable for wide spaces (storage, retail)
+    #  |  |_|    |_|    |_|  |  - ~1.4x height + skylight width 'ideal' rule
+    #  |_____________________|  - better daylight distribution, many wells
+    #
+    #    2. "strips"
+    #   _____________________
+    #  |   _      _      _   |  - ?x columns (min 2), 1x row
+    #  |  | |    | |    | |  |  - ~doubles %SRR ...
+    #  |  | |    | |    | |  |  - SRR ~10% (1.2m x ?1.2m), as illustrated
+    #  |  | |    | |    | |  |  - SRR ~19% (2.4m x ?1.2m)
+    #  |  |_|    |_|    |_|  |  - ~roof monitor layout
+    #  |_____________________|  - fewer wells
+    #
+    #    3. "strip"
+    #    ____________________
+    #   |                    |  - 1x column, 1x row (min 1x)
+    #   |   ______________   |  - SRR ~11% (1.2m x ?1.2m)
+    #   |  | ............ |  |  - SRR ~22% (2.4m x ?1.2m), as illustrated
+    #   |  |______________|  |  - +suitable for elongated bounded boxes
+    #   |                    |  - 1x well
+    #   |____________________|
+    #
+    #   TO-DO: Support strips/strip patterns along ridge of paired roof surfaces.
+    layouts  = ["array", "strips", "strip"]
+    patterns = []
+
+    # Validate skylight placement patterns, if provided.
+    if opts.key?(:patterns)
+      if opts[:patterns].is_a?(Array)
+        opts[:patterns].each_with_index do |pattern, i|
+          pattern = trim(pattern).downcase
+
+          if pattern.empty?
+            invalid("pattern #{i+1}", mth, 0, ERR)
+            next
+          end
+
+          patterns << pattern if layouts.include?(pattern)
+        end
+      else
+        mismatch("patterns", opts[:patterns], Array, mth, DBG)
+      end
+    end
+
+    patterns = layouts if patterns.empty?
+
+    # The method first attempts to add skylights in ideal candidate spaces:
+    #   - large roof surface areas (e.g. retail, classrooms ... not corridors)
+    #   - not sidelit (favours core spaces)
+    #   - having flat roofs (avoids sloped roofs)
+    #   - not under plenums, nor attics (avoids wells)
+    #
+    # This ideal (albeit stringent) set of conditions is "combo a".
+    #
+    # If required %SRR has not yet been achieved, the method decrementally drops
+    # selection criteria and starts over, e.g.:
+    #   - then considers sidelit spaces
+    #   - then considers sloped roofs
+    #   - then considers skylight wells
+    #
+    # A maximum number of skylights are allocated to roof surfaces matching a
+    # given combo. Priority is always given to larger roof areas. If
+    # unsuccessful in meeting the required %SRR target, a single criterion is
+    # then dropped (e.g. b, then c, etc.), and the allocation process is
+    # relaunched. An error message is logged if the %SRR isn't ultimately met.
+    #
+    # Through filters, users may restrict candidate roof surfaces:
+    #   b. above occupied sidelit spaces ('false' restricts to core spaces)
+    #   c. that are sloped ('false' restricts to flat roofs)
+    #   d. above indirectly conditioned spaces (e.g. plenums, uninsulated wells)
+    #   e. above unconditioned spaces (e.g. attics, insulated wells)
+    filters = ["a", "b", "bc", "bcd", "bcde"]
+
+    # Prune filters, based on user-selected options.
+    [:sidelit, :sloped, :plenum, :attic].each do |opt|
+      next unless opts.key?(opt)
+      next unless opts[opt] == false
+
+      case opt
+      when :sidelit then filters.map! { |f| f.include?("b") ? f.delete("b") : f }
+      when :sloped  then filters.map! { |f| f.include?("c") ? f.delete("c") : f }
+      when :plenum  then filters.map! { |f| f.include?("d") ? f.delete("d") : f }
+      when :attic   then filters.map! { |f| f.include?("e") ? f.delete("e") : f }
+      end
+    end
+
+    filters.reject! { |f| f.empty? }
+    filters.uniq!
+
+    # Remaining filters may be further reduced (after space/roof processing),
+    # depending on geometry, e.g.:
+    #  - if there are no sidelit spaces: filter "b" will be pruned away
+    #  - if there are no sloped roofs  : filter "c" will be pruned away
+    #  - if no plenums are identified  : filter "d" will be pruned away
+    #  - if no attics are identified   : filter "e" will be pruned away
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Break down spaces (and connected spaces) into groups.
+    sets     = [] # collection of skylight arrays to deploy
+    rooms    = {} # occupied CONDITIONED spaces to toplight
+    plenums  = {} # unoccupied (INDIRECTLY-) CONDITIONED spaces above rooms
+    attics   = {} # unoccupied UNCONDITIONED spaces above rooms
+    ceilings = {} # of occupied CONDITIONED space (if plenums/attics)
+
+    # Select candidate 'rooms' to toplit - excludes plenums/attics.
+    spaces.each do |space|
+      next if unconditioned?(space)          # e.g. attic
+      next unless space.partofTotalFloorArea # occupied (not plenum)
+
+      # Already toplit?
+      if daylit?(space, false, true, false)
+        log(WRN, "#{id} is already toplit, skipping (#{mth})")
+        next
+      end
+
+      # When unoccupied spaces are involved (e.g. plenums, attics), the occupied
+      # space (to toplight) may not share the same local transformation as its
+      # unoccupied space(s) above. Fetching local transformation.
+      t0 = transforms(space)
+      next unless t0[:t]
+
+      rooms[space]           = {}
+      rooms[space][:t      ] = t0[:t]
+      rooms[space][:m      ] = space.multiplier
+      rooms[space][:h      ] = space.ceilingHeight
+      rooms[space][:roofs  ] = facets(space, "Outdoors", "RoofCeiling")
+      rooms[space][:sidelit] = daylit?(space, true, false, false)
+
+      # Fetch and process room-specific outdoor-facing roof surfaces, the most
+      # basic 'set' to track:
+      #   - no skylight wells
+      #   - 1x skylight array per roof surface
+      #   - no need to preprocess space transformation
+      rooms[space][:roofs].each do |roof|
+        box = boundedBox(roof)
+        next if box.empty?
+
+        bm2 = OpenStudio.getArea(box)
+        next if bm2.empty?
+
+        bm2 = bm2.get
+        next if bm2.round(2) < w02.round(2)
+
+        # Track if bounded box is significantly smaller than roof.
+        tight = bm2 < roof.grossArea / 2 ? true : false
+
+        set           = {}
+        set[:box    ] = box
+        set[:bm2    ] = bm2
+        set[:tight  ] = tight
+        set[:roof   ] = roof
+        set[:space  ] = space
+        set[:sidelit] = rooms[space][:sidelit]
+        set[:t      ] = rooms[space][:t      ]
+        set[:sloped ] = slopedRoof?(roof)
+        sets << set
+      end
+    end
+
+    # Process outdoor-facing roof surfaces of plenums and attics above.
+    rooms.each do |space, room|
+      t0    = room[:t]
+      toits = getRoofs(space)
+      rufs  = room.key?(:roofs) ? toits - room[:roofs] : toits
+      next if rufs.empty?
+
+      # Process room ceilings, as 1x or more are overlapping roofs above. Fetch
+      # vertically-cast overlaps.
+      rufs.each do |ruf|
+        espace = ruf.space
+        next if espace.empty?
+
+        espace = espace.get
+        next if espace.partofTotalFloorArea
+
+        m  = espace.multiplier
+        ti = transforms(espace)
+        next unless ti[:t]
+
+        ti = ti[:t]
+        ri = ti * ruf.vertices
+
+        facets(space, "Surface", "RoofCeiling").each do |tile|
+          ci0 = cast(t0 * tile.vertices, ri, ray)
+          next if ci0.empty?
+
+          olap = overlap(ri, ci0, false)
+          next if olap.empty?
+
+          box = boundedBox(olap)
+          next if box.empty?
+
+          # Adding skylight wells (plenums/attics) is contingent to safely
+          # linking new base roof 'inserts' through leader lines. Currently,
+          # this requires an offset from main roof surface edges.
+          #
+          # TO DO: expand the method to factor in cases where simple 'side'
+          #        cutouts can be supported (no need for leader lines), e.g.
+          #        skylight strips along roof ridges.
+          box = offset(box, -gap, 340)
+          next if box.empty?
+
+          bm2 = OpenStudio.getArea(box)
+          next if bm2.empty?
+
+          bm2 = bm2.get
+          next if bm2.round(2) < w02.round(2)
+
+          # Vertically-cast box onto ceiling below.
+          cbox = cast(box, t0 * tile.vertices, ray)
+          next if cbox.empty?
+
+          cm2 = OpenStudio.getArea(cbox)
+          next if cm2.empty?
+
+          cm2 = cm2.get
+
+          # Track if bounded boxes are significantly smaller than either roof
+          # or ceiling.
+          tight = bm2 < ruf.grossArea  / 2 ? true : false
+          tight = cm2 < tile.grossArea / 2 ? true : tight
+
+          unless ceilings.key?(tile)
+            floor = tile.adjacentSurface
+
+            if floor.empty?
+              log(ERR, "#{tile.nameString} adjacent floor? (#{mth})")
+              next
+            end
+
+            floor = floor.get
+
+            if floor.space.empty?
+              log(ERR, "#{floor.nameString} space? (#{mth})")
+              next
+            end
+
+            espce = floor.space.get
+
+            unless espce == espace
+              log(ERR, "#{espce.nameString} != #{espace.nameString}? (#{mth})")
+              next
+            end
+
+            ceilings[tile]         = {}
+            ceilings[tile][:roofs] = []
+            ceilings[tile][:space] = space
+            ceilings[tile][:floor] = floor
+          end
+
+          ceilings[tile][:roofs] << ruf
+
+          # More detailed skylight set entries with suspended ceilings.
+          set           = {}
+          set[:olap   ] = olap
+          set[:box    ] = box
+          set[:cbox   ] = cbox
+          set[:bm2    ] = bm2
+          set[:cm2    ] = cm2
+          set[:tight  ] = tight
+          set[:roof   ] = ruf
+          set[:space  ] = space
+          set[:clng   ] = tile
+          set[:t      ] = t0
+          set[:sidelit] = room[:sidelit]
+          set[:sloped ] = slopedRoof?(ruf)
+
+          if unconditioned?(espace) # e.g. attic
+            unless attics.key?(espace)
+              attics[espace] = {t: ti, m: m, bm2: 0, roofs: []}
+            end
+
+            attics[espace][:bm2  ] += bm2
+            attics[espace][:roofs] << ruf
+
+            set[:attic] = espace
+
+            ceilings[tile][:attic] = espace
+          else # e.g. plenum
+            unless plenums.key?(espace)
+              plenums[espace] = {t: ti, m: m, bm2: 0, roofs: []}
+            end
+
+            plenums[espace][:bm2  ] += bm2
+            plenums[espace][:roofs] << ruf
+
+            set[:plenum] = espace
+
+            ceilings[tile][:plenum] = espace
+          end
+
+          sets << set
+          break # only 1x unique ruf/ceiling pair.
+        end
+      end
+    end
+
+    # Ensure uniqueness of plenum roofs, and set GROSS ROOF AREA.
+    attics.values.each do |attic|
+      attic[:roofs ].uniq!
+      attic[:ridges] = getHorizontalRidges(attic[:roofs]) # TO-DO
+    end
+
+    plenums.values.each do |plenum|
+      plenum[:roofs ].uniq!
+      # plenum[:m2    ] = plenum[:roofs].sum(&:grossArea)
+      plenum[:ridges] = getHorizontalRidges(plenum[:roofs]) # TO-DO
+    end
+
+    # Regardless of the selected skylight arrangement pattern, the current
+    # solution may only consider attic/plenum sets that can be successfully
+    # linked to leader line anchors, for both roof and ceiling surfaces.
+    [attics, plenums].each do |greniers|
+      k = greniers == attics ? :attic : :plenum
+
+      greniers.each do |spce, grenier|
+        grenier[:roofs].each do |roof|
+          sts = sets
+
+          sts = sts.select { |st| st.key?(k) }
+          sts = sts.select { |st| st.key?(:box) }
+          sts = sts.select { |st| st.key?(:bm2) }
+          sts = sts.select { |st| st.key?(:roof) }
+          sts = sts.select { |st| st.key?(:space) }
+          sts = sts.select { |st| st[k    ] == spce }
+          sts = sts.select { |st| st[:roof] == roof }
+          next if sts.empty?
+
+          sts = sts.sort_by { |st| st[:bm2] }
+          genAnchors(roof, sts, :box)
+        end
+      end
+    end
+
+    # Delete voided sets.
+    sets.reject! { |set| set.key?(:void) }
+
+    # Repeat leader line loop for ceilings.
+    ceilings.each do |tile, ceiling|
+      k = ceiling.key?(:attic) ? :attic : :plenum
+      next unless ceiling.key?(k)
+
+      space = ceiling[:space]
+      spce  = ceiling[k     ]
+      next unless ceiling.key?(:roofs)
+      next unless rooms.key?(space)
+
+      stz = []
+
+      ceiling[:roofs].each do |roof|
+        sts = sets
+
+        sts = sts.select { |st| st.key?(k) }
+        sts = sts.select { |st| st.key?(:cbox) }
+        stz = stz.select { |st| st.key?(:cm2) }
+        sts = sts.select { |st| st.key?(:roof) }
+        sts = sts.select { |st| st.key?(:clng) }
+        sts = sts.select { |st| st.key?(:space) }
+        sts = sts.select { |st| st[k     ] == spce }
+        sts = sts.select { |st| st[:roof ] == roof }
+        sts = sts.select { |st| st[:clng ] == tile }
+        sts = sts.select { |st| st[:space] == space }
+        next unless sts.size == 1
+
+        stz << sts.first
+      end
+
+      next if stz.empty?
+
+      stz = stz.sort_by { |st| st[:cm2] }
+      genAnchors(tile, stz, :cbox)
+    end
+
+    # Delete voided sets.
+    sets.reject! { |set| set.key?(:void) }
+
+    m2  = 0 # existing skylight rough opening area
+    rm2 = grossRoofArea(spaces)
+
+    # Tally existing skylight rough opening areas (%SRR calculations).
+    rooms.values.each do |room|
+      m = room[:m]
+
+      room[:roofs].each do |roof|
+        roof.subSurfaces.each do |sub|
+          next unless fenestration?(sub)
+
+          id  = sub.nameString
+          xm2 = sub.grossArea
+
+          if sub.allowWindowPropertyFrameAndDivider
+            unless sub.windowPropertyFrameAndDivider.empty?
+              fw   = sub.windowPropertyFrameAndDivider.get.frameWidth
+              vec  = offset(sub.vertices, fw, 300)
+              aire = OpenStudio.getArea(vec)
+
+              if aire.empty?
+                log(ERR, "Skipping '#{id}': invalid Frame&Divider (#{mth})")
+              else
+                xm2 = aire.get
+              end
+            end
+          end
+
+          m2 += xm2 * sub.multiplier * m
+        end
+      end
+    end
+
+    # Required skylight area to add.
+    sm2 = rm2 * srr - m2
+
+    # Skip if existing skylights exceed or ~roughly match requested %SRR.
+    if sm2.round(2) < w02.round(2)
+      log(INF, "Skipping: existing srr > requested srr (#{mth})")
+      return 0
+    end
+
+    # Any sidelit/sloped roofs being targeted?
+    #
+    # TODO: enable double-ridged, sloped roofs have double-sloped
+    #       skylights/wells (patterns "strip"/"strips").
+    sidelit = sets.any? { |set| set[:sidelit] }
+    sloped  = sets.any? { |set| set[:sloped ] }
+
+    # Precalculate skylight rows + cols, for each selected pattern. In the case
+    # of 'cols x rows' arrays of skylights, the method initially overshoots
+    # with regards to ideal skylight placement, e.g.:
+    #
+    #   aceee.org/files/proceedings/2004/data/papers/SS04_Panel3_Paper18.pdf
+    #
+    # ... yet skylight areas are subsequently contracted to strictly meet SRR%.
+    sets.each_with_index do |set, i|
+      id     = "set #{i+1}"
+      well   = set.key?(:clng)
+      space  = set[:space]
+      tight  = set[:tight]
+      factor = tight ? 1.75 : 1.25
+      room   = rooms[space]
+      h      = room[:h]
+      t      = OpenStudio::Transformation.alignFace(set[:box])
+      abox   = poly(set[:box], false, false, false, t, :ulc)
+      obox   = getRealignedFace(abox)
+      next unless obox[:set]
+
+      width = width(obox[:set])
+      depth = height(obox[:set])
+      area  = width * depth
+      skym2 = srr * area
+
+      # Flag sets if too narrow/shallow to hold a single skylight.
+      if well
+        if width.round(2) < wl.round(2)
+          log(ERR, "#{id}: Too narrow")
+          set[:void] = true
+          next
+        end
+
+        if depth.round(2) < wl.round(2)
+          log(ERR, "#{id}: Too shallow")
+          set[:void] = true
+          next
+        end
+      else
+        if width.round(2) < w0.round(2)
+          log(ERR, "#{id}: Too narrow")
+          set[:void] = true
+          next
+        end
+
+        if depth.round(2) < w0.round(2)
+          log(ERR, "#{id}: Too shallow")
+          set[:void] = true
+          next
+        end
+      end
+
+      # Estimate number of skylight modules per 'pattern'. Default spacing
+      # varies based on bounded box size (i.e. larger vs smaller rooms).
+      patterns.each do |pattern|
+        cols = 1
+        rows = 1
+        wx   = w0
+        wy   = w0
+        wxl  = wl
+        wyl  = wl
+        dX   = nil
+        dY   = nil
+
+        case pattern
+        when "array" # min 2x cols x min 2x rows
+          cols = 2
+          rows = 2
+
+          if tight
+            sp = 1.4 * h / 2
+            lx = well ? width - cols * wxl : width - cols * wx
+            ly = well ? depth - rows * wyl : depth - rows * wy
+            next if lx.round(2) < sp.round(2)
+            next if ly.round(2) < sp.round(2)
+
+            if well
+              cols = ((width - wxl) / (wxl + sp)).round(2).to_i + 1
+              rows = ((depth - wyl) / (wyl + sp)).round(2).to_i + 1
+            else
+              cols = ((width - wx) / (wx + sp)).round(2).to_i + 1
+              rows = ((depth - wy) / (wy + sp)).round(2).to_i + 1
+            end
+
+            next if cols < 2
+            next if rows < 2
+
+            dX = well ? 0.0 : bfr + f
+            dY = well ? 0.0 : bfr + f
+          else
+            sp = 1.4 * h
+            lx = well ? (width - cols * wxl) / cols : (width - cols * wx) / cols
+            ly = well ? (depth - rows * wyl) / rows : (depth - rows * wy) / cols
+            next if lx.round(2) < sp.round(2)
+            next if ly.round(2) < sp.round(2)
+
+            if well
+              cols = (width / (wxl + sp)).round(2).to_i
+              rows = (depth / (wyl + sp)).round(2).to_i
+            else
+              cols = (width / (wx + sp)).round(2).to_i
+              rows = (depth / (wy + sp)).round(2).to_i
+            end
+
+            next if cols < 2
+            next if rows < 2
+
+            ly = well ? (depth - rows * wyl) / rows : (depth - rows * wy) / cols
+            dY = ly / 2
+          end
+
+          # Current skylight area. If undershooting, adjust skylight width/depth
+          # as well as reduce spacing. For geometrical constrained cases,
+          # undershooting means not reaching 1.75x the required SRR%. Otherwise,
+          # undershooting means not reaching 1.25x the required SRR%. Any
+          # consequent overshooting is later corrected.
+          tm2       = wx * cols * wy * rows
+          undershot = tm2.round(2) < factor * skym2.round(2) ? true : false
+
+          # Inflate skylight width/depth (and reduce spacing) to reach SRR%.
+          if undershot
+            ratio2 = 1 + (factor * skym2 - tm2) / tm2
+            ratio  = Math.sqrt(ratio2)
+
+            sp  = w
+            wx *= ratio
+            wy *= ratio
+            wxl = wx + gap
+            wyl = wy + gap
+
+            if tight
+              if well
+                lx = (width - cols * wxl) / (cols - 1)
+                ly = (depth - rows * wyl) / (rows - 1)
+              else
+                lx = (width - cols * wx) / (cols - 1)
+                ly = (depth - rows * wy) / (rows - 1)
+              end
+
+              lx = lx.round(2) < sp.round(2) ? sp : lx
+              ly = ly.round(2) < sp.round(2) ? sp : ly
+
+              if well
+                wxl = (width - (cols - 1) * lx) / cols
+                wyl = (depth - (rows - 1) * ly) / rows
+                wx  = wxl - gap
+                wy  = wyl - gap
+              else
+                wx  = (width - (cols - 1) * lx) / cols
+                wy  = (depth - (rows - 1) * ly) / rows
+                wxl = wx + gap
+                wyl = wy + gap
+              end
+            else
+              if well
+                lx = (width - cols * wxl) / cols
+                ly = (depth - rows * wyl) / rows
+              else
+                lx = (width - cols * wx) / cols
+                ly = (depth - rows * wy) / rows
+              end
+
+              lx = lx.round(2) < sp.round(2) ? sp : lx
+              ly = ly.round(2) < sp.round(2) ? sp : ly
+
+              if well
+                wxl = (width - cols * lx) / cols
+                wyl = (depth - rows * ly) / rows
+                wx  = wxl - gap
+                wy  = wyl - gap
+                lx  = (width - cols * wxl) / cols
+                ly  = (depth - rows * wyl) / rows
+              else
+                wx  = (width - cols * lx) / cols
+                wy  = (depth - rows * ly) / rows
+                wxl = wx + gap
+                wyl = wy + gap
+                lx  = (width - cols * wx) / cols
+                ly  = (depth - rows * wy) / rows
+              end
+            end
+
+            dY = ly / 2
+          end
+        when "strips" # min 2x cols x 1x row
+          cols = 2
+
+          if tight
+            sp = h / 2
+            lx = well ? width - cols * wxl : width - cols * wx
+            ly = well ? depth - wyl : depth - wy
+            next if lx.round(2) < sp.round(2)
+            next if ly.round(2) < sp.round(2)
+
+            if well
+              cols = ((width - wxl) / (wxl + sp)).round(2).to_i + 1
+            else
+              cols = ((width - wx) / (wx + sp)).round(2).to_i + 1
+            end
+
+            next if cols < 2
+
+            if well
+              wyl = depth - ly
+              wy  = wyl - gap
+            else
+              wy  = depth - ly
+              wyl = wy + gap
+            end
+
+            dX = well ? 0 : bfr + f
+            dY = ly / 2
+          else
+            sp = h
+            lx = well ? (width - cols * wxl) / cols : (width - cols * wx) / cols
+            ly = well ? depth - wyl : depth - wy
+            next if lx.round(2) < sp.round(2)
+            next if ly.round(2) < w.round(2)
+
+            if well
+              cols = (width / (wxl + sp)).round(2).to_i
+            else
+              cols = (width / (wx + sp)).round(2).to_i
+            end
+
+            next if cols < 2
+
+            if well
+              wyl = depth - ly
+              wy  = wyl - gap
+            else
+              wy  = depth - ly
+              wyl = wy + gap
+            end
+
+            dY = ly / 2
+          end
+
+          tm2       = wx * cols * wy
+          undershot = tm2.round(2) < factor * skym2.round(2) ? true : false
+
+          # Inflate skylight width (and reduce spacing) to reach SRR%.
+          if undershot
+            ratio2 = 1 + (factor * skym2 - tm2) / tm2
+
+            sp  = w
+            wx *= ratio2
+            wxl = wx + gap
+
+            if tight
+              if well
+                lx = (width - cols * wxl) / (cols - 1)
+              else
+                lx = (width - cols * wx) / (cols - 1)
+              end
+
+              lx = lx.round(2) < sp.round(2) ? sp : lx
+
+              if well
+                wxl = (width - (cols - 1) * lx) / cols
+                wx  = wxl - gap
+              else
+                wx  = (width - (cols - 1) * lx) / cols
+                wxl = wx + gap
+              end
+            else
+              if well
+                lx = (width - cols * wxl) / cols
+              else
+                lx = (width - cols * wx) / cols
+              end
+
+              lx  = lx.round(2) < sp.round(2) ? sp : lx
+
+              if well
+                wxl = (width - cols * lx) / cols
+                wx  = wxl - gap
+                lx  = (width - cols * wxl) / cols
+              else
+                wx  = (width - cols * lx) / cols
+                wxl = wx + gap
+                lx  = (width - cols * wx) / cols
+              end
+            end
+          end
+        else # "strip" 1 (long?) row x 1 column
+          sp = w
+          lx = well ? width - wxl : width - wx
+          ly = well ? depth - wyl : depth - wy
+
+          if tight
+            next if lx.round(2) < sp.round(2)
+            next if ly.round(2) < sp.round(2)
+
+            if well
+              wxl = width - lx
+              wyl = depth - ly
+              wx  = wxl - gap
+              wy  = wyl - gap
+            else
+              wx  = width - lx
+              wy  = depth - ly
+              wxl = wx + gap
+              wyl = wy + gap
+            end
+
+            dX = well ? 0.0 : bfr + f
+            dY = ly / 2
+          else
+            next if lx.round(2) < sp.round(2)
+            next if ly.round(2) < sp.round(2)
+
+            if well
+              wxl = width - lx
+              wyl = depth - ly
+              wx  = wxl - gap
+              wy  = wyl - gap
+            else
+              wx  = width - lx
+              wy  = depth - ly
+              wxl = wx + gap
+              wyl = wy + gap
+            end
+
+            dY = ly / 2
+          end
+
+          tm2       = wx * wy
+          undershot = tm2.round(2) < factor * skym2.round(2) ? true : false
+
+          # Inflate skylight depth to reach SRR%.
+          if undershot
+            ratio2 = 1 + (factor * skym2 - tm2) / tm2
+
+            sp  = w
+            wy *= ratio2
+            wyl = wy + gap
+
+            ly  = well ? depth - wy : depth - wyl
+            ly  = ly.round(2) < sp.round(2) ? sp : lx
+
+            if well
+              wyl = depth - ly
+              wy  = wyl - gap
+            else
+              wy  = depth - ly
+              wyl = wy + gap
+            end
+          end
+        end
+
+        st         = {}
+        st[:tight] = tight
+        st[:cols ] = cols
+        st[:rows ] = rows
+        st[:wx   ] = wx
+        st[:wy   ] = wy
+        st[:wxl  ] = wxl
+        st[:wyl  ] = wyl
+        st[:dX   ] = dX if dX
+        st[:dY   ] = dY if dY
+
+        set[pattern] = st
+      end
+    end
+
+    # Delete voided sets.
+    sets.reject! { |set| set.key?(:void) }
+
+    # Final reset of filters.
+    filters.map! { |f| f.include?("b") ? f.delete("b") : f } unless sidelit
+    filters.map! { |f| f.include?("c") ? f.delete("c") : f } unless sloped
+    filters.map! { |f| f.include?("d") ? f.delete("d") : f } if plenums.empty?
+    filters.map! { |f| f.include?("e") ? f.delete("e") : f } if attics.empty?
+
+    filters.reject! { |f| f.empty? }
+    filters.uniq!
+
+    # Initialize skylight area tally.
+    skm2 = 0
+
+    # Assign skylight pattern.
+    filters.each_with_index do |filter, i|
+      next if skm2.round(2) >= sm2.round(2)
+
+      sts = sets
+      sts = sts.sort_by { |st| st[:bm2] }.reverse!
+      sts = sts.reject  { |st| st.key?(:pattern) }
+
+      if filter.include?("a")
+        # Start with the default (ideal) allocation selection:
+          # - large roof surface areas (e.g. retail, classrooms not corridors)
+          # - not sidelit (favours core spaces)
+          # - having flat roofs (avoids sloped roofs)
+          # - not under plenums, nor attics (avoids wells)
+        sts = sts.reject { |st| st[:sidelit]   }
+        sts = sts.reject { |st| st[:sloped ]   }
+        sts = sts.reject { |st| st.key?(:clng) }
+      else
+        sts = sts.reject { |st| st[:sidelit]     } unless filter.include?("b")
+        sts = sts.reject { |st| st[:sloped]      } unless filter.include?("c")
+        sts = sts.reject { |st| st.key?(:plenum) } unless filter.include?("d")
+        sts = sts.reject { |st| st.key?(:attic)  } unless filter.include?("e")
+      end
+
+      next if sts.empty?
+
+      # Tally precalculated skylights per pattern (once filtered).
+      fpm2 = {}
+
+      patterns.each do |pattern|
+        sts.each do |st|
+          next unless st.key?(pattern)
+
+          cols = st[pattern][:cols]
+          rows = st[pattern][:rows]
+          wx   = st[pattern][:wx  ]
+          wy   = st[pattern][:wy  ]
+
+          fpm2[pattern] = {m2: 0, tight: false} unless fpm2.key?(pattern)
+
+          fpm2[pattern][:m2   ] += wx * wy * cols * rows
+          fpm2[pattern][:tight] = st[:tight] ? true : false
+        end
+      end
+
+      pattern = nil
+      next if fpm2.empty?
+
+      fpm2 = fpm2.sort_by { |_, fm2| fm2[:m2] }.to_h
+
+      # Select suitable pattern, often overshooting. Favour array unless
+      # geometrically constrainted.
+      if fpm2.keys.include?("array")
+        if (fpm2["array"][:m2]).round(2) >= sm2.round(2)
+          pattern = "array" unless fpm2[:tight]
+        end
+      end
+
+      unless pattern
+        if fpm2.values.first[:m2].round(2) >= sm2.round(2)
+          pattern = fpm2.keys.first
+        elsif fpm2.values.last[:m2].round(2) <= sm2.round(2)
+          pattern = fpm2.keys.last
+        else
+          fpm2.keep_if { |_, fm2| fm2[:m2].round(2) >= sm2.round(2) }
+
+          pattern = fpm2.keys.first
+        end
+      end
+
+      skm2 += fpm2[pattern][:m2]
+
+      # Update matching sets.
+      sts.each do |st|
+        sets.each do |set|
+          next unless set.key?(pattern)
+          next unless st[:roof] == set[:roof]
+          next unless same?(st[:box], set[:box])
+
+          if st.key?(:clng)
+            next unless set.key?(:clng)
+            next unless st[:clng] == set[:clng]
+          end
+
+          set[:pattern] = pattern
+          set[:cols   ] = set[pattern][:cols]
+          set[:rows   ] = set[pattern][:rows]
+          set[:w      ] = set[pattern][:wx  ]
+          set[:d      ] = set[pattern][:wy  ]
+          set[:w0     ] = set[pattern][:wxl ]
+          set[:d0     ] = set[pattern][:wyl ]
+          set[:dX     ] = set[pattern][:dX  ]
+          set[:dY     ] = set[pattern][:dY  ]
+        end
+      end
+    end
+
+    # Skylight size contraction if overshot (e.g. -13.2% if overshot by +13.2%).
+    # This is applied on a surface/pattern basis; individual skylight sizes may
+    # vary from one surface to the next, depending on respective patterns.
+    if skm2.round(2) > sm2.round(2)
+      ratio2 = 1 - (skm2 - sm2) / skm2
+      ratio  = Math.sqrt(ratio2)
+      skm2  *= ratio2
+
+      sets.each do |set|
+        next if set.key?(:void)
+        next unless set.key?(:pattern)
+
+        pattern = set[:pattern]
+        next unless set.key?(pattern)
+
+        case pattern
+        when "array" # equally adjust both width and depth
+          xr  = set[:w] * ratio
+          yr  = set[:d] * ratio
+          dyr = set[:d] - yr
+
+          set[:w ]  = xr
+          set[:d ]  = yr
+          set[:w0]  = set[:w] + gap
+          set[:d0]  = set[:d] + gap
+          set[:dY] += dyr / 2
+        when "strips" # adjust depth
+          xr2 = set[:w] * ratio2
+
+          set[:w ]  = xr2
+          set[:w0]  = set[:w] + gap
+        else # "strip", adjust width
+          yr2 = set[:d] * ratio2
+          dyr = set[:d] - yr2
+
+          set[:d ]  = yr2
+          set[:d0]  = set[:w] + gap
+          set[:dY] += dyr / 2
+        end
+      end
+    end
+
+    # Generate skylight well roofs for attics & plenums.
+    [attics, plenums].each do |greniers|
+      k = greniers == attics ? :attic : :plenum
+
+      greniers.each do |spce, grenier|
+        ti = grenier[:t]
+
+        grenier[:roofs].each do |roof|
+          sts = sets
+
+          sts = sts.select { |st| st.key?(k) }
+          sts = sts.select { |st| st.key?(:pattern) }
+          sts = sts.select { |st| st.key?(:clng) }
+          sts = sts.select { |st| st.key?(:roof) }
+          sts = sts.select { |st| st.key?(:space) }
+          sts = sts.select { |st| st[:roof] == roof }
+          sts = sts.select { |st| st[k    ] == spce }
+          sts = sts.select { |st| st.key?(st[:pattern]) }
+          sts = sts.select { |st| rooms.key?(st[:space]) }
+          sts = sts.select { |st| st.key?(:ld) }
+          sts = sts.select { |st| st[:ld].key?(roof) }
+          next if sts.empty?
+
+          # If successful, 'genInserts' returns extended roof surface vertices,
+          # including leader lines to support cutouts. The final selection is
+          # contingent to successfully inserting corresponding room ceiling
+          # inserts (vis-à-vis attic/plenum floor below). The method also
+          # generates new roof inserts. See key:value pair :vts.
+          vertices = genInserts(roof, sts)
+          next if vertices.empty?
+
+          roof.setVertices(ti * vertices)
+        end
+      end
+    end
+
+    # Repeat for ceilings below attic/plenum floors.
+    ceilings.each do |tile, ceiling|
+      k = ceiling.key?(:attic) ? :attic : :plenum
+      next unless ceiling.key?(k)
+      next unless ceiling.key?(:roofs)
+
+      greniers = ceiling.key?(:attic) ? attics : plenums
+      space    = ceiling[:space]
+      spce     = ceiling[k     ]
+      floor    = ceiling[:floor]
+      next unless rooms.key?(space)
+      next unless greniers.key?(spce)
+
+      room    = rooms[space]
+      grenier = greniers[spce]
+      ti      = grenier[:t]
+      t0      = room[:t]
+      stz     = []
+
+      ceiling[:roofs].each do |roof|
+        sts = sets
+
+        sts = sts.select { |st| st.key?(k) }
+        sts = sts.select { |st| st.key?(:clng) }
+        sts = sts.select { |st| st.key?(:cm2) }
+        sts = sts.select { |st| st.key?(:roof) }
+        sts = sts.select { |st| st.key?(:space) }
+        sts = sts.select { |st| st[:clng] == tile }
+        sts = sts.select { |st| st[:roof] == roof }
+        sts = sts.select { |st| st[k    ] == spce }
+        sts = sts.select { |st| rooms.key?(st[:space]) }
+        sts = sts.select { |st| st.key?(:ld) }
+        sts = sts.select { |st| st.key?(:vtx) }
+        sts = sts.select { |st| st.key?(:vts) }
+        sts = sts.select { |st| st[:ld].key?(roof) }
+        sts = sts.select { |st| st[:ld].key?(tile) }
+        next unless sts.size == 1
+
+        stz << sts.first
+      end
+
+      next if stz.empty?
+
+      # Vertically-cast set roof :vtx onto ceiling.
+      stz.each do |st|
+        cvtx = cast(ti * st[:vtx], t0 * tile.vertices, ray)
+        st[:cvtx] = t0.inverse * cvtx
+      end
+
+      # Extended ceiling vertices.
+      stz = stz.sort_by { |st| st[:cm2] }
+      vertices = genExtendedVertices(tile, stz, :cvtx)
+      next if vertices.empty?
+
+      # Reset ceiling and adjacent floor vertices.
+      tile.setVertices(t0.inverse * vertices)
+      floor.setVertices(ti.inverse * vertices.to_a.reverse)
+
+      # Add new roof inserts & skylights for the (now) toplit space.
+      stz.each_with_index do |st, i|
+        sub          = {}
+        sub[:type  ] = "Skylight"
+        sub[:width ] = st[:w] - f2
+        sub[:height] = st[:d] - f2
+        sub[:sill  ] = gap / 2
+        sub[:frame ] = frame if frame
+
+        st[:vts].each do |id, vt|
+          roof = OpenStudio::Model::Surface.new(t0.inverse * vt, mdl)
+          roof.setSpace(space)
+          roof.setName("#{i}:#{id}:#{space.nameString}")
+
+          # Generate well walls.
+          v0 = roof.vertices
+          vX = cast(roof, tile, ray)
+          s0 = getSegments(v0)
+          sX = getSegments(vX)
+
+          s0.each_with_index do |sg, j|
+            sg0 = sg.to_a
+            sgX = sX[j].to_a
+            vec  = OpenStudio::Point3dVector.new
+            vec << sg0.first
+            vec << sg0.last
+            vec << sgX.last
+            vec << sgX.first
+
+            grenier_wall = OpenStudio::Model::Surface.new(vec, mdl)
+            grenier_wall.setSpace(spce)
+            grenier_wall.setName("#{id}:#{j}:#{spce.nameString}")
+
+            room_wall = OpenStudio::Model::Surface.new(vec.to_a.reverse, mdl)
+            room_wall.setSpace(space)
+            room_wall.setName("#{id}:#{j}:#{space.nameString}")
+
+            grenier_wall.setAdjacentSurface(room_wall)
+            room_wall.setAdjacentSurface(grenier_wall)
+          end
+
+          # Add individual skylights.
+          addSubs(roof, [sub])
+        end
+      end
+    end
+
+    # New direct roof loop. No overlaps, so no need for relative space
+    # coordinate adjustments.
+    rooms.each do |space, room|
+      room[:roofs].each do |roof|
+        sets.each_with_index do |set, i|
+          next     if set.key?(:clng)
+          next unless set.key?(:box)
+          next unless set.key?(:roof)
+          next unless set.key?(:cols)
+          next unless set.key?(:rows)
+          next unless set.key?(:d)
+          next unless set.key?(:w)
+          next unless set.key?(:dX)
+          next unless set.key?(:dY)
+          next unless set.key?(:tight)
+          next unless set[:roof] == roof
+
+          tight = set[:tight]
+
+          d1 = set[:d] - f2
+          w1 = set[:w] - f2
+
+          # Y-axis 'height' of the roof, once re/aligned.
+          # TODO: retrieve st[:out], +efficient
+          y  = alignedHeight(set[:box])
+          dY = set[:dY] if set[:dY]
+
+          set[:rows].times.each do |j|
+            sub            = {}
+            sub[:type    ] = "Skylight"
+            sub[:count   ] = set[:cols]
+            sub[:width   ] = w1
+            sub[:height  ] = d1
+            sub[:frame   ] = frame if frame
+            sub[:id      ] = "set #{i+1}:#{j+1}"
+            sub[:sill    ] = dY + j * (2 * dY + d1)
+            sub[:r_buffer] = set[:dX] if set[:dX]
+            sub[:l_buffer] = set[:dX] if set[:dX]
+            addSubs(roof, [sub])
+          end
+        end
+      end
+    end
+
+    rm2
   end
 
   ##

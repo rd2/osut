@@ -29,5 +29,5 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module OSut
-  VERSION = "0.4.0".freeze # OSut version
+  VERSION = "0.5.0".freeze # OSut version
 end
