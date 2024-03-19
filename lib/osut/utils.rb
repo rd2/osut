@@ -6375,7 +6375,7 @@ module OSut
           # TO DO: expand the method to factor in cases where simple 'side'
           #        cutouts can be supported (no need for leader lines), e.g.
           #        skylight strips along roof ridges.
-          box = offset(box, -gap, 340)
+          box = offset(box, -gap, 300)
           box = poly(box, false, false, false, false, :blc)
           next if box.empty?
 
