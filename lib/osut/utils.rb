@@ -2334,17 +2334,24 @@ module OSut
   # @return [OpenStudio::Point3dVector] 3D vector (see logs if empty)
   def to_p3Dv(pts = nil)
     mth = "OSut::#{__callee__}"
-    cl1 = Array
+    cl1 = OpenStudio::Point3d
     cl2 = OpenStudio::Point3dVector
     cl3 = OpenStudio::Model::PlanarSurface
-    cl4 = OpenStudio::Point3d
+    cl4 = Array
     v   = OpenStudio::Point3dVector.new
-    return pts                                           if pts.is_a?(cl2)
-    return pts.vertices                                  if pts.is_a?(cl3)
-    return mismatch("points", pts, cl1, mth, DBG, v) unless pts.is_a?(cl1)
+
+    if pts.is_a?(cl1)
+      v << pts
+      return v
+    end
+
+    return pts if pts.is_a?(cl2)
+    return pts.vertices if pts.is_a?(cl3)
+
+    return mismatch("points", pts, cl1, mth, DBG, v) unless pts.is_a?(cl4)
 
     pts.each do |pt|
-      return mismatch("point", pt, cl4, mth, DBG, v) unless pt.is_a?(cl4)
+      return mismatch("point", pt, cl4, mth, DBG, v) unless pt.is_a?(cl1)
     end
 
     pts.each { |pt| v << OpenStudio::Point3d.new(pt.x, pt.y, pt.z) }
@@ -2357,23 +2364,49 @@ module OSut
   #
   # @param s1 [Set<OpenStudio::Point3d>] 1st set of 3D point(s)
   # @param s2 [Set<OpenStudio::Point3d>] 2nd set of 3D point(s)
+  # @param indexed [Bool] whether to attempt to harmonize vertex sequence
   #
   # @return [Bool] whether sets are nearly equal (within TOL)
   # @return [false] if invalid input (see logs)
-  def same?(s1 = [], s2 = [])
+  def same?(s1 = nil, s2 = nil, indexed = true)
     mth = "OSut::#{__callee__}"
-    s1  = [s1] if s1.is_a?(OpenStudio::Point3d)
-    s2  = [s2] if s2.is_a?(OpenStudio::Point3d)
-    s1  = to_p3Dv(s1)
-    s2  = to_p3Dv(s2)
+    s1  = to_p3Dv(s1).to_a
+    s2  = to_p3Dv(s2).to_a
     return false if s1.empty?
     return false if s2.empty?
+    return false unless s1.size == s2.size
 
-    size = s1.size
-    return invalid("set sizes", mth, 0, ERR, false) unless s2.size == size
+    indexed = true unless [true, false].include?(indexed)
+
+    if indexed
+      xOK = (s1[0].x - s2[0].x).abs < TOL
+      yOK = (s1[0].y - s2[0].y).abs < TOL
+      zOK = (s1[0].z - s2[0].z).abs < TOL
+
+      if xOK && yOK && zOK && s1.size == 1
+        return true
+      else
+        indx = nil
+
+        s2.each_with_index do |pt, i|
+          break if indx
+
+          xOK = (s1[0].x - s2[i].x).abs < TOL
+          yOK = (s1[0].y - s2[i].y).abs < TOL
+          zOK = (s1[0].z - s2[i].z).abs < TOL
+
+          indx = i if xOK && yOK && zOK
+        end
+
+        return false unless indx
+
+        s2 = to_p3Dv(s2).to_a
+        s2.rotate!(indx)
+      end
+    end
 
     # OpenStudio.isAlmostEqual3dPt(p1, p2, TOL) # ... from v350 onwards.
-    size.times.each do |i|
+    s1.size.times.each do |i|
       xOK = (s1[i].x - s2[i].x).abs < TOL
       yOK = (s1[i].y - s2[i].y).abs < TOL
       zOK = (s1[i].z - s2[i].z).abs < TOL
@@ -2403,29 +2436,55 @@ module OSut
   end
 
   ##
-  # Returns OpenStudio 3D point (of a provided set) nearest to e.g. grid origin.
+  # Returns OpenStudio 3D point (in a set) nearest to a point of reference, e.g.
+  # grid origin. If left unspecified, the method systematically returns the
+  # bottom-left corner (BLC) of any horizontal set. If more than one point fits
+  # the initial criteria, the method relies on deterministic sorting through
+  # triangulation.
   #
   # @param pts [Set<OpenStudio::Point3d>] 3D points
-  # @param p0 [OpenStudio::Point3d] e.g. grid origin coordinates
+  # @param p01 [OpenStudio::Point3d] point of reference
   #
-  # @return [Integer] set index of nearest point to e.g. grid origin
+  # @return [Integer] set index of nearest point to point of reference
   # @return [nil] if invalid input (see logs)
-  def nearest(pts = nil, p0 = OpenStudio::Point3d.new(0,0,0))
+  def nearest(pts = nil, p01 = nil)
     mth = "OSut::#{__callee__}"
-    l   = 100000000000
+    l   = 100
+    d01 = 10000
+    d02 = 0
+    d03 = 0
     idx = nil
     pts = to_p3Dv(pts)
-    cl  = OpenStudio::Point3d
-    return mismatch("point", p0, cl, mth) unless p0.is_a?(cl)
+    return idx if pts.empty?
 
-    pts.each_with_index { |pt, i| return i if same?(pt, p0) }
+    p03 = OpenStudio::Point3d.new( l,-l,-l)
+    p02 = OpenStudio::Point3d.new( l, l, l)
+    p01 = OpenStudio::Point3d.new(-l,-l,-l) unless p01
+    return mismatch("point", p01, cl, mth) unless p01.is_a?(OpenStudio::Point3d)
+
+    pts.each_with_index { |pt, i| return i if same?(pt, p01) }
 
     pts.each_with_index do |pt, i|
-      length = (pt - p0).length
+      length01 = (pt - p01).length
+      length02 = (pt - p02).length
+      length03 = (pt - p03).length
 
-      if length < l
-        l   = length
+      if length01.round(2) == d01.round(2)
+        if length02.round(2) == d02.round(2)
+          if length03.round(2) > d03.round(2)
+            idx = i
+            d03 = length03
+          end
+        elsif length02.round(2) > d02.round(2)
+          idx = i
+          d03 = length03
+          d02 = length02
+        end
+      elsif length01.round(2) < d01.round(2)
         idx = i
+        d01 = length01
+        d02 = length02
+        d03 = length03
       end
     end
 
@@ -2433,29 +2492,55 @@ module OSut
   end
 
   ##
-  # Returns OpenStudio 3D point (of a provided set) farthest to e.g. grid origin.
+  # Returns OpenStudio 3D point (in a set) farthest from a point of reference,
+  # e.g. grid origin. If left unspecified, the method systematically returns the
+  # top-right corner (TRC) of any horizontal set. If more than one point fits
+  # the initial criteria, the method relies on deterministic sorting through
+  # triangulation.
   #
   # @param pts [Set<OpenStudio::Point3d>] 3D points
-  # @param p0 [OpenStudio::Point3d] e.g. grid origin coordinates
+  # @param p01 [OpenStudio::Point3d] point of reference
   #
-  # @return [Integer] set index of farthest point to e.g. grid origin
+  # @return [Integer] set index of farthest point from point of reference
   # @return [nil] if invalid input (see logs)
-  def farthest(pts = nil, p0 = OpenStudio::Point3d.new(0,0,0))
+  def farthest(pts = nil, p01 = nil)
     mth = "OSut::#{__callee__}"
-    l   = 0
+    l   = 100
+    d01 = 0
+    d02 = 10000
+    d03 = 10000
     idx = nil
     pts = to_p3Dv(pts)
-    cl  = OpenStudio::Point3d
-    return mismatch("point", p0, cl, mth) unless p0.is_a?(cl)
+    return idx if pts.empty?
+
+    p03 = OpenStudio::Point3d.new( l,-l,-l)
+    p02 = OpenStudio::Point3d.new( l, l, l)
+    p01 = OpenStudio::Point3d.new(-l,-l,-l) unless p01
+    return mismatch("point", p01, cl, mth) unless p01.is_a?(OpenStudio::Point3d)
 
     pts.each_with_index do |pt, i|
-      next if same?(pt, p0)
+      next if same?(pt, p01)
 
-      length = (pt - p0).length
+      length01 = (pt - p01).length
+      length02 = (pt - p02).length
+      length03 = (pt - p03).length
 
-      if length > l
-        l   = length
+      if length01.round(2) == d01.round(2)
+        if length02.round(2) == d02.round(2)
+          if length03.round(2) < d03.round(2)
+            idx = i
+            d03 = length03
+          end
+        elsif length02.round(2) < d02.round(2)
+          idx = i
+          d03 = length03
+          d02 = length02
+        end
+      elsif length01.round(2) > d01.round(2)
         idx = i
+        d01 = length01
+        d02 = length02
+        d03 = length03
       end
     end
 
@@ -2533,7 +2618,7 @@ module OSut
   #
   # @return [OpenStudio::Point3d] the next sequential point
   # @return [nil] if invalid input (see logs)
-  def next(pts = nil, pt = nil)
+  def nextUp(pts = nil, pt = nil)
     mth = "OSut::#{__callee__}"
     pts = to_p3Dv(pts)
     cl  = OpenStudio::Point3d
@@ -2546,9 +2631,9 @@ module OSut
   end
 
   ##
-  # Returns 'width' of a set of OpenStudio 3D points, once re/aligned.
+  # Returns 'width' of a set of OpenStudio 3D points.
   #
-  # @param pts [Set<OpenStudio::Point3d>] 3D points, once re/aligned
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
   #
   # @return [Float] width along X-axis, once re/aligned
   # @return [0.0] if invalid inputs
@@ -2656,13 +2741,12 @@ module OSut
   # Returns paired sequential points as (non-zero length) line segments. If the
   # set strictly holds 2x unique points, a single segment is returned.
   # Otherwise, the returned number of segments equals the number of unique
-  # points. If non-collinearity is requested, then the number of returned
-  # segments equals the number of non-colliear points.
+  # points.
   #
   # @param pts [Set<OpenStudio::Point3d>] 3D points
-  #^
+  #
   # @return [OpenStudio::Point3dVectorVector] line segments (see logs if empty)
-  def getSegments(pts = nil, co = false)
+  def getSegments(pts = nil)
     mth = "OSut::#{__callee__}"
     vv  = OpenStudio::Point3dVectorVector.new
     pts = getUniques(pts)
@@ -2752,39 +2836,59 @@ module OSut
   end
 
   ##
-  # Validates whether a 3D point lies along a set of 3D point segments.
+  # Validates whether a 3D point lies ~along a 3D point segment, i.e. less than
+  # 10mm from any segment.
   #
   # @param p0 [OpenStudio::Point3d] a 3D point
-  # @param s [Set<OpenStudio::Point3d] 3D point segments
+  # @param sg [Set<OpenStudio::Point3d] a 3D point segment
   #
-  # @return [Bool] whether a 3D point lies along a set of 3D point segments
+  # @return [Bool] whether a 3D point lies ~along a 3D point segment
   # @return [false] if invalid input (see logs)
-  def pointAlongSegments?(p0 = nil, s = [])
+  def pointAlongSegment?(p0 = nil, sg = [])
+    mth = "OSut::#{__callee__}"
+    cl1 = OpenStudio::Point3d
+    cl2 = OpenStudio::Point3dVector
+    return mismatch(  "point", p0, cl1, mth, DBG, false) unless p0.is_a?(cl1)
+    return mismatch("segment", sg, cl2, mth, DBG, false) unless segment?(sg)
+
+    return true if holds?(sg, p0)
+
+    a   = sg.first
+    b   = sg.last
+    ab  = b - a
+    abn = b - a
+    abn.normalize
+    ap  = p0 - a
+    sp = ap.dot(abn)
+    return false if sp < 0
+
+    apd = scalar(abn, sp)
+    return false if apd.length > ab.length + TOL
+
+    ap0 = a + apd
+    return true if (p0 - ap0).length.round(2) <= TOL
+
+    false
+  end
+
+  ##
+  # Validates whether a 3D point lies anywhere ~along a set of 3D point
+  # segments, i.e. less than 10mm from any segment.
+  #
+  # @param p0 [OpenStudio::Point3d] a 3D point
+  # @param sgs [Set<OpenStudio::Point3d] 3D point segments
+  #
+  # @return [Bool] whether a 3D point lies ~along a set of 3D point segments
+  # @return [false] if invalid input (see logs)
+  def pointAlongSegments?(p0 = nil, sgs = [])
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Point3d
     cl2 = OpenStudio::Point3dVectorVector
-    sgs = s.is_a?(cl2) ? s : getSegments(s)
+    sgs = sgs.is_a?(cl2) ? sgs : getSegments(sgs)
     return empty("segments",         mth, DBG, false)     if sgs.empty?
     return mismatch("point", p0, cl, mth, DBG, false) unless p0.is_a?(cl1)
 
-    sgs.each_with_index do |s, i|
-      return invalid("segments ##{i}", mth, 1, DBG, false) unless s.size == 2
-    end
-
-    sgs.each { |s| return true if holds?(s, p0) }
-
-    sgs.each do |s|
-      a   = s.first
-      b   = s.last
-      ab  = b - a
-      pa  = a - p0
-      pb  = b - p0
-      abl = ab.length
-      pal = pa.length
-      pbl = pb.length
-      next        if ab.cross(pa).length > 0.001
-      return true if pal < abl && pbl < abl
-    end
+    sgs.each { |sg| return true if pointAlongSegment?(p0, sg) }
 
     false
   end
@@ -2798,7 +2902,6 @@ module OSut
   # @return [OpenStudio::Point3d] point of intersection of both lines
   # @return [nil] if no intersection, equal, or invalid input (see logs)
   def getLineIntersection(s1 = [], s2 = [])
-    mth = "OSut::#{__callee__}"
     s1  = getSegments(s1)
     s2  = getSegments(s2)
     return nil if s1.empty?
@@ -2809,7 +2912,7 @@ module OSut
 
     # Matching segments?
     return nil if same?(s1, s2)
-    return nil if same?(s1, s2.reverse)
+    return nil if same?(s1, s2.to_a.reverse)
 
     a1 = s1[0]
     a2 = s1[1]
@@ -2828,42 +2931,47 @@ module OSut
     return b1 if pointAlongSegments?(b1, s1)
     return b2 if pointAlongSegments?(b2, s1)
 
-    # Line segments as vectors. Skip if colinear
+    # Line segments as vectors. Skip if colinear.
     a   = a2 - a1
     b   = b2 - b1
     xab = a.cross(b)
-    return nil if xab.length < 0.001
+    return nil if xab.length.round(4) < TOL2
 
-    # Link segment endpoints as vectors. Must be coplanar (re cross products).
+    # Link 1st point to other segment endpoints as vectors. Must be coplanar.
     a1b1  = b1 - a1
     a1b2  = b2 - a1
     xa1b1 = a.cross(a1b1)
     xa1b2 = a.cross(a1b2)
-    return nil unless xab.cross(xa1b1).length < 0.001
-    return nil unless xab.cross(xa1b2).length < 0.001
+    return nil unless xab.cross(xa1b1).length.round(4) < TOL2
+    return nil unless xab.cross(xa1b2).length.round(4) < TOL2
 
-    lxa1b1 = xa1b1.length
-    lxa1b2 = xa1b2.length
+    # Both segment endpoints can't be 'behind' point.
+    return nil if a.dot(a1b1) < 0 && a.dot(a1b2) < 0
 
-    # Pick 'b' endpoint farthest from 'a' (as 1x could be colinear).
-    c1    = lxa1b1 < lxa1b2 ? b2 : b1
-    c2    = same?(c1, b1)   ? b2 : b1
+    # Both in 'front' of point? Pick farthest from 'a'.
+    if a.dot(a1b1) > 0 && a.dot(a1b2) > 0
+      lxa1b1 = xa1b1.length
+      lxa1b2 = xa1b2.length
+
+      c1 = lxa1b1.round(4) < lxa1b2.round(4) ? b1 : b2
+    else
+      c1 = a.dot(a1b1) > 0 ? b1 : b2
+    end
+
     c1a1  = a1 - c1
     xc1a1 = a.cross(c1a1)
     d1    = a1 + xc1a1
     n     = a.cross(xc1a1)
     dot   = b.dot(n)
+    n     = n.reverseVector if dot < 0
+    f     = c1a1.dot(n) / b.dot(n)
+    p0    = c1 + scalar(b, f)
 
-    # Precaution, shouldn't be necessary ...
-    return zero("dot product (n, xc1a1)", mth) if dot.abs < 0.001
+    # Intersection can't be 'behind' point.
+    return nil if a.dot(p0 - a1) < 0
 
-    n  = n.reverseVector if dot < 0
-    f  = c1a1.dot(n) / b.dot(n)
-    p0 = c1 + scalar(b, f)
-
-    # Ensure intersection is sandwiched between 1st line segment endpoints.
-    return nil unless pointAlongSegments?(p0, s1)
-    return nil unless pointAlongSegments?(p0, s2)
+    # Ensure intersection is sandwiched between endpoints.
+    return nil unless pointAlongSegments?(p0, s2) && pointAlongSegments?(p0, s1)
 
     p0
   end
@@ -2877,7 +2985,6 @@ module OSut
   # @return [Bool] whether 3D line intersects 3D segments
   # @return [false] if invalid input (see logs)
   def lineIntersects?(l = [], s = [])
-    mth = "OSut::#{__callee__}"
     l   = getSegments(l)
     s   = getSegments(s)
     return nil if l.empty?
@@ -2885,7 +2992,7 @@ module OSut
 
     l = l.first
 
-    s.each { |segment| return true unless getLineIntersection(l, segment).nil? }
+    s.each { |segment| return true if getLineIntersection(l, segment) }
 
     false
   end
@@ -2901,46 +3008,70 @@ module OSut
     mth = "OSut::#{__callee__}"
     pts = to_p3Dv(pts)
     n   = false
-    return invalid("3+ points"         , mth, 1, DBG, n)     if pts.size < 3
-    return invalid("(unaligned) points", mth, 1, DBG, n) unless xyz?(pts, :z, 0)
+    return invalid("3+ points"  , mth, 1, DBG, n)     if pts.size < 3
+    return invalid("flat points", mth, 1, DBG, n) unless xyz?(pts, :z)
 
     OpenStudio.pointInPolygon(pts.first, pts, TOL)
   end
 
   ##
-  # Returns 'aligned' OpenStudio 3D points conforming to Openstudio's
-  # counterclockwise UpperLeftCorner (ULC) convention.
+  # Returns OpenStudio 3D points (min 3x) conforming to an UpperLeftCorner (ULC)
+  # convention. Points Z-axis values must be ~= 0. Points are returned
+  # counterclockwise.
   #
-  # @param pts [Set<OpenStudio::Point3d>] aligned 3D points
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
   #
   # @return [OpenStudio::Point3dVector] ULC points (see logs if empty)
   def ulc(pts = nil)
     mth = "OSut::#{__callee__}"
-    pts = to_p3Dv(pts)
     v   = OpenStudio::Point3dVector.new
-    p0  = OpenStudio::Point3d.new(0,0,0)
-    i0  = nil
-    return v if pts.empty?
-
+    pts = to_p3Dv(pts).to_a
     return invalid("points (3+)",      mth, 1, DBG, v)     if pts.size < 3
     return invalid("points (aligned)", mth, 1, DBG, v) unless xyz?(pts, :z)
 
     # Ensure counterclockwise sequence.
-    pts = pts.to_a
-    pts = pts.reverse if clockwise?(pts)
+    pts  = pts.reverse if clockwise?(pts)
+    minX = pts.min_by(&:x).x
+    i0   = nearest(pts)
+    p0   = pts[i0]
 
-    # Fetch index of candidate (0,0,0) point (i == 1, in most cases). Resort
-    # to last X == 0 point. Leave as is if failed attempts.
-    i0 = pts.index  { |pt| same?(pt, p0) }
-    i0 = pts.rindex { |pt| pt.x.abs < TOL } if i0.nil?
+    pts_x = pts.select { |pt| pt.x.round(2) == minX.round(2) }.reverse
 
-    unless i0.nil?
-      i   = pts.size - 1
-      i   = i0 - 1 unless i0 == 0
-      pts = pts.rotate(i)
-    end
+    p1 = pts_x.max_by { |pt| (pt - p0).length }
+    i1 = pts.index(p1)
 
-    to_p3Dv(pts)
+    to_p3Dv(pts.rotate(i1))
+  end
+
+  ##
+  # Returns OpenStudio 3D points (min 3x) conforming to an BottomLeftCorner
+  # (BLC) convention. Points Z-axis values must be ~= 0. Points are returned
+  # counterclockwise.
+  #
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
+  #
+  # @return [OpenStudio::Point3dVector] BLC points (see logs if empty)
+  def blc(pts = nil)
+    mth = "OSut::#{__callee__}"
+    v   = OpenStudio::Point3dVector.new
+    pts = to_p3Dv(pts).to_a
+    return invalid("points (3+)",      mth, 1, DBG, v)     if pts.size < 3
+    return invalid("points (aligned)", mth, 1, DBG, v) unless xyz?(pts, :z)
+
+    # Ensure counterclockwise sequence.
+    pts  = pts.reverse if clockwise?(pts)
+    minX = pts.min_by(&:x).x
+    i0   = nearest(pts)
+    p0   = pts[i0]
+
+    pts_x = pts.select { |pt| pt.x.round(2) == minX.round(2) }.reverse
+
+    return to_p3Dv(pts.rotate(i0)) if pts_x.include?(p0)
+
+    p1 = pts_x.min_by { |pt| (pt - p0).length }
+    i1 = pts.index(p1)
+
+    to_p3Dv(pts.rotate(i1))
   end
 
   ##
@@ -2978,9 +3109,8 @@ module OSut
     end
 
     n = n.to_i
-    n = 0    unless n.abs < pts.size
-    a = a[0..n]  if n > 0
-    a = a[n..-1] if n < 0
+    a = a[0..n-1]  if n > 0
+    a = a[n-1..-1] if n < 0
 
     to_p3Dv(a)
   end
@@ -3010,7 +3140,7 @@ module OSut
   # Returns an OpenStudio 3D point vector as basis for a valid OpenStudio 3D
   # polygon. In addition to basic OpenStudio polygon tests (e.g. all points
   # sharing the same 3D plane, non-self-intersecting), the method can
-  # optionally check for convexity, or ensure uniqueness and/or collinearity.
+  # optionally check for convexity, or ensure uniqueness and/or non-collinearity.
   # Returned vector can also be 'aligned', as well as in UpperLeftCorner (ULC)
   # counterclockwise sequence, or in clockwise sequence.
   #
@@ -3019,7 +3149,7 @@ module OSut
   # @param uq [Bool] whether to ensure uniqueness
   # @param co [Bool] whether to ensure non-collinearity
   # @param tt [Bool, OpenStudio::Transformation] whether to 'align'
-  # @param sq [:no, :ulc, :cw] unaltered, ULC or clockwise sequence
+  # @param sq [:no, :ulc, :blc, :cw] unaltered, ULC, BLC or clockwise sequence
   #
   # @return [OpenStudio::Point3dVector] 3D points (see logs if empty)
   def poly(pts = nil, vx = false, uq = false, co = false, tt = false, sq = :no)
@@ -3034,7 +3164,7 @@ module OSut
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Exit if mismatched/invalid arguments.
     ok1 = tt == true || tt == false || tt.is_a?(cl)
-    ok2 = sq == :no  || sq == :ulc  || sq == :cw
+    ok2 = sq == :no  || sq == :ulc  || sq == :blc || sq == :cw
     return invalid("transformation", mth, 5, DBG, v) unless ok1
     return invalid("sequence",       mth, 6, DBG, v) unless ok2
 
@@ -3050,33 +3180,22 @@ module OSut
       return empty("plane", mth, ERR, v) unless pln.pointOnPlane(pt)
     end
 
-    # A self-intersecting polygon will log the following:
-    # [utilities.Transformation] <1> Cannot compute outward normal for vertices
-    t = tt.is_a?(cl) ? tt : OpenStudio::Transformation.alignFace(pts)
-    a = (t.inverse * pts).reverse
-
-    # May reactivate the following in the future. For now, OpenStudio's
-    # selfIntersect will correctly catch a typical self-intersecting polygon
-    # (like a "bowtie"), yet unfortunately will also catch a valid polygon that
-    # may surround another (through the use of leader lines).
-    #
-    # acw = clockwise?(a) ? a : a.reverse
-    #
-    # if OpenStudio.selfIntersects(acw, TOL)
-    #   return invalid("polygon", mth, 1, ERR, v)
-    # end
+    t  = OpenStudio::Transformation.alignFace(pts)
+    at = (t.inverse * pts).reverse
 
     if tt.is_a?(cl)
-      # Using a transformation that is most likely not specific to pts. The
-      # most likely reason to retain this option is when testing for polygon
-      # intersections, unions, etc., operations that typically require that
-      # points remain nonetheless 'aligned'. If re-activated, this logs a
-      # warning if aligned points aren't @Z = 0, before 'flattening'.
-      #
-      #   invalid("points (non-aligned)", mth, 1, WRN) unless xyz?(a, :z, 0)
-      a = flatten(a).to_a unless xyz?(a, :z)
+      att = (tt.inverse * pts).reverse
+
+      if same?(at, att)
+        a = att
+        a = ulc(a).to_a if clockwise?(a)
+        t = nil
+      else
+        t = xyz?(att, :z) ? nil : OpenStudio::Transformation.alignFace(att)
+        a = t ? (t.inverse * att).reverse : att
+      end
     else
-      return invalid("(unaligned) points", mth, 1, ERR, v) unless xyz?(a, :z, 0)
+      a = at
     end
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
@@ -3089,43 +3208,43 @@ module OSut
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Check for convexity (optional).
-    if vx && p3.size > 3
+    if vx && a.size > 3
       zen = OpenStudio::Point3d.new(0, 0, 1000)
-      acw = clockwise?(a) ? a.clone : a.reverse
-      acw = getNonCollinears(acw)
 
-      getTriads(acw).each do |trio|
+      getTriads(a).each do |trio|
         p1  = trio[0]
         p2  = trio[1]
         p3  = trio[2]
         v12 = p2 - p1
         v13 = p3 - p1
         x   = (zen - p1).cross(v12)
-        return invalid("points (non-convex)", mth, 1, ERR, v) if x.dot(v13) > 0
+        return v if x.dot(v13).round(4) > 0
       end
     end
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Alter sequence (optional).
-    unless tt
+    if tt.is_a?(cl)
       case sq
       when :ulc
-        a = to_p3Dv(t * ulc(a.reverse))
+        a = t ? to_p3Dv(t * ulc(a.reverse)) : to_p3Dv(ulc(a.reverse))
+      when :blc
+        a = t ? to_p3Dv(t * blc(a.reverse)) : to_p3Dv(blc(a.reverse))
       when :cw
-        a = to_p3Dv(t * a)
-        a = OpenStudio.reverse(a) unless clockwise?(a)
+        a = t ? to_p3Dv(t * a) : to_p3Dv(a)
       else
-        a = to_p3Dv(t * a.reverse)
+        a = t ? to_p3Dv(t * a.reverse) : to_p3Dv(a.reverse)
       end
     else
       case sq
       when :ulc
-        a = ulc(a.reverse)
+        a = tt ? to_p3Dv(ulc(a.reverse)) : to_p3Dv(t * ulc(a.reverse))
+      when :blc
+        a = tt ? to_p3Dv(blc(a.reverse)) : to_p3Dv(t * blc(a.reverse))
       when :cw
-        a = to_p3Dv(a)
-        a = OpenStudio.reverse(a) unless clockwise?(a)
+        a = tt ? to_p3Dv(a) : to_p3Dv(t * a)
       else
-        a = to_p3Dv(a.reverse)
+        a = tt ? to_p3Dv(a.reverse) : to_p3Dv(t * a.reverse)
       end
     end
 
@@ -3133,44 +3252,60 @@ module OSut
   end
 
   ##
-  # Validates whether 3D point is entirely within a 3D polygon. False if point
-  # lies along any of the polygon edges, or is near any of its vertices.
+  # Validates whether 3D point is within a 3D polygon. If option 'entirely' is
+  # set to true, then the method returns false if point lies along any of the
+  # polygon edges, or is very near any of its vertices.
   #
   # @param p0 [OpenStudio::Point3d] a 3D point
   # @param s [Set<OpenStudio::Point3d] a 3D polygon
+  # @param entirely [Bool] whether point should be neatly within polygon limits
   #
-  # @return [Bool] whether a 3D point lies entirely within a 3D polygon
+  # @return [Bool] whether a 3D point lies within a 3D polygon
   # @return [false] if invalid input (see logs)
-  def pointWithinPolygon?(p0 = nil, s = [])
+  def pointWithinPolygon?(p0 = nil, s = [], entirely = false)
     mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Point3d
-    s   = poly(s, false, true)
+    s   = poly(s, false, true, true)
     return empty("polygon",          mth, DBG, false)     if s.empty?
     return mismatch("point", p0, cl, mth, DBG, false) unless p0.is_a?(cl)
 
-    # Along polygon edges, or near vertices?
-    sgs = getSegments(s)
-    return false if pointAlongSegments?(p0, sgs)
+    n = OpenStudio.getOutwardNormal(s)
+    return false if n.empty?
 
-    sgs.each do |sg|
+    n  = n.get
+    pl = OpenStudio::Plane.new(s.first, n)
+    return false unless pl.pointOnPlane(p0)
+
+    entirely = false unless [true, false].include?(entirely)
+    segments = getSegments(s)
+
+    # Along polygon edges, or near vertices?
+    if pointAlongSegments?(p0, segments)
+      return false    if entirely
+      return true unless entirely
+    end
+
+    segments.each do |segment|
       #   - draw vector from segment midpoint to point
-      #   - scale 10000x (assuming no building surface would be 10km wide)
+      #   - scale 1000x (assuming no building surface would be 1km wide)
       #   - convert vector to an independent line segment
       #   - loop through polygon segments, tally the number of intersections
-      #   - return false if number of intersections is even.
-      mpV = scalar(midpoint(sg.first, sg.last) - p0, 10000)
+      #   - avoid double-counting polygon vertices as intersections
+      #   - return false if number of intersections is even
+      mid = midpoint(segment.first, segment.last)
+      mpV = scalar(mid - p0, 1000)
       p1  = p0 + mpV
       ctr = 0
       pts = []
 
-      # Skip if collinear.
-      next if mpV.cross(sg.last - sg.first).length < TOL
+      # Skip if ~collinear.
+      next if (mpV.cross(segment.last - segment.first).length).round(4) < TOL2
 
-      sgs.each do |sg|
+      segments.each do |sg|
         intersect = getLineIntersection([p0, p1], sg)
-        next if intersect.nil?
+        next unless intersect
 
-        # If intersection ~= polygon vertex, ignore if already accounted for.
+        # One of the polygon vertices?
         if holds?(s, intersect)
           next if holds?(pts, intersect)
 
@@ -3180,6 +3315,7 @@ module OSut
         ctr += 1
       end
 
+      next         if ctr.zero?
       return false if ctr.even?
     end
 
@@ -3195,7 +3331,6 @@ module OSut
   # @return [Bool] whether 2 polygons are parallel
   # @return [false] if invalid input (see logs)
   def parallel?(p1 = nil, p2 = nil)
-    mth = "OSut::#{__callee__}"
     p1  = poly(p1, false, true, false)
     p2  = poly(p2, false, true, false)
     return false if p1.empty?
@@ -3220,7 +3355,6 @@ module OSut
   # @return [Bool] if facing upwards
   # @return [false] if invalid input (see logs)
   def facingUp?(pts = nil)
-    mth = "OSut::#{__callee__}"
     up  = OpenStudio::Point3d.new(0,0,1) - OpenStudio::Point3d.new(0,0,0)
     pts = poly(pts, false, true, false)
     return false if pts.empty?
@@ -3239,7 +3373,6 @@ module OSut
   # @return [Bool] if facing downwards
   # @return [false] if invalid input (see logs)
   def facingDown?(pts = nil)
-    mth = "OSut::#{__callee__}"
     lo  = OpenStudio::Point3d.new(0,0,-1) - OpenStudio::Point3d.new(0,0,0)
     pts = poly(pts, false, true, false)
     return false if pts.empty?
@@ -3252,14 +3385,13 @@ module OSut
 
   ##
   # Validates whether an OpenStudio polygon is a rectangle (4x sides + 2x
-  # diagonals of equal length).
+  # diagonals of equal length, meeting at midpoints).
   #
   # @param pts [Set<OpenStudio::Point3d>] 3D points
   #
   # @return [Bool] whether polygon is rectangular
   # @return [false] if invalid input (see logs)
   def rectangular?(pts = nil)
-    mth = "OSut::#{__callee__}"
     pts = poly(pts, false, false, false)
     return false     if pts.empty?
     return false unless pts.size == 4
@@ -3276,116 +3408,150 @@ module OSut
   end
 
   ##
-  # Determines whether a 1st OpenStudio polygon fits in a 2nd polygon. If the
-  # optional 3rd argument is set to false, the 1st polygon may only fit if it
-  # shares the 3D plane equation of the 2nd one. If the 3rd argument instead
-  # remains true (default), then the 1st polygon is first cast onto the 3D plane
-  # of the 2nd one; the method therefore returns true if the projection of the
-  # 1st polygon fits in the 2nd one.
+  # Validates whether an OpenStudio polygon is a square (rectangular, 4x ~equal
+  # sides).
   #
-  # @param p1 [Set<OpenStudio::Point3d>] 1st set of 3D points
-  # @param p2 [Set<OpenStudio::Point3d>] 2nd set of 3D points
-  # @param flat [Bool] whether to first cast the 1st set onto the 2nd set plane
+  # @param pts [Set<OpenStudio::Point3d>] 3D points
   #
-  # @return [Bool] whether 1st polygon fits within the 2nd polygon
+  # @return [Bool] whether polygon is a square
   # @return [false] if invalid input (see logs)
-  def fits?(p1 = nil, p2 = nil, flat = true)
-    mth  = "OSut::#{__callee__}"
-    flat = true unless [true, false].include?(flat)
-    p1   = poly(p1, false, true, false)
-    p2   = poly(p2, false, true, false)
-    return false if p1.empty?
-    return false if p2.empty?
+  def square?(pts = nil)
+    d   = nil
+    pts = poly(pts, false, false, false)
+    return false if pts.empty?
+    return false unless rectangular?(pts)
 
-    # Aligned, clockwise points using transformation from 2nd polygon.
-    t  = OpenStudio::Transformation.alignFace(p2)
-    p1 = poly(p1, false, false, true, t, :cw)
-    p2 = poly(p2, false, false, true, t, :cw)
-    return false if p1.empty?
-    return false if p2.empty?
-
-    # If flat == false, return false unless p1 is flat.
-    if flat
-      p1 = flatten(p1)
-    else
-      return false unless xyz?(p1, :z)
+    getSegments(pts).each do |pt|
+      l = (pt[1] - pt[0]).length
+      d = l unless d
+      return false unless l.round(2) == d.round(2)
     end
 
-    area1 = OpenStudio.getArea(p1)
-    area2 = OpenStudio.getArea(p2)
-    return empty("points 1 area", mth, ERR, false) if area1.empty?
-    return empty("points 2 area", mth, ERR, false) if area2.empty?
-
-    area1 = area1.get
-    area2 = area2.get
-    union = OpenStudio.join(p1, p2, TOL2)
-    return false if union.empty?
-
-    union = union.get
-    area  = OpenStudio.getArea(union)
-    return false if area.empty?
-
-    area = area.get
-
-    if area > TOL
-      return true if (area - area2).abs < TOL
-    end
-
-    false
+    true
   end
 
   ##
-  # Returns largest intersection of overlapping polygons, empty if non
-  # intersecting. If the optional 3rd argument is set to false, the 2nd polygon
-  # may only overlap if it shares the 3D plane equation of the 1st one. If the
-  # 3rd argument instead remains true (default), then the 2nd polygon is first
-  # cast onto the 3D plane of the 1st one; the method therefore returns (as
-  # overlap) the intersection of a projection of the 2nd polygon onto the 1st
-  # one. The method returns the smallest of the 2 polygons if either fits within
-  # the larger one.
+  # Determines whether a 1st OpenStudio polygon fits in a 2nd polygon. Vertex
+  # sequencing of both polygons must be counterclockwise. If option 'entirely'
+  # is set to true, then the method returns false if point lies along any of the
+  # polygon edges, or is very near any of its vertices.
+  #
+  # @param p1 [Set<OpenStudio::Point3d>] 1st set of 3D points
+  # @param p2 [Set<OpenStudio::Point3d>] 2nd set of 3D points
+  # @param entirely [Bool] whether point should be neatly within polygon limits
+  #
+  # @return [Bool] whether 1st polygon fits within the 2nd polygon
+  # @return [false] if invalid input (see logs)
+  def fits?(p1 = nil, p2 = nil, entirely = false)
+    pts = []
+    p1  = poly(p1)
+    p2  = poly(p2)
+    return false if p1.empty?
+    return false if p2.empty?
+
+    p1.each { |p0| return false unless pointWithinPolygon?(p0, p2) }
+
+    entirely = false unless [true, false].include?(entirely)
+    return true unless entirely
+
+    p1.each { |p0| return false unless pointWithinPolygon?(p0, p2, entirely) }
+
+    true
+  end
+
+  ##
+  # Returns intersection of overlapping polygons, empty if non intersecting. If
+  # the optional 3rd argument is left as false, the 2nd polygon may only overlap
+  # if it shares the 3D plane equation of the 1st one. If the 3rd argument is
+  # instead set to true, then the 2nd polygon is first cast onto the 3D plane of
+  # the 1st one; the method therefore returns (as overlap) the intersection of a
+  # projection of the 2nd polygon onto the 1st one. The method returns the
+  # smallest of the 2 polygons if either fits within the larger one.
   #
   # @param p1 [Set<OpenStudio::Point3d>] 1st set of 3D points
   # @param p2 [Set<OpenStudio::Point3d>] 2nd set of 3D points
   # @param flat [Bool] whether to first align the 2nd set onto the 1st set plane
   #
   # @return [OpenStudio::Point3dVector] largest intersection (see logs if empty)
-  def overlap(p1 = nil, p2 = nil, flat = true)
+  def overlap(p1 = nil, p2 = nil, flat = false)
     mth  = "OSut::#{__callee__}"
-    flat = true unless [true, false].include?(flat)
+    flat = false unless [true, false].include?(flat)
     face = OpenStudio::Point3dVector.new
-    p1   = poly(p1, false, true, false)
-    p2   = poly(p2, false, true, false)
-    return face if p1.empty?
-    return face if p2.empty?
+    p01  = poly(p1)
+    p02  = poly(p2)
+    return empty("points 1", mth, DBG, face) if p01.empty?
+    return empty("points 2", mth, DBG, face) if p02.empty?
+    return p01 if fits?(p01, p02)
+    return p02 if fits?(p02, p01)
 
-    pl1 = OpenStudio::Plane.new(getNonCollinears(p1, 3))
-    pl2 = OpenStudio::Plane.new(getNonCollinears(p2, 3))
-    n1  = pl1.outwardNormal
-    n2  = pl2.outwardNormal
-    t   = OpenStudio::Transformation.alignFace(p1)
-    a1  = poly(p1, false, false, true, t, :cw)
-    a2  = poly(p2, false, false, true, t, :cw)
+    if xyz?(p01, :z)
+      t   = nil
+      cw1 = clockwise?(p01)
+      a1  = cw1 ? p01.to_a.reverse : p01.to_a
+      a2  = p02.to_a
+      a2  = flatten(a2).to_a if flat
+      return invalid("points 2", mth, 2, DBG, face) unless xyz?(a2, :z)
 
-    # If flat == false, return face unless a2 is flat.
-    if flat
-      a2 = flatten(a2)
+      cw2 = clockwise?(a2)
+      a2  = a2.reverse if cw2
     else
-      return face unless xyz?(a2, :z)
+      t   = OpenStudio::Transformation.alignFace(p01)
+      a1  = t.inverse * p01
+      a2  = t.inverse * p02
+      a2  = flatten(a2).to_a if flat
+      return invalid("points 2", mth, 2, DBG, face) unless xyz?(a2, :z)
+
+      cw2 = clockwise?(a2)
+      a2  = a2.reverse if cw2
     end
 
-    if fits?(a1, a2)
-      return p1
-    elsif fits?(a2, a1)
-      pl02 = OpenStudio::Plane.new(getNonCollinears(a2, 3))
-      n02  = pl02.outwardNormal
-      a2   = to_p3Dv(a2.to_a.reverse) if n1.dot(n02) < 0
-      return to_p3Dv(t * a2)
+    # Return either (transformed) polygon if one fits into the other.
+    p1t = p01
+
+    if t
+      p2t = to_p3Dv(cw2 ? t * a2 : t * a2.reverse)
+    else
+      if cw1
+        p2t = to_p3Dv(cw2 ? a2.reverse : a2)
+      else
+        p2t = to_p3Dv(cw2 ? a2 : a2.reverse)
+      end
     end
 
-    res = OpenStudio.intersect(a1, a2, TOL)
+    return p1t if fits?(a1, a2)
+    return p2t if fits?(a2, a1)
+
+    area1 = OpenStudio.getArea(a1)
+    area2 = OpenStudio.getArea(a2)
+    return empty("points 1 area", mth, ERR, face) if area1.empty?
+    return empty("points 2 area", mth, ERR, face) if area2.empty?
+
+    area1 = area1.get
+    area2 = area2.get
+    union = OpenStudio.join(a1.reverse, a2.reverse, TOL2)
+    return face if union.empty?
+
+    union = union.get
+    area  = OpenStudio.getArea(union)
+    return face if area.empty?
+
+    area  = area.get
+    delta = area1 + area2 - area
+
+    if area > TOL
+      return face if  area.round(2) == area1.round(2)
+      return face if  area.round(2) == area2.round(2)
+      return face if delta.round(2) == 0
+    end
+
+    res = OpenStudio.intersect(a1.reverse, a2.reverse, TOL)
     return face if res.empty?
 
-    to_p3Dv(t * res.get.polygon1.reverse)
+    res  = res.get
+    res1 = res.polygon1
+    return face if res1.empty?
+
+    to_p3Dv(t ? t * res1.reverse : res1.reverse)
   end
 
   ##
@@ -3397,7 +3563,7 @@ module OSut
   #
   # @return [Bool] whether polygons overlap (or fit)
   # @return [false] if invalid input (see logs)
-  def overlaps?(p1 = nil, p2 = nil, flat = true)
+  def overlaps?(p1 = nil, p2 = nil, flat = false)
     overlap(p1, p2, flat).empty? ? false : true
   end
 
@@ -3414,8 +3580,8 @@ module OSut
     mth  = "OSut::#{__callee__}"
     cl   = OpenStudio::Vector3d
     face = OpenStudio::Point3dVector.new
-    p1   = poly(p1, false, false, false)
-    p2   = poly(p2, false, false, false)
+    p1   = poly(p1)
+    p2   = poly(p2)
     return face if p1.empty?
     return face if p2.empty?
     return mismatch("ray", ray, cl, mth) unless ray.is_a?(cl)
@@ -3746,31 +3912,30 @@ module OSut
   end
 
   ##
-  # Generates a box from a triad (3D points). Points must be unique and
+  # Generates a BLC box from a triad (3D points). Points must be unique and
   # non-collinear.
   #
   # @param [Set<OpenStudio::Point3d>] a triad (3D points)
   #
-  # @return [Set<OpenStudio::Point3D>] a generated rectangle (see logs if empty)
+  # @return [Set<OpenStudio::Point3D>] a rectangular ULC box (see logs if empty)
   def triadBox(pts = nil)
     mth = "OSut::#{__callee__}"
     bkp = OpenStudio::Point3dVector.new
-    box = OpenStudio::Point3dVector.new
+    box = []
     pts = getNonCollinears(pts)
     return bkp if pts.empty?
 
     t   = xyz?(pts, :z) ? nil : OpenStudio::Transformation.alignFace(pts)
-    pts = poly(pts, false, false, false, t) if t
+    pts = poly(pts, false, true, true, t) if t
     return bkp if pts.empty?
     return invalid("triad", mth, 1, ERR, bkp) unless pts.size == 3
 
-    cw = clockwise?(pts)
+    pts = to_p3Dv(pts.to_a.reverse) if clockwise?(pts)
+    p0  = pts[0]
+    p1  = pts[1]
+    p2  = pts[2]
 
-    p0 = pts[0]
-    p1 = pts[1]
-    p2 = pts[2]
-
-    # Cast p1 unto vertical plane defined by p1/p2.
+    # Cast p0 unto vertical plane defined by p1/p2.
     pp0 = verticalPlane(p1, p2).project(p0)
     v00 = p0  - pp0
     v11 = pp0 - p1
@@ -3795,23 +3960,16 @@ module OSut
     box << OpenStudio::Point3d.new(p2.x, p2.y, p2.z)
     box << OpenStudio::Point3d.new(p3.x, p3.y, p3.z)
 
-    return invalid("box", mth, 0, ERR, bkp) unless rectangular?(box)
+    box = blc(box)
+    return bkp unless rectangular?(box)
 
-    clockwise = clockwise?(box)
-
-    if cw
-      box = OpenStudio.reverse(box) unless clockwise
-    else
-      box = OpenStudio.reverse(box) if clockwise
-    end
-
-    box = ulc(box) unless cw
     box = to_p3Dv(t * box) if t
+
     box
   end
 
   ##
-  # Generates a box bounded within a triangle (midpoint theorem).
+  # Generates a BLC box bounded within a triangle (midpoint theorem).
   #
   # pts [Set<OpenStudio::Point3d>] triangular polygon
   #
@@ -3819,7 +3977,7 @@ module OSut
   def medialBox(pts = nil)
     mth = "OSut::#{__callee__}"
     bkp = OpenStudio::Point3dVector.new
-    box = OpenStudio::Point3dVector.new
+    box = []
     pts = poly(pts, true, true, true)
     return bkp if pts.empty?
     return invalid("triangle", mth, 1, ERR, bkp) unless pts.size == 3
@@ -3828,7 +3986,7 @@ module OSut
     pts = poly(pts, false, false, false, t) if t
     return bkp if pts.empty?
 
-    cw = clockwise?(pts)
+    pts = to_p3Dv(pts.to_a.reverse) if clockwise?(pts)
 
     # Generate vertical plane along longest segment.
     mpoints = []
@@ -3839,34 +3997,24 @@ module OSut
     # Fetch midpoints of other 2 segments.
     sgs.each { |s| mpoints << midpoint(s.first, s.last) unless s == longest }
 
-    return invalid("midpoints", mth, 0, ERR, bkp) unless mpoints.size == 2
+    return bkp unless mpoints.size == 2
 
     # Generate medial bounded box.
     box << plane.project(mpoints.first)
     box << mpoints.first
     box << mpoints.last
     box << plane.project(mpoints.last)
+    box = clockwise?(box) ? blc(box.reverse) : blc(box)
+    return bkp unless rectangular?(box)
+    return bkp unless fits?(box, pts)
 
-    return invalid("box", mth, 0, ERR, bkp) unless rectangular?(box)
-
-    clockwise = clockwise?(box)
-
-    if cw
-      box = OpenStudio.reverse(box) unless clockwise
-    else
-      box = OpenStudio.reverse(box) if clockwise
-    end
-
-    return invalid("unfit medial", mth, 1, ERR, bkp) unless fits?(box, pts)
-
-    box = ulc(box) unless cw
     box = to_p3Dv(t * box) if t
+
     box
   end
 
   ##
-  # Generates a bounded box within a polygon. Returns a ULC sequence if original
-  # points are counterclockwise.
+  # Generates a BLC bounded box within a polygon.
   #
   # @param pts [Set<OpenStudio::Point3d>] OpenStudio 3D points
   #
@@ -3877,22 +4025,21 @@ module OSut
 
     mth = "OSut::#{__callee__}"
     bkp = OpenStudio::Point3dVector.new
-    box = OpenStudio::Point3dVector.new
-    pts = poly(pts, false, true)
+    box = []
+    pts = poly(pts, false, true, true)
     return bkp if pts.empty?
 
     t   = xyz?(pts, :z) ? nil : OpenStudio::Transformation.alignFace(pts)
-    pts = poly(pts, false, false, false, t) if t
+    pts = t.inverse * pts if t
     return bkp if pts.empty?
 
-    cw = clockwise?(pts)
+    pts = to_p3Dv(pts.to_a.reverse) if clockwise?(pts)
 
     # PATH A : Return medial bounded box if polygon is a triangle.
     if pts.size == 3
       box = medialBox(pts)
 
       unless box.empty?
-        box = ulc(box) unless cw
         box = to_p3Dv(t * box) if t
         return box
       end
@@ -3900,14 +4047,13 @@ module OSut
 
     # PATH B : Return polygon itself if already rectangular.
     if rectangular?(pts)
-      box = ulc(pts) unless cw
       box = t ? to_p3Dv(t * pts) : pts
       return box
     end
 
-    # PATH C : Right-angle, midpoint triad approach.
     aire = 0
 
+    # PATH C : Right-angle, midpoint triad approach.
     getSegments(pts).each do |sg|
       m0 = midpoint(sg.first, sg.last)
 
@@ -3921,7 +4067,7 @@ module OSut
 
         out = triadBox(OpenStudio::Point3dVector.new([m0, p1, p2]))
         next if out.empty?
-        next unless fits?(out, pts, false)
+        next unless fits?(out, pts)
 
         area = OpenStudio.getArea(out)
         next if area.empty?
@@ -3946,7 +4092,7 @@ module OSut
 
         out = triadBox(OpenStudio::Point3dVector.new([p0, p1, p2]))
         next if out.empty?
-        next unless fits?(out, pts, false)
+        next unless fits?(out, pts)
 
         area = OpenStudio.getArea(out)
         next if area.empty?
@@ -3961,7 +4107,6 @@ module OSut
     end
 
     unless aire < TOL
-      box = ulc(box) unless cw
       box = to_p3Dv(t * box) if t
       return box
     end
@@ -3977,9 +4122,9 @@ module OSut
         next if same?(p2, p0)
         next if same?(p2, p1)
 
-        out = medialBox(OpenStudio::Point3dVector.new(p0, p1, p2))
+        out = medialBox(OpenStudio::Point3dVector.new([p0, p1, p2]))
         next if out.empty?
-        next unless fits?(out, pts, false)
+        next unless fits?(out, pts)
 
         area = OpenStudio.getArea(box)
         next if area.empty?
@@ -3994,7 +4139,6 @@ module OSut
     end
 
     unless aire < TOL
-      box = ulc(box) unless cw
       box = to_p3Dv(t * box) if t
       return box
     end
@@ -4007,9 +4151,9 @@ module OSut
       p1 = sg[1]
       p2 = sg[2]
 
-      out = medialBox(OpenStudio::Point3dVector.new(p0, p1, p2))
+      out = medialBox(OpenStudio::Point3dVector.new([p0, p1, p2]))
       next if out.empty?
-      next unless fits?(out, pts, false)
+      next unless fits?(out, pts)
 
       area = OpenStudio.getArea(box)
       next if area.empty?
@@ -4023,14 +4167,13 @@ module OSut
     end
 
     unless aire < TOL
-      box = ulc(box) unless cw
       box = to_p3Dv(t * box) if t
       return box
     end
 
     # PATH G : Medial box, triangulated approach.
     aire  = 0
-    outer = poly(pts, false, true, true, false, :cw)
+    outer = to_p3Dv(pts.to_a.reverse)
     holes = OpenStudio::Point3dVectorVector.new
 
     OpenStudio.computeTriangulation(outer, holes).each do |triangle|
@@ -4042,9 +4185,9 @@ module OSut
           next if same?(p2, p0)
           next if same?(p2, p1)
 
-          out = medialBox(OpenStudio::Point3dVector.new(p0, p1, p2))
+          out = medialBox(OpenStudio::Point3dVector.new([p0, p1, p2]))
           next if out.empty?
-          next unless fits?(out, pts, false)
+          next unless fits?(out, pts)
 
           area = OpenStudio.getArea(out)
           next if area.empty?
@@ -4061,16 +4204,8 @@ module OSut
 
     return bkp if aire < TOL
 
-    clockwise = clockwise?(box)
-
-    if cw
-      box = OpenStudio.reverse(box) unless clockwise
-    else
-      box = OpenStudio.reverse(box) if clockwise
-    end
-
-    box = ulc(box) unless cw
     box = to_p3Dv(t * box) if t
+
     box
   end
 
@@ -4100,24 +4235,45 @@ module OSut
     pts = poly(pts, false, true)
     return out if pts.empty?
     return invalid("aligned plane", mth, 1, DBG, out) unless xyz?(pts, :z)
+    return invalid("clockwise pts", mth, 1, DBG, out)     if clockwise?(pts)
 
-    cw   = clockwise?(pts)
-    w    = width(pts)
-    h    = height(pts)
-    d    = h > w ? h : w
-    box  = boundedBox(pts)
-    return invalid("bounded box" , mth, 0, DBG, out) if box.empty?
+    o   = OpenStudio::Point3d.new(0, 0, 0)
+    w   = width(pts)
+    h   = height(pts)
+    d   = h > w ? h : w
+    sgs = {}
+    box = boundedBox(pts)
+    return invalid("bounded box", mth, 0, DBG, out) if box.empty?
 
-    s = getSegments(box)
-    return invalid("bounded box segments", mth, 0, DBG, out) if s.empty?
+    segments = getSegments(box)
+    return invalid("bounded box segments", mth, 0, DBG, out) if segments.empty?
 
-    i        = ((s[0][1] - s[0][0]).length < (s[1][1] - s[1][0]).length) ? 0 : 1
-    k        = i + 2
-    mid0     = midpoint(s[i][0], s[i][1])
-    mid1     = midpoint(s[k][0], s[k][1])
-    o        = OpenStudio::Point3d.new(0, 0, 0)
-    origin   = ((o - mid0).length < (o - mid1).length) ? mid0 : mid1
-    terminal = ((o - mid0).length < (o - mid1).length) ? mid1 : mid0
+    # Deterministic ID of box rotation/translation 'origin'.
+    segments.each_with_index do |sg, idx|
+      sgs[sg]       = {}
+      sgs[sg][:idx] = idx
+      sgs[sg][:mid] = midpoint(sg[0], sg[1])
+      sgs[sg][:l  ] = (sg[1] - sg[0]).length
+      sgs[sg][:mo ] = (sgs[sg][:mid] - o).length
+    end
+
+    sgs = sgs.sort_by { |sg, s| s[:mo] }.first(2).to_h     if square?(box)
+    sgs = sgs.sort_by { |sg, s| s[:l ] }.first(2).to_h unless square?(box)
+    sgs = sgs.sort_by { |sg, s| s[:mo] }.first(2).to_h unless square?(box)
+
+    sg0 = sgs.values[0]
+    sg1 = sgs.values[1]
+
+    if (sg0[:mo]).round(2) == (sg1[:mo]).round(2)
+      i = sg1[:mid].y.round(2) < sg0[:mid].y.round(2) ? sg1[:idx] : sg0[:idx]
+    else
+      i = sg0[:idx]
+    end
+
+    k = i + 2 < segments.size ? i + 2 : i - 2
+
+    origin   = midpoint(segments[i][0], segments[i][1])
+    terminal = midpoint(segments[k][0], segments[k][1])
     seg      = terminal - origin
     right    = OpenStudio::Point3d.new(origin.x + d, origin.y    , 0) - origin
     north    = OpenStudio::Point3d.new(origin.x,     origin.y + d, 0) - origin
@@ -4125,23 +4281,16 @@ module OSut
     angle    = OpenStudio::getAngle(right, seg)
     angle    = -angle if north.dot(seg) < 0
     r        = OpenStudio.createRotation(origin, axis, angle)
-    pts      = poly(r.inverse * pts)
-    box      = poly(r.inverse * box)
+    pts      = to_p3Dv(r.inverse * pts)
+    box      = to_p3Dv(r.inverse * box)
     dX       = pts.min_by(&:x).x
     dY       = pts.min_by(&:y).y
     xy       = OpenStudio::Point3d.new(origin.x + dX, origin.y + dY, 0)
     origin2  = xy - origin
     t        = OpenStudio.createTranslation(origin2)
-    set      = poly(t.inverse * pts)
-    box      = poly(t.inverse * box, false, false, false, false, :ulc)
+    set      = t.inverse * pts
+    box      = t.inverse * box
     bbox     = outline([set])
-    clckwise = clockwise?(bbox)
-
-    if cw
-      bbox = OpenStudio.reverse(bbox) unless clckwise
-    else
-      bbox = OpenStudio.reverse(bbox) if clckwise
-    end
 
     out[:set ] = set
     out[:box ] = box
@@ -4191,12 +4340,12 @@ module OSut
   # Generates leader line anchors, linking polygon vertices to one or more sets
   # (Hashes) of sequenced vertices. By default, the method seeks to link set
   # :vtx (key) vertices (users can select another collection of vertices, e.g.
-  # tag == :box). The method does not validate individual sets of vertices (e.g.
-  # non-coplanarity, self-intersecting, inter-set conflicts). Potential leader
-  # lines cannot intersect each other, other 'tagged' set vertices or original
-  # polygon edges. For highly-articulated cases (e.g. a narrow polygon with
-  # multiple concavities, holding multiple sets), such leader line conflicts
-  # will undoubtedly occur. The method relies on a 'first-come-first-served'
+  # tag == :box). The method minimally validates individual sets of vertices
+  # (e.g. coplanarity, non-self-intersecting, no inter-set conflicts). Potential
+  # leader lines cannot intersect each other, other 'tagged' set vertices or
+  # original polygon edges. For highly-articulated cases (e.g. a narrow polygon
+  # with multiple concavities, holding multiple sets), such leader line
+  # conflicts will surely occur. The method relies on a 'first-come-first-served'
   # approach: sets without leader lines are ignored (check for set :void keys,
   # see error logs). It is recommended to sort sets prior to calling the method.
   #
@@ -4207,27 +4356,31 @@ module OSut
   # @return [Integer] number of successfully-generated anchors (check logs)
   def genAnchors(s = nil, set = [], tag = :vtx)
     mth = "OSut::#{__callee__}"
+    dZ  = nil
+    t   = nil
     id  = s.respond_to?(:nameString) ? "#{s.nameString}: " : ""
-    f   = false
-    pts = poly(s, f, f, f)
+    pts = poly(s)
     n   = 0
     return n if pts.empty?
     return mismatch("set", set, Array, mth, DBG, n) unless set.respond_to?(:to_a)
 
     set = set.to_a
-    t   = OpenStudio::Transformation.alignFace(pts)
-    pts = t.inverse * pts
 
     # Validate individual sets. Purge surface-specific leader line anchors.
     set.each_with_index do |st, i|
-      str = id + "set ##{i+1}"
-      return mismatch(str, st, Hash,  mth, DBG, a) unless st.respond_to?(:key?)
-      return hashkey( str, st,  tag,  mth, DBG, a) unless st.key?(tag)
-      return empty("#{str} vertices", mth, DBG, a) if st[tag].empty?
+      str1 = id + "set ##{i+1}"
+      str2 = str1 + " #{tag.to_s}"
+      return mismatch(str1, st, Hash,  mth, DBG, n) unless st.respond_to?(:key?)
+      return hashkey( str1, st,  tag,  mth, DBG, n) unless st.key?(tag)
+      return empty("#{str2} vertices", mth, DBG, n) if st[tag].empty?
+
+      stt = poly(st[tag])
+      return invalid("#{str2} polygon", mth, 0, DBG, n) if stt.empty?
+      return invalid("#{str2} gap", mth, 0, DBG, n) unless fits?(stt, pts, true)
 
       if st.key?(:ld)
         ld = st[:ld]
-        return invalid("#{id} leaders", mth, 0, DBG, a) unless ld.is_a?(Hash)
+        return invalid("#{str1} leaders", mth, 0, DBG, n) unless ld.is_a?(Hash)
 
         ld.reject! { |k, _| k == s }
       else
@@ -4235,31 +4388,49 @@ module OSut
       end
     end
 
-    # Set leader lines anchors.
-    pts.each_with_index do |pt, k|
-      set.each_with_index do |st, i|
-        next if st[:ld].key?(s)
+    if facingUp?(pts)
+      if xyz?(pts, :z)
+        dZ = 0
+      else
+        dZ = pts.first.z
+        pts = flatten(pts).to_a
+      end
+    else
+      t  = OpenStudio::Transformation.alignFace(pts)
+      pts = t.inverse * pts
+    end
 
-        p1 = (t.inverse * st[tag]).first
-        ld = [pt, p1]
-        nb = 0
+    # Set leader lines anchors. Gather candidate leader line anchors; select
+    # anchor with shortest distance to first vertex of 'tagged' set.
+    set.each_with_index do |st, i|
+      candidates = []
+      break if st[:ld].key?(s)
+
+      stt = dZ ? flatten(st[tag]).to_a : t.inverse * st[tag]
+      p1  = stt.first
+
+      pts.each_with_index do |pt, k|
+        ld  = [pt, p1]
+        nb  = 0
 
         # Check for intersections between leader line and polygon edges.
         getSegments(pts).each do |sg|
-          next unless nb.zero?
+          break unless nb.zero?
           next if holds?(sg, pt)
 
-          nb += 1 unless getLineIntersection(sg, ld).nil?
+          nb += 1 if lineIntersects?(sg, ld)
         end
 
         next unless nb.zero?
 
         # Check for intersections between candidate leader line and other sets.
         set.each_with_index do |other, j|
-          next unless nb.zero?
+          break unless nb.zero?
           next if i == j
 
-          sgj = getSegments(t.inverse * other[tag])
+          ost = dZ ? flatten(other[tag]).to_a : t.inverse * other[tag]
+          sgj = getSegments(ost)
+
           sgj.each { |sg| nb += 1 if lineIntersects?(ld, sg) }
         end
 
@@ -4267,39 +4438,48 @@ module OSut
 
         # ... and previous leader lines (first come, first serve basis).
         set.each_with_index do |other, j|
-          next unless nb.zero?
+          break unless nb.zero?
           next if i == j
           next unless other[:ld].key?(s)
 
-          pj  = other[tag].first
-          ldj = [ other[:ld][s], pj ]
-          nb += 1 if lineIntersects?(ld, t.inverse * ldj)
+          ost = other[tag]
+          pj  = ost.first
+          old = other[:ld][s]
+          ldj = dZ ? flatten([ old, pj ]) : t.inverse * [ old, pj ]
+
+          unless same?(old, pt)
+            nb += 1 if lineIntersects?(ld, ldj)
+          end
         end
 
         next unless nb.zero?
 
         # Finally, check for self-intersections.
-        getSegments(t.inverse * st[tag]).each do |sg|
-          next unless nb.zero?
+        getSegments(stt).each do |sg|
+          break unless nb.zero?
           next if holds?(sg, p1)
 
-          nb += 1 unless getLineIntersection(sg, ld).nil?
+          nb += 1 if lineIntersects?(sg, ld)
+          nb += 1 if (sg.first - sg.last).cross(ld.first - ld.last).length < TOL
         end
 
-        # Only consider sets with valid leader line anchor points.
-        if nb.zero?
-          st[:ld][s] = t * pt
-          n += 1
-        end
+        candidates << pt if nb.zero?
       end
-    end
 
-    # Log unsuccessful attempts.
-    set.each_with_index do |st, i|
-      unless st[:ld].key?(s)
+      if candidates.empty?
         str = id + "set ##{i+1}"
-        log(ERR, "#{str}: unable to anchor leader line (#{mth})")
+        log(ERR, "#{str}: unable to anchor #{tag} leader line (#{mth})")
         st[:void] = true
+      else
+        p0 = candidates.sort_by! { |pt| (pt - p1).length }.first
+
+        if dZ
+          st[:ld][s] = OpenStudio::Point3d.new(p0.x, p0.y, p0.z + dZ)
+        else
+          st[:ld][s] = t * p0
+        end
+
+        n += 1
       end
     end
 
@@ -4308,13 +4488,12 @@ module OSut
 
   ##
   # Generates extended polygon vertices to circumscribe one or more sets
-  # (Hashes) of sequenced vertices. The method neither alters the original
-  # polygon vertices, nor validates individual sets of vertices (e.g.
-  # non-coplanarity, self-intersecting, inter-set conflicts). Valid leader line
-  # anchors (set key :ld) need to be generated prior to calling the method (see
-  # genAnchors). By default, the method seeks to link leader line anchors to
-  # set :vtx (key) vertices (users can select another collection of vertices,
-  # e.g. tag == :box).
+  # (Hashes) of sequenced vertices. The method minimally validates individual
+  # sets of vertices (e.g. coplanarity, non-self-intersecting, no inter-set
+  # conflicts). Valid leader line anchors (set key :ld) need to be generated
+  # prior to calling the method (see genAnchors). By default, the method seeks
+  # to link leader line anchors to set :vtx (key) vertices (users can select
+  # another collection of vertices, e.g. tag == :box).
   #
   # @param s [Set<OpenStudio::Point3d>] a larger (parent) set of points
   # @param [Array<Hash>] set a collection of sequenced vertices
@@ -4326,7 +4505,7 @@ module OSut
     mth = "OSut::#{__callee__}"
     id  = s.respond_to?(:nameString) ? "#{s.nameString}: " : ""
     f   = false
-    pts = poly(s, f, f, f)
+    pts = poly(s)
     cl  = OpenStudio::Point3d
     a   = OpenStudio::Point3dVector.new
     v   = []
@@ -4334,13 +4513,18 @@ module OSut
     return mismatch("set", set, Array, mth, DBG, a) unless set.respond_to?(:to_a)
 
     set = set.to_a
-    t   = OpenStudio::Transformation.alignFace(pts)
 
     # Validate individual sets.
     set.each_with_index do |st, i|
-      str = id + "set ##{i+1}"
-      return mismatch(str, st, Hash, mth, DBG, a) unless st.respond_to?(:key?)
-      return hashkey( str, st,  :ld, mth, DBG, a) unless st.key?(:ld)
+      str1 = id + "set ##{i+1}"
+      str2 = str1 + " #{tag.to_s}"
+      return mismatch(str1, st,  Hash, mth, DBG, a) unless st.respond_to?(:key?)
+      return hashkey( str1, st,   tag, mth, DBG, a) unless st.key?(tag)
+      return empty("#{str2} vertices", mth, DBG, a) if st[tag].empty?
+      return hashkey( str1, st,   :ld, mth, DBG, a) unless st.key?(:ld)
+
+      stt = poly(st[tag])
+      return invalid("#{str2} polygon", mth, 0, DBG, a) if stt.empty?
 
       ld = st[:ld]
       return mismatch(str, ld,  Hash, mth, DBG, a) unless ld.is_a?(Hash)
@@ -4349,13 +4533,11 @@ module OSut
     end
 
     # Re-sequence polygon vertices.
-    t.inverse * pts.each do |pt|
+    pts.each do |pt|
       v << pt
 
       # Loop through each valid set; concatenate circumscribing vertices.
-      set.each do |st|
-        next unless st.key?(:ld)
-        next unless st[:ld].key?(s)
+      set.each_with_index do |st, i|
         next unless same?(st[:ld][s], pt)
         next unless st.key?(tag)
 
@@ -4390,7 +4572,6 @@ module OSut
   def genInserts(s = nil, set = [])
     mth = "OSut::#{__callee__}"
     id  = s.respond_to?(:nameString) ? "#{s.nameString}:" : ""
-    f   = false
     pts = poly(s)
     cl  = OpenStudio::Point3d
     a   = OpenStudio::Point3dVector.new
@@ -4414,19 +4595,15 @@ module OSut
       return hashkey( str2, ld,     s, mth, DBG, a) unless ld.key?(s)
       return mismatch(str2, ld[s], cl, mth, DBG, a) unless ld[s].is_a?(cl)
 
-      bx = poly(st[:box], true, true)
-      return invalid("#{str1} box",       mth, 0, DBG, a)     if bx.empty?
-      return invalid("#{str1} rectangle", mth, 0, DBG, a) unless rectangular?(bx)
-
       # Ensure each set bounding box is safely within larger polygon boundaries.
       # TO DO: In line with related addSkylights "TO DO", expand method to
       #        safely handle 'side' cutouts (i.e. no need for leader lines). In
       #        so doing, boxes could eventually align along surface edges.
-      bx.each do |pt|
-        unless pointWithinPolygon?(pt, s)
-          return invalid("#{id} point", mth, 0, DBG, a)
-        end
-      end
+      str3 = str1 + " box"
+      bx = poly(st[:box])
+      return invalid(str3, mth, 0, DBG, a) if bx.empty?
+      return invalid("#{str3} rectangle", mth, 0, DBG, a) unless rectangular?(bx)
+      return invalid("#{str3} box", mth, 0, DBG, a) unless fits?(bx, pts, true)
 
       if st.key?(:rows)
         rws = st[:rows]
@@ -4481,41 +4658,16 @@ module OSut
 
     # Flag conflicts between set bounding boxes. TO DO: ease up for ridges.
     set.each_with_index do |st, i|
-      str = id + "set ##{i+1}"
-      bx  = st[:box]
+      bx = st[:box]
 
       set.each_with_index do |other, j|
         next if i == j
 
-        bx2 = other[:box]
-        sgs = getSegments(bx2)
-
-        bx.each do |pt|
-          if pointAlongSegments?(pt, getSegments(bx2))
-            return invalid("#{str} collinear point", mth, 0, DBG, a)
-          end
-
-          if pointWithinPolygon?(pt, bx2)
-            return invalid("#{str} overlapping point", mth, 0, DBG, a)
-          end
-        end
+        bx2  = other[:box]
+        str4 = id + "set boxes ##{i+1}:##{j+1}"
+        next unless overlaps?(bx, bx2)
+        return invalid("#{str4} (overlapping)", mth, 0, DBG, a)
       end
-    end
-
-    t   = OpenStudio::Transformation.alignFace(pts)
-    pts = poly(pts, f, f, f, t)
-    sgs = getSegments(pts)
-
-    set.each do |st|
-      bx = t.inverse * poly(st[:box])
-
-      out = getRealignedFace(bx)
-      next unless out[:set]
-
-      # Overwrite original box vertex sequence ... redundant?
-      st[:out] = out
-      st[:bx ] = out[:r] * (out[:t] * out[:set])
-      st[:box] = t * st[:bx]
     end
 
     # Loop through each 'valid' set (i.e. linking a valid leader line anchor),
@@ -4523,11 +4675,32 @@ module OSut
     # coordinates once completed.
     set.each_with_index do |st, i|
       str = id + "set ##{i+1}"
-      next unless st.key?(:out)
+      dZ  = nil
+      t   = nil
+      bx  = st[:box]
+
+      if facingUp?(bx)
+        if xyz?(bx, :z)
+          dZ = 0
+        else
+          dZ = bx.first.z
+          bx = flatten(bx).to_a
+        end
+      else
+        t  = OpenStudio::Transformation.alignFace(bx)
+        bx = t.inverse * bx
+      end
+
+      o = getRealignedFace(bx)
+      next unless o[:set]
+
+      st[:out] = o
+      st[:bx ] = blc(o[:r] * (o[:t] * o[:set]))
+
 
       vts  = {} # collection of individual (named) polygon insert vertices
       vtx  = [] # sequence of circumscribing polygon vertices
-      o    = st[:out]
+
       bx   = o[:set]
       w    = width(bx)  # overall sandbox width
       d    = height(bx) # overall sandbox depth
@@ -4614,8 +4787,15 @@ module OSut
           vec << OpenStudio::Point3d.new(xC + x, yC    , 0)
 
           # Store.
-          vertices = o[:r] * (o[:t] * vec)
-          vts[nom] = to_p3Dv(t * vertices)
+          vtz = ulc(o[:r] * (o[:t] * vec))
+
+          if dZ
+            vz = OpenStudio::Point3dVector.new
+            vtz.each { |v| vz << OpenStudio::Point3d.new(v.x, v.y, v.z + dZ) }
+            vts[nom] = vz
+          else
+            vts[nom] = to_p3Dv(t * vtz)
+          end
 
           # Add reverse vertices, circumscribing each insert.
           vec.reverse!
@@ -4632,7 +4812,14 @@ module OSut
       end
 
       vtx = o[:r] * (o[:t] * vtx)
-      vtx = to_p3Dv(t * vtx)
+
+      if dZ
+        vz = OpenStudio::Point3dVector.new
+        vtx.each { |v| vz << OpenStudio::Point3d.new(v.x, v.y, v.z + dZ) }
+        vtx = vz
+      else
+        vtx = to_p3Dv(t * vtx)
+      end
 
       st[:vts] = vts
       st[:vtx] = vtx
@@ -4999,7 +5186,7 @@ module OSut
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     t   = OpenStudio::Transformation.alignFace(s.vertices)
-    s0  = poly(s, false, false, true, t, :ulc)
+    s0  = poly(s, false, false, false, t, :ulc)
     s00 = nil
 
     if facingUp?(s) || facingDown?(s) # TODO: redundant check?
@@ -5458,6 +5645,7 @@ module OSut
         vc = vec
         vc = offset(vc, fr, 300) if fr > 0
         ok = fits?(vc, s)
+
         log(ERR, "Skip '#{name}': won't fit in '#{nom}' (#{mth})") unless ok
         break                                                      unless ok
 
@@ -5603,11 +5791,13 @@ module OSut
         facets(other, "Outdoors", "RoofCeiling").each do |roof|
           rvi  = ti * roof.vertices
           cst  = cast(cv0, rvi, up)
+          next if cst.empty?
 
           # The overlap calculation fails for roof and ceiling surfaces with
           # previously-added leader lines.
           #
           # TODO: revise approach for attics ONCE skylight wells have been added.
+          olap = nil
           olap = overlap(cst, rvi, false)
           next if olap.empty?
 
@@ -5664,7 +5854,6 @@ module OSut
 
           edg   = ridge[:edge]
           match = same?(edge, edg) || same?(edge, edg.reverse)
-          # match = true if same?(edge, edg) || same?(edge, edg.reverse)
         end
 
         next if match
@@ -6050,14 +6239,21 @@ module OSut
       # When unoccupied spaces are involved (e.g. plenums, attics), the occupied
       # space (to toplight) may not share the same local transformation as its
       # unoccupied space(s) above. Fetching local transformation.
+      h  = 0
       t0 = transforms(space)
       next unless t0[:t]
+
+      toitures = facets(space, "Outdoors", "RoofCeiling")
+      plafonds = facets(space, "Surface", "RoofCeiling")
+
+      toitures.each { |surf| h = [h, surf.vertices.max_by(&:z).z].max }
+      plafonds.each { |surf| h = [h, surf.vertices.max_by(&:z).z].max }
 
       rooms[space]           = {}
       rooms[space][:t      ] = t0[:t]
       rooms[space][:m      ] = space.multiplier
-      rooms[space][:h      ] = space.ceilingHeight
-      rooms[space][:roofs  ] = facets(space, "Outdoors", "RoofCeiling")
+      rooms[space][:h      ] = h
+      rooms[space][:roofs  ] = toitures
       rooms[space][:sidelit] = daylit?(space, true, false, false)
 
       # Fetch and process room-specific outdoor-facing roof surfaces, the most
@@ -6111,10 +6307,58 @@ module OSut
         ti = transforms(espace)
         next unless ti[:t]
 
-        ti = ti[:t]
+        ti  = ti[:t]
+        vtx = ruf.vertices
+
+        # Ensure BLC vertex sequence.
+        if facingUp?(vtx)
+          vtx = ti * vtx
+
+          if xyz?(vtx, :z)
+            vtx = blc(vtx)
+          else
+            dZ  = vtx.first.z
+            vtz = blc(flatten(vtx)).to_a
+            vtx = []
+
+            vtz.each { |v| vtx << OpenStudio::Point3d.new(v.x, v.y, v.z + dZ) }
+          end
+
+          ruf.setVertices(ti.inverse * vtx)
+        else
+          tr  = OpenStudio::Transformation.alignFace(vtx)
+          vtx = blc(tr.inverse * vtx)
+          ruf.setVertices(tr * vtx)
+        end
+
         ri = ti * ruf.vertices
 
         facets(space, "Surface", "RoofCeiling").each do |tile|
+          vtx = tile.vertices
+
+          # Ensure BLC vertex sequence.
+          if facingUp?(vtx)
+            vtx = t0 * vtx
+
+            if xyz?(vtx, :z)
+              vtx = blc(vtx)
+            else
+              dZ  = vtx.first.z
+              vtz = blc(flatten(vtx)).to_a
+              vtx = []
+
+              vtz.each { |v| vtx << OpenStudio::Point3d.new(v.x, v.y, v.z + dZ) }
+            end
+
+            vtx = t0.inverse * vtx
+          else
+            tr  = OpenStudio::Transformation.alignFace(vtx)
+            vtx = blc(tr.inverse * vtx)
+            vtx = tr * vtx
+          end
+
+          tile.setVertices(vtx)
+
           ci0 = cast(t0 * tile.vertices, ri, ray)
           next if ci0.empty?
 
@@ -6132,6 +6376,7 @@ module OSut
           #        cutouts can be supported (no need for leader lines), e.g.
           #        skylight strips along roof ridges.
           box = offset(box, -gap, 340)
+          box = poly(box, false, false, false, false, :blc)
           next if box.empty?
 
           bm2 = OpenStudio.getArea(box)
@@ -6163,6 +6408,10 @@ module OSut
             end
 
             floor = floor.get
+
+            # Ensure BLC vertex sequence.
+            vtx = t0 * vtx
+            floor.setVertices(ti.inverse * vtx.reverse)
 
             if floor.space.empty?
               log(ERR, "#{floor.nameString} space? (#{mth})")
@@ -6301,7 +6550,6 @@ module OSut
 
       next if stz.empty?
 
-      stz = stz.sort_by { |st| st[:cm2] }
       genAnchors(tile, stz, :cbox)
     end
 
@@ -6886,7 +7134,6 @@ module OSut
 
         grenier[:roofs].each do |roof|
           sts = sets
-
           sts = sts.select { |st| st.key?(k) }
           sts = sts.select { |st| st.key?(:pattern) }
           sts = sts.select { |st| st.key?(:clng) }
@@ -6905,10 +7152,10 @@ module OSut
           # contingent to successfully inserting corresponding room ceiling
           # inserts (vis-à-vis attic/plenum floor below). The method also
           # generates new roof inserts. See key:value pair :vts.
-          vertices = genInserts(roof, sts)
-          next if vertices.empty?
+          vz = genInserts(roof, sts)
+          next if vz.empty? # TODO log error if empty
 
-          roof.setVertices(ti * vertices)
+          roof.setVertices(ti.inverse * vz)
         end
       end
     end
@@ -6963,7 +7210,6 @@ module OSut
       end
 
       # Extended ceiling vertices.
-      stz = stz.sort_by { |st| st[:cm2] }
       vertices = genExtendedVertices(tile, stz, :cvtx)
       next if vertices.empty?
 

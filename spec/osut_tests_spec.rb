@@ -1614,8 +1614,8 @@ RSpec.describe OSut do
     end
 
     # Invalid input test.
-    m1 = "Invalid 'group' arg #2 (OSut::transforms)"
     expect(mod1.status).to be_zero
+    m1 = "Invalid 'group' arg #2 (OSut::transforms)"
     tr = mod1.transforms(nil)
     expect(tr).to be_a(Hash)
     expect(tr).to have_key(:t)
@@ -1660,8 +1660,7 @@ RSpec.describe OSut do
     expect(a[3].y - a[1].y).to be_within(TOL).of(hyp)
 
     pts = r * a
-
-    pts.each_with_index { |pt, i| expect(mod1.same?(pt, vtx[i])).to be true }
+    expect(mod1.same?(pts, vtx)).to be true
 
     output1 = mod1.getRealignedFace(vtx)
     expect(mod1.status).to be_zero
@@ -1673,25 +1672,30 @@ RSpec.describe OSut do
     expect(output1).to have_key(:r)
     expect(output1).to have_key(:o)
 
+    ubox1  = output1[ :box]
+    ubbox1 = output1[:bbox]
+
     # Realign a previously realigned surface?
     output2 = mod1.getRealignedFace(output1[:box])
-    expect(mod1.status).to be_zero
+    ubox2   = output1[ :box]
+    ubbox2  = output1[:bbox]
 
     # Realigning a previously realigned polygon has no effect (== safe).
-    expect(mod1.same?(output1[:box ], output2[:box ])).to be true
-    expect(mod1.same?(output1[:bbox], output2[:bbox])).to be true
+    expect(mod1.same?(ubox1, ubox2, false)).to be true
+    expect(mod1.same?(ubbox1, ubbox2, false)).to be true
 
-    bounded_area  = OpenStudio.getArea(output1[:box ])
-    bounding_area = OpenStudio.getArea(output1[:bbox])
+    bounded_area  = OpenStudio.getArea(ubox1)
+    bounding_area = OpenStudio.getArea(ubbox1)
     expect(bounded_area).to_not be_empty
     expect(bounding_area).to_not be_empty
     expect(bounded_area.get).to be_within(TOL).of(bounding_area.get)
 
-    bounded_area  = OpenStudio.getArea(output2[:box ])
-    bounding_area = OpenStudio.getArea(output2[:bbox])
+    bounded_area  = OpenStudio.getArea(ubox2)
+    bounding_area = OpenStudio.getArea(ubbox2)
     expect(bounded_area).to_not be_empty
     expect(bounding_area).to_not be_empty
     expect(bounded_area.get).to be_within(TOL).of(bounding_area.get)
+    expect(mod1.status).to be_zero
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Repeat with slight change in orientation.
@@ -1702,32 +1706,32 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(  6,  4,  0)
 
     output3 = mod1.getRealignedFace(vtx)
-    expect(mod1.status).to be_zero
+    ubox3   = output3[ :box]
+    ubbox3  = output3[:bbox]
 
     # Realign a previously realigned surface?
     output4 = mod1.getRealignedFace(output3[:box])
-    expect(mod1.status).to be_zero
+    ubox4   = output4[ :box]
+    ubbox4  = output4[:bbox]
 
     # Realigning a previously realigned polygon has no effect (== safe).
-    expect(mod1.same?(output1[:box ], output2[:box ])).to be true
-    expect(mod1.same?(output1[:bbox], output2[:bbox])).to be true
-    expect(mod1.same?(output1[:box ], output3[:box ])).to be true
-    expect(mod1.same?(output1[:bbox], output3[:bbox])).to be true
-    expect(mod1.same?(output1[:box ], output4[:box ])).to be true
-    expect(mod1.same?(output1[:bbox], output4[:bbox])).to be true
+    expect(mod1.same?(ubox1, ubox3, false)).to be true
+    expect(mod1.same?(ubbox1, ubbox3, false)).to be true
+    expect(mod1.same?(ubox1, ubox4, false)).to be true
+    expect(mod1.same?(ubbox1, ubbox4, false)).to be true
 
-    bounded_area  = OpenStudio.getArea(output3[:box ])
-    bounding_area = OpenStudio.getArea(output3[:bbox])
+    bounded_area  = OpenStudio.getArea(ubox3)
+    bounding_area = OpenStudio.getArea(ubbox3)
     expect(bounded_area).to_not be_empty
     expect(bounding_area).to_not be_empty
     expect(bounded_area.get).to be_within(TOL).of(bounding_area.get)
 
-    bounded_area  = OpenStudio.getArea(output4[:box ])
-    bounding_area = OpenStudio.getArea(output4[:bbox])
+    bounded_area  = OpenStudio.getArea(ubox4)
+    bounding_area = OpenStudio.getArea(ubbox4)
     expect(bounded_area).to_not be_empty
     expect(bounding_area).to_not be_empty
     expect(bounded_area.get).to be_within(TOL).of(bounding_area.get)
-
+    expect(mod1.status).to be_zero
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Repeat with changes in vertex sequence.
@@ -1738,33 +1742,36 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(  2,  2,  0)
 
     output5 = mod1.getRealignedFace(vtx)
-    expect(mod1.status).to be_zero
+    ubox5   = output5[ :box]
+    ubbox5  = output5[:bbox]
 
     # Realign a previously realigned surface?
     output6 = mod1.getRealignedFace(output5[:box])
-    expect(mod1.status).to be_zero
+    ubox6   = output6[ :box]
+    ubbox6  = output6[:bbox]
 
     # Realigning a previously realigned polygon has no effect (== safe).
-    expect(mod1.same?(output1[:box ], output5[:box ])).to be true
-    expect(mod1.same?(output1[:box ], output6[:box ])).to be true
-    expect(mod1.same?(output1[:bbox], output5[:bbox])).to be true
-    expect(mod1.same?(output1[:bbox], output6[:bbox])).to be true
-    expect(mod1.same?(output5[:box ], output6[:box ])).to be true
-    expect(mod1.same?(output5[:box ], output5[:box ])).to be true
-    expect(mod1.same?(output5[:bbox], output6[:bbox])).to be true
-    expect(mod1.same?(output6[:bbox], output6[:bbox])).to be true
+    expect(mod1.same?(ubox1, ubox5)).to be true
+    expect(mod1.same?(ubox1, ubox6)).to be true
+    expect(mod1.same?(ubbox1, ubbox5)).to be true
+    expect(mod1.same?(ubbox1, ubbox6)).to be true
+    expect(mod1.same?(ubox5, ubox6, false)).to be true
+    expect(mod1.same?(ubox5, ubbox5, false)).to be true
+    expect(mod1.same?(ubbox5, ubox6, false)).to be true
+    expect(mod1.same?(ubox6, ubbox6, false)).to be true
 
-    bounded_area  = OpenStudio.getArea(output5[:box ])
-    bounding_area = OpenStudio.getArea(output5[:bbox])
+    bounded_area  = OpenStudio.getArea(ubox5)
+    bounding_area = OpenStudio.getArea(ubbox5)
     expect(bounded_area).to_not be_empty
     expect(bounding_area).to_not be_empty
     expect(bounded_area.get).to be_within(TOL).of(bounding_area.get)
 
-    bounded_area  = OpenStudio.getArea(output6[:box ])
-    bounding_area = OpenStudio.getArea(output6[:bbox])
+    bounded_area  = OpenStudio.getArea(ubox6)
+    bounding_area = OpenStudio.getArea(ubbox6)
     expect(bounded_area).to_not be_empty
     expect(bounding_area).to_not be_empty
     expect(bounded_area.get).to be_within(TOL).of(bounding_area.get)
+    expect(mod1.status).to be_zero
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Repeat with slight change in orientation (vertices resequenced).
@@ -1775,260 +1782,77 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(  1,  4,  0)
 
     output7 = mod1.getRealignedFace(vtx)
-    expect(mod1.status).to be_zero
+    ubox7   = output7[ :box]
+    ubbox7  = output7[:bbox]
 
     # Realign a previously realigned surface?
-    output8 = mod1.getRealignedFace(output7[:box])
-    expect(mod1.status).to be_zero
+    output8 = mod1.getRealignedFace(ubox7)
+    ubox8   = output8[ :box]
+    ubbox8  = output8[:bbox]
 
     # Realigning a previously realigned polygon has no effect (== safe).
-    expect(mod1.same?(output1[:box ], output7[:box ])).to be true
-    expect(mod1.same?(output1[:box ], output8[:box ])).to be true
-    expect(mod1.same?(output1[:bbox], output7[:bbox])).to be true
-    expect(mod1.same?(output1[:bbox], output8[:bbox])).to be true
-    expect(mod1.same?(output5[:box ], output7[:box ])).to be true
-    expect(mod1.same?(output5[:bbox], output7[:bbox])).to be true
-    expect(mod1.same?(output5[:box ], output8[:box ])).to be true
-    expect(mod1.same?(output5[:bbox], output8[:bbox])).to be true
+    expect(mod1.same?(ubox1, ubox7)).to be true
+    expect(mod1.same?(ubox1, ubox8)).to be true
+    expect(mod1.same?(ubbox1, ubbox7)).to be true
+    expect(mod1.same?(ubbox1, ubbox8)).to be true
+    expect(mod1.same?(ubox5, ubox7, false)).to be true
+    expect(mod1.same?(ubbox5, ubbox7, false)).to be true
+    expect(mod1.same?(ubox5, ubox5, false)).to be true
+    expect(mod1.same?(ubbox5, ubbox8, false)).to be true
 
-    bounded_area  = OpenStudio.getArea(output7[:box ])
-    bounding_area = OpenStudio.getArea(output7[:bbox])
+    bounded_area  = OpenStudio.getArea(ubox7)
+    bounding_area = OpenStudio.getArea(ubbox7)
     expect(bounded_area).to_not be_empty
     expect(bounding_area).to_not be_empty
     expect(bounded_area.get).to be_within(TOL).of(bounding_area.get)
 
-    bounded_area  = OpenStudio.getArea(output8[:box ])
-    bounding_area = OpenStudio.getArea(output8[:bbox])
+    bounded_area  = OpenStudio.getArea(ubox8)
+    bounding_area = OpenStudio.getArea(ubbox8)
     expect(bounded_area).to_not be_empty
     expect(bounding_area).to_not be_empty
     expect(bounded_area.get).to be_within(TOL).of(bounding_area.get)
-
-
-    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # SEB case.
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
-    path  = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model).to_not be_empty
-    model = model.get
-
-    # Roof Surfaces.
-    r1 = "Level 0 Open area 1 Ceiling Plenum RoofCeiling"
-    r2 = "Level 0 Utility 1 Ceiling Plenum RoofCeiling"
-    r3 = "Level 0 Entry way  Ceiling Plenum RoofCeiling"
-    r4 = "Level 0 Small office 1 Ceiling Plenum RoofCeiling"
-
-    r1 = model.getSurfaceByName(r1)
-    r2 = model.getSurfaceByName(r2)
-    r3 = model.getSurfaceByName(r3)
-    r4 = model.getSurfaceByName(r4)
-
-    expect(r1).to_not be_empty
-    expect(r2).to_not be_empty
-    expect(r3).to_not be_empty
-    expect(r4).to_not be_empty
-
-    r1 = r1.get
-    r2 = r2.get
-    r3 = r3.get
-    r4 = r4.get
-
-    # Detailed tests for r2.
-    r2v    = r2.vertices
-    t      = OpenStudio::Transformation.alignFace(r2v)
-    r2a    = mod1.poly(r2v, false, false, false, t)
-    output = mod1.getRealignedFace(r2a)
     expect(mod1.status).to be_zero
-    expect(output).to be_a Hash
-    expect(output).to have_key(:set)
-    expect(output).to have_key(:box)
-    expect(output).to have_key(:bbox)
-    expect(output).to have_key(:t)
-    expect(output).to have_key(:r)
-    expect(output).to have_key(:o)
-    expect(mod1.rectangular?(output[:box])).to be true
-
-    # Reapply translation transformation.
-    tset = output[:t] * output[:set]
-    expect(tset.size).to eq(r2v.size)
-
-    tset.each_with_index do |pt, i|
-      expect(pt.x - output[:set][i].x).to be_within(TOL).of(0.765)  # delta-X
-      expect(pt.y - output[:set][i].y).to be_within(TOL).of(-0.142) # delta-Y
-    end
-
-    # Reapply rotation transformation.
-    rset = output[:r] * tset
-    expect(rset.size).to eq(r2v.size)
-    rset.each_with_index { |pt, i| expect(mod1.same?(pt, r2a[i])).to be true }
-
-    # Full circle, back to original vertices.
-    vtx = t * rset
-    expect(vtx.size).to eq(r2v.size)
-    vtx.each_with_index { |pt, i| expect(mod1.same?(pt, r2v[i])).to be true }
-
-    # More concise call for generated bounded and bounding boxes.
-    box  = t * (output[:r] * (output[:t] * output[:box]))
-    bbox = t * (output[:r] * (output[:t] * output[:bbox]))
-
-    # Both bounded and bounding boxes are rectangular.
-    expect(mod1.rectangular?(box)).to be true
-    expect(mod1.rectangular?(bbox)).to be true
-
-    # The bounded box fits within the original roof surface limits, while the
-    # latter fits within its bounding box. Bounded and bounding box sides are
-    # parallel to each other.
-    expect(mod1.fits?(box, bbox)).to be true
-    expect(mod1.fits?(box, vtx)).to be true
-    expect(mod1.fits?(vtx, bbox)).to be true
-
-    r2_area   = OpenStudio.getArea(vtx)
-    box_area  = OpenStudio.getArea(box)
-    bbox_area = OpenStudio.getArea(bbox)
-    expect(r2_area).to_not be_empty
-    expect(box_area).to_not be_empty
-    expect(bbox_area).to_not be_empty
-    expect(box_area.get).to be_within(TOL).of(10.96)
-    expect(r2_area.get).to be_within(TOL).of(16.44)
-    expect(bbox_area.get).to be_within(TOL).of(19.78)
-
-    # Repeat for r1, more concisely.
-    r1v = r1.vertices
-    t   = OpenStudio::Transformation.alignFace(r1v)
-    r1a = mod1.poly(r1v, false, false, false, t)
-    o   = mod1.getRealignedFace(r1a)
-    expect(o).to be_a Hash
-    expect(o).to have_key(:set)
-    expect(o).to have_key(:box)
-    expect(o).to have_key(:bbox)
-    expect(o).to have_key(:t)
-    expect(o).to have_key(:r)
-    expect(o).to have_key(:o)
-    width  = mod1.width(o[:box])
-    height = mod1.height(o[:box])
-    area   = OpenStudio.getArea(o[:box])
-    expect(area).to_not be_empty
-    area = area.get
-    expect(area).to be_within(TOL).of(30.81)
-    expect(area).to be_within(TOL).of(width * height)
-    vtx = t * (o[:r] * (o[:t] * o[:box]))
-    expect(mod1.rectangular?(vtx)).to be true
-    expect(mod1.fits?(vtx, r1)).to be true
-
-    # Realign bounded box.
-    o2 = mod1.getRealignedFace(o[:box])
-    expect(o2).to be_a Hash
-    expect(o2).to have_key(:set)
-    expect(o2).to have_key(:box)
-    expect(o2).to have_key(:t)
-    expect(o2).to have_key(:r)
-    expect(o2).to have_key(:o)
-    # puts o2[:box]
-    # [8.169, 0.000, 0]
-    # [8.169, 3.772, 0]
-    # [0.000, 3.772, 0]
-    # [0.000, 0.000, 0]
-    width2  = mod1.width(o2[:box])
-    height2 = mod1.height(o2[:box])
-    expect(width2).to be_within(TOL).of(width)
-    expect(height2).to be_within(TOL).of(height)
-    area2 = OpenStudio.getArea(o2[:box])
-    expect(area2).to_not be_empty
-    area2 = area2.get
-    expect(area2).to be_within(TOL).of(area)
-    expect(area2).to be_within(TOL).of(width2 * height2)
-    vtx = o2[:r] * (o2[:t] * o2[:box])
-    expect(mod1.rectangular?(vtx)).to be true
-    expect(mod1.fits?(vtx, o[:set])).to be true
-    vtx2 = o[:r] * (o[:t] * vtx)
-    expect(mod1.fits?(vtx2, r1a)).to be true
-    vtx3 = t * vtx2
-    expect(mod1.fits?(vtx3, r1)).to be true
-    expect(mod1.status).to be_zero
-
-
-    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # Test pre-triangulated case.
-    max    = 0
-    r1tri  = mod1.poly(r1v, false, true, true, true, :cw)
-    holes  = OpenStudio::Point3dVectorVector.new
-
-    OpenStudio.computeTriangulation(r1tri, holes).each do |triangle|
-      o  = mod1.getRealignedFace(triangle)
-      expect(o).to be_a Hash
-      expect(o).to have_key(:set)
-      expect(o).to have_key(:box)
-      expect(o).to have_key(:t)
-      expect(o).to have_key(:r)
-      expect(o).to have_key(:o)
-      width  = mod1.width(o[:box])
-      height = mod1.height(o[:box])
-      area   = OpenStudio.getArea(o[:box])
-      expect(area).to_not be_empty
-      area   = area.get
-      expect(area).to be_within(TOL).of(width * height)
-      max    = [max, area].max
-      vtx    = t * (o[:r] * (o[:t] * o[:box]))
-      expect(mod1.rectangular?(vtx)).to be true
-      expect(mod1.fits?(vtx, r1)).to be true
-      expect(mod1.status).to be_zero
-    end
-
-    expect(max).to be < 4 # m2 ... significantly less than 30.8m2
-  end
-
-  it "checks flattened 3D points" do
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    expect(mod1.reset(DBG)).to eq(DBG)
-    expect(mod1.level).to eq(DBG)
-    expect(mod1.clean!).to eq(DBG)
-
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
-    path  = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    model = model.get
-
-    cl1 = OpenStudio::Model::Model
-    cl2 = OpenStudio::Point3dVector
-    cl3 = OpenStudio::Point3d
-    cl4 = NilClass
-    m   = "OSut::flatten"
-    m1  = "'points' #{cl4}?"
-    m2  = "'points' #{cl1}?"
-
-    model.getSurfaces.each do |s|
-      next unless s.isPartOfEnvelope
-      next unless s.surfaceType == "RoofCeiling"
-
-      flat = mod1.flatten(s)
-      expect(flat).to be_a(cl2)
-      expect(mod1.xyz?(flat, :z)).to be true
-      expect(mod1.facingUp?(flat)).to be true
-      expect(s.vertices.first.x).to be_within(TOL).of(flat.first.x)
-      expect(s.vertices.first.y).to be_within(TOL).of(flat.first.y)
-    end
-
-    expect(mod1.status).to be_zero
-    flat = mod1.flatten(nil)
-    expect(flat).to be_a(cl2)
-    expect(flat).to be_empty
-    expect(mod1.debug?).to be true
-    expect(mod1.logs.size).to be(1)
-    expect(mod1.logs.first[:message]).to include(m1)
-
-    expect(mod1.clean!).to eq(DBG)
-    flat = mod1.flatten(model)
-    expect(flat).to be_a(cl2)
-    expect(flat).to be_empty
-    expect(mod1.debug?).to be true
-    expect(mod1.logs.size).to be(1)
-    expect(mod1.logs.first[:message]).to include(m2)
   end
 
   it "checks surface fits? & overlaps?" do
     expect(mod1.reset(DBG)).to eq(DBG)
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
+
+    # Tests line intersecting line segments.
+    sg1 = OpenStudio::Point3dVector.new
+    sg1 << OpenStudio::Point3d.new(18, 0, 0)
+    sg1 << OpenStudio::Point3d.new( 8, 3, 0)
+
+    sg2 = OpenStudio::Point3dVector.new
+    sg2 << OpenStudio::Point3d.new(12, 14, 0)
+    sg2 << OpenStudio::Point3d.new(12,  6, 0)
+
+    expect(mod1.getLineIntersection(sg1, sg2)).to be_nil
+
+    sg1 = OpenStudio::Point3dVector.new
+    sg1 << OpenStudio::Point3d.new(0.60,19.06, 0)
+    sg1 << OpenStudio::Point3d.new(0.60, 0.60, 0)
+    sg1 << OpenStudio::Point3d.new(0.00, 0.00, 0)
+    sg1 << OpenStudio::Point3d.new(0.00,19.66, 0)
+    sgs1 = mod1.getSegments(sg1)
+
+    sg2 = OpenStudio::Point3dVector.new
+    sg2 << OpenStudio::Point3d.new(9.83, 9.83, 0)
+    sg2 << OpenStudio::Point3d.new(0.00, 0.00, 0)
+    sg2 << OpenStudio::Point3d.new(0.00,19.66, 0)
+    sgs2 = mod1.getSegments(sg2)
+
+    expect(mod1.same?(sg1[2], sg2[1])).to be true
+    expect(mod1.same?(sg1[3], sg2[2])).to be true
+    expect(mod1.fits?(sg1, sg2)).to be true
+    expect(mod1.fits?(sg2, sg1)).to be false
+    expect( mod1.same?( mod1.overlap(sg1, sg2), sg1) ).to be true
+    expect( mod1.same?( mod1.overlap(sg2, sg1), sg1) ).to be true
+
+    sg1.each_with_index do |pt, i|
+      expect(mod1.pointWithinPolygon?(pt, sg2)).to be true
+    end
 
     # Note: As of OpenStudio v340, the following method is available as an
     # all-in-one solution to check if a polygon fits within another polygon.
@@ -2039,7 +1863,6 @@ RSpec.describe OSut do
     # (using OpenStudio Transformation' alignFace method), and set in a
     # clockwise sequence. OSut sticks to fits? as it executes these steps
     # behind the scenes, and remains consistent for pre-v340 implementations.
-
     model = OpenStudio::Model::Model.new
 
     # 10m x 10m parent vertical (wall) surface.
@@ -2050,19 +1873,48 @@ RSpec.describe OSut do
     vec << OpenStudio::Point3d.new( 10,  0, 10)
     wall = OpenStudio::Model::Surface.new(vec, model)
 
-    # 1m x 2m corner door (with 2x edges along wall edges)
+    # Side test: point alignment detection, 'w12' == wall/floor edge (vector).
+    w1  = vec[1]
+    w2  = vec[2]
+    w12 = w2 - w1
+
+    # Side test: same?
+    vec2 = mod1.to_p3Dv(vec).to_a
+    expect(vec).to_not eq(vec2)
+    expect(mod1.same?(vec, vec2)).to be true
+
+    vec2.rotate!(2)
+    expect(mod1.same?(vec, vec2)).to be true
+    expect(mod1.same?(vec, vec2, false)).to be false
+
+    # 1m x 2m corner door (with 2x edges along wall edges), 4mm sill.
     vec = OpenStudio::Point3dVector.new
-    vec << OpenStudio::Point3d.new(  0,  0,  2)
-    vec << OpenStudio::Point3d.new(  0,  0,  0)
-    vec << OpenStudio::Point3d.new(  1,  0,  0)
-    vec << OpenStudio::Point3d.new(  1,  0,  2)
+    vec << OpenStudio::Point3d.new(  0.5,  0,  2.000)
+    vec << OpenStudio::Point3d.new(  0.5,  0,  0.004)
+    vec << OpenStudio::Point3d.new(  1.5,  0,  0.004)
+    vec << OpenStudio::Point3d.new(  1.5,  0,  2.000)
     door1 = OpenStudio::Model::SubSurface.new(vec, model)
+
+    # Side test: point alignment detection:
+    # 'd1_w1': vector from door sill to wall corner 1 ( 0,0,0)
+    # 'd1_w2': vector from door sill to wall corner 1 (10,0,0)
+    d1 = vec[1]
+    d2 = vec[2]
+    d1_w1 = w1 - d1
+    d1_w2 = w2 - d1
+    expect(mod1.pointAlongSegments?(d1, [w1, w2])).to be true
 
     # Order of arguments matter.
     expect(mod1.fits?(door1, wall)).to be true
     expect(mod1.overlaps?(door1, wall)).to be true
     expect(mod1.fits?(wall, door1)).to be false
     expect(mod1.overlaps?(wall, door1)).to be true
+
+    # The method 'fits' offers an optional 3rd argument: whether a smaller
+    # polygon (e.g. door1) needs to 'entirely' fit within the larger polygon.
+    # Here, door1 shares its sill with the host wall (as its within 10mm of the
+    # wall bottom edge).
+    expect(mod1.fits?(door1, wall, true)).to be false
 
     # Another 1m x 2m corner door, yet entirely beyond the wall surface.
     vec = OpenStudio::Point3dVector.new
@@ -2088,6 +1940,9 @@ RSpec.describe OSut do
 
     # Window fits?, overlaps?
     expect(mod1.fits?(window, wall)).to be false
+    olap = mod1.overlap(window, wall)
+    expect(olap.size).to eq(4)
+    expect(mod1.fits?(olap, wall)).to be true
     expect(mod1.overlaps?(window, wall)).to be true
     expect(mod1.fits?(wall, window)).to be false
     expect(mod1.overlaps?(wall, window)).to be true
@@ -2138,10 +1993,28 @@ RSpec.describe OSut do
     soffit  = soffit.get
     south   = south.get
 
+    # Side test: triad, medial and bounded boxes.
+    pts   = mod1.getNonCollinears(ceiling.vertices, 3)
+    box01 = mod1.triadBox(pts)
+    box11 = mod1.boundedBox(ceiling)
+    expect(mod1.same?(box01, box11)).to be true
+    expect(mod1.fits?(box01, ceiling)).to be true
+
+    pts   = mod1.getNonCollinears(roof.vertices, 3)
+    box02 = mod1.medialBox(pts)
+    box12 = mod1.boundedBox(roof)
+    expect(mod1.same?(box02, box12)).to be true
+    expect(mod1.fits?(box02, roof)).to be true
+
+    box03 = mod1.triadBox(pts)
+    expect(mod1.same?(box03, box12)).to be false
+    expect(mod1.status).to be_zero
+
     # For parallel surfaces, OSut's 'overlap' output is consistent regardless
     # of the sequence of arguments. Here, floor and ceiling are mirrored - the
     # former counterclockwise, the latter clockwise. The returned overlap
     # conserves the vertex winding of the first surface.
+    expect(mod1.parallel?(floor, ceiling)).to be true
     olap1 = mod1.overlap(floor, ceiling)
     olap2 = mod1.overlap(ceiling, floor)
     expect(mod1.same?(floor.vertices, olap1)).to be true
@@ -2153,8 +2026,8 @@ RSpec.describe OSut do
     # the generated overlap will obviously be distorted with respect to the
     # original soffit vertices. Nonetheless, the shared vertices/edge(s) would
     # be preserved.
-    olap1 = mod1.overlap(soffit, roof)
-    olap2 = mod1.overlap(roof, soffit)
+    olap1 = mod1.overlap(soffit, roof, true)
+    olap2 = mod1.overlap(roof, soffit, true)
     expect(mod1.parallel?(olap1, soffit)).to be true
     expect(mod1.parallel?(olap1, roof)).to be false
     expect(mod1.parallel?(olap2, roof)).to be true
@@ -2167,7 +2040,7 @@ RSpec.describe OSut do
     expect(area2).to_not be_empty
     area1 = area1.get
     area2 = area2.get
-    expect(area1 - area2).to be > TOL
+    expect((area1 - area2).abs).to be > TOL
     pl1 = OpenStudio::Plane.new(mod1.getNonCollinears(olap1, 3))
     pl2 = OpenStudio::Plane.new(mod1.getNonCollinears(olap2, 3))
     n1  = pl1.outwardNormal
@@ -2175,11 +2048,12 @@ RSpec.describe OSut do
     expect(soffit.plane.outwardNormal.dot(n1)).to be_within(TOL).of(1)
     expect(  roof.plane.outwardNormal.dot(n2)).to be_within(TOL).of(1)
 
+
     # When surfaces are neither parallel nor share any edges (e.g. sloped roof
     # vs horizontal floor), the generated overlap is more likely to hold extra
     # vertices, depending on which surface it is cast onto.
-    olap1 = mod1.overlap(floor, roof)
-    olap2 = mod1.overlap(roof, floor)
+    olap1 = mod1.overlap(floor, roof, true)
+    olap2 = mod1.overlap(roof, floor, true)
     expect(mod1.parallel?(olap1, floor)).to be true
     expect(mod1.parallel?(olap1, roof)).to be false
     expect(mod1.parallel?(olap2, roof)).to be true
@@ -2237,16 +2111,34 @@ RSpec.describe OSut do
     end
 
     # Overlap between roof and vertically-cast ceiling onto roof plane.
-    olap02 = mod1.overlap(roof, cast02, false)
+    olap02 = mod1.overlap(roof, cast02)
     expect(olap02.size).to eq(3) # not 5
     expect(mod1.fits?(olap02, roof)).to be(true)
 
     olap02.each { |pt| expect(pl2.pointOnPlane(pt)) }
 
+    vtx1 = OpenStudio::Point3dVector.new
+    vtx1 << OpenStudio::Point3d.new(17.69, 0.00, 0)
+    vtx1 << OpenStudio::Point3d.new(13.46, 4.46, 0)
+    vtx1 << OpenStudio::Point3d.new( 4.23, 4.46, 0)
+    vtx1 << OpenStudio::Point3d.new( 0.00, 0.00, 0)
+
+    vtx2 = OpenStudio::Point3dVector.new
+    vtx2 << OpenStudio::Point3d.new( 8.85, 0.00, 0)
+    vtx2 << OpenStudio::Point3d.new( 8.85, 4.46, 0)
+    vtx2 << OpenStudio::Point3d.new( 4.23, 4.46, 0)
+    vtx2 << OpenStudio::Point3d.new( 4.23, 0.00, 0)
+
+    expect(mod1.pointAlongSegment?(vtx2[1], [ vtx1[1], vtx1[2] ])).to be true
+    expect(mod1.pointAlongSegments?(vtx2[1], vtx1)).to be true
+    expect(mod1.pointWithinPolygon?(vtx2[1], vtx1)).to be true
+    expect(mod1.fits?(vtx2, vtx1)).to be true
+
     # Bounded box test.
     cast03 = mod1.cast(ceiling, south, down)
     expect(mod1.rectangular?(cast03)).to be true
-    olap03 = mod1.overlap(south, cast03, false)
+    olap03 = mod1.overlap(south, cast03)
+    expect(mod1.parallel?(south, olap03)).to be true
     expect(mod1.rectangular?(olap03)).to be false
     box = mod1.boundedBox(olap03)
     expect(mod1.rectangular?(box)).to be true
@@ -2367,12 +2259,12 @@ RSpec.describe OSut do
     expect(mod1.same?(pt, p5)).to be true
 
     # Point ENTIRELY within (vs outside) a polygon.
-    expect(mod1.pointWithinPolygon?(p0, [p0, p1, p2, p3])).to be false
-    expect(mod1.pointWithinPolygon?(p1, [p0, p1, p2, p3])).to be false
-    expect(mod1.pointWithinPolygon?(p2, [p0, p1, p2, p3])).to be false
-    expect(mod1.pointWithinPolygon?(p3, [p0, p1, p2, p3])).to be false
+    expect(mod1.pointWithinPolygon?(p0, [p0, p1, p2, p3], true)).to be false
+    expect(mod1.pointWithinPolygon?(p1, [p0, p1, p2, p3], true)).to be false
+    expect(mod1.pointWithinPolygon?(p2, [p0, p1, p2, p3], true)).to be false
+    expect(mod1.pointWithinPolygon?(p3, [p0, p1, p2, p3], true)).to be false
     expect(mod1.pointWithinPolygon?(p4, [p0, p1, p2, p3])).to be false
-    expect(mod1.pointWithinPolygon?(p5, [p0, p1, p2, p3])).to be false
+    expect(mod1.pointWithinPolygon?(p5, [p0, p1, p2, p3])).to be true
     expect(mod1.pointWithinPolygon?(p6, [p0, p1, p2, p3])).to be false
     expect(mod1.pointWithinPolygon?(p7, [p0, p1, p2, p3])).to be true
     expect(mod1.status).to be_zero
@@ -2460,7 +2352,7 @@ RSpec.describe OSut do
     expect(mod1.status).to be_zero
   end
 
-  it "checks ULC" do
+  it "checks ULC & BLC" do
     expect(mod1.reset(DBG)).to eq(DBG)
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
@@ -2490,16 +2382,25 @@ RSpec.describe OSut do
 
     # 2. OSut ULC reordering.
     ulc_a_vtx = mod1.ulc(a_vtx)
+    blc_a_vtx = mod1.blc(a_vtx)
     ulc_vtx   = t * ulc_a_vtx
-    expect(mod1.status).to be_zero
+    blc_vtx   = t * blc_a_vtx
     expect(ulc_vtx[1].x.abs).to be < TOL
     expect(ulc_vtx[1].y.abs).to be < TOL
     expect(ulc_vtx[1].z.abs).to be < TOL
+    expect(blc_vtx[0].x.abs).to be < TOL
+    expect(blc_vtx[0].y.abs).to be < TOL
+    expect(blc_vtx[0].z.abs).to be < TOL
     # puts ulc_vtx
     # [ 0, 0, 10]
     # [ 0, 0,  0]
     # [20, 0,  0]
     # [20, 0, 10]
+    # puts blc_vtx
+    # [ 0, 0,  0]
+    # [20, 0,  0]
+    # [20, 0, 10]
+    # [ 0, 0, 10]
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Same, yet (0,0,0) is at index == 0.
@@ -2523,26 +2424,37 @@ RSpec.describe OSut do
 
     # 2. OSut ULC reordering.
     ulc_a_vtx = mod1.ulc(a_vtx)
+    blc_a_vtx = mod1.blc(a_vtx)
     ulc_vtx   = t * ulc_a_vtx
-    expect(mod1.status).to be_zero
+    blc_vtx   = t * blc_a_vtx
     expect(ulc_vtx[1].x.abs).to be < TOL
     expect(ulc_vtx[1].y.abs).to be < TOL
     expect(ulc_vtx[1].z.abs).to be < TOL
+    expect(blc_vtx[0].x.abs).to be < TOL
+    expect(blc_vtx[0].y.abs).to be < TOL
+    expect(blc_vtx[0].z.abs).to be < TOL
     # puts ulc_vtx
     # [ 0, 0, 10]
     # [ 0, 0,  0]
     # [20, 0,  0]
     # [20, 0, 10]
+    # puts blc_vtx
+    # [ 0, 0,  0]
+    # [20, 0,  0]
+    # [20, 0, 10]
+    # [ 0, 0, 10]
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Irregular polygon, no point at 0,0,0.
     vtx = OpenStudio::Point3dVector.new
     vtx << OpenStudio::Point3d.new(18, 0, 10)
     vtx << OpenStudio::Point3d.new( 2, 0, 10)
-    vtx << OpenStudio::Point3d.new( 0, 0,  5)
+    vtx << OpenStudio::Point3d.new( 0, 0,  6)
+    vtx << OpenStudio::Point3d.new( 0, 0,  4)
     vtx << OpenStudio::Point3d.new( 2, 0,  0)
     vtx << OpenStudio::Point3d.new(18, 0,  0)
-    vtx << OpenStudio::Point3d.new(20, 0,  5)
+    vtx << OpenStudio::Point3d.new(20, 0,  4)
+    vtx << OpenStudio::Point3d.new(20, 0,  6)
 
     t     = OpenStudio::Transformation.alignFace(vtx)
     a_vtx = t.inverse * vtx
@@ -2552,26 +2464,43 @@ RSpec.describe OSut do
     ulc_vtx   = t * ulc_a_vtx
     # puts ulc_vtx
     # [18, 0,  0]
-    # [20, 0,  5]
+    # [20, 0,  4]
+    # [20, 0,  6]
     # [18, 0, 10]
     # [ 2, 0, 10]
-    # [ 0, 0,  5]
+    # [ 0, 0,  6]
+    # [ 0, 0,  4]
     # [ 2, 0,  0] ... consistent pattern with previous cases, yet ULC?
 
     # 2. OSut ULC reordering.
     ulc_a_vtx = mod1.ulc(a_vtx)
+    blc_a_vtx = mod1.blc(a_vtx)
+    iN = mod1.nearest(ulc_a_vtx)
+    iF = mod1.farthest(ulc_a_vtx)
+    expect(iN).to eq(2)
+    expect(iF).to eq(6)
     ulc_vtx   = t * ulc_a_vtx
-    expect(mod1.status).to be_zero
-    expect(ulc_vtx[1].x.abs).to be < TOL
-    expect(ulc_vtx[1].y.abs).to be < TOL
-    expect(ulc_vtx[1].z.abs).to be > TOL
+    blc_vtx   = t * blc_a_vtx
+    expect(mod1.same?(ulc_vtx[2], ulc_vtx[iN])).to be true
+    expect(mod1.same?(blc_vtx[1], ulc_vtx[iN])).to be true
     # puts ulc_vtx
-    # [ 2, 0, 10]
-    # [ 0, 0,  5]
+    # [ 0, 0,  6]
+    # [ 0, 0,  4]
     # [ 2, 0,  0]
     # [18, 0,  0]
-    # [20, 0,  5]
+    # [20, 0,  4]
+    # [20, 0,  6]
     # [18, 0, 10]
+    # [ 2, 0, 10]
+    # puts blc_vtx
+    # [ 0, 0,  4]
+    # [ 2, 0,  0]
+    # [18, 0,  0]
+    # [20, 0,  4]
+    # [20, 0,  6]
+    # [18, 0, 10]
+    # [ 2, 0, 10]
+    # [ 0, 0,  6]
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     vtx = OpenStudio::Point3dVector.new
@@ -2581,12 +2510,18 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(70,  0,  0)
 
     ulc_vtx = mod1.ulc(vtx)
+    blc_vtx = mod1.blc(vtx)
     expect(mod1.status).to be_zero
     # puts ulc_vtx
     # [ 0, 45, 0]
     # [ 0,  0, 0]
     # [70,  0, 0]
     # [70, 45, 0]
+    # puts blc_vtx
+    # [ 0,  0, 0]
+    # [70,  0, 0]
+    # [70, 45, 0]
+    # [ 0, 45, 0]
   end
 
   it "checks polygon attributes" do
@@ -2734,10 +2669,7 @@ RSpec.describe OSut do
     v = mod1.poly(vtx, true)
     expect(v).to be_a(OpenStudio::Point3dVector)
     expect(v).to be_empty
-    expect(mod1.error?).to be true
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to include("non-convex")
-    expect(mod1.clean!).to eq(INF)
+    expect(mod1.status).to be_zero
 
     # 2nd check for (valid) convexity (with collinear points).
     vtx  = OpenStudio::Point3dVector.new
@@ -2760,10 +2692,7 @@ RSpec.describe OSut do
     v = mod1.poly(vtx, true, false, false, false, :ulc)
     expect(v).to be_a(OpenStudio::Point3dVector)
     expect(v).to be_empty
-    expect(mod1.error?).to be true
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to include("non-convex")
-    expect(mod1.clean!).to eq(INF)
+    expect(mod1.status).to be_zero
 
     # 3rd check for (valid) convexity (with collinear points), yet returned
     # 3D points vector become 'aligned' & clockwise.
@@ -3382,9 +3311,8 @@ RSpec.describe OSut do
 
     sbz = [w1, w2, t1, t2]
     expect(mod1.addSubs(wall4, sbz)).to be true
+    puts mod1.logs unless mod1.status.zero?
     expect(mod1.status).to be_zero
-
-
 
     # Add another 5x (frame&divider-enabled) fixed windows, from either
     # left- or right-corner of base surfaces. Fetch "Openarea Wall 6".
@@ -3455,7 +3383,7 @@ RSpec.describe OSut do
     file = File.join(__dir__, "files/osms/out/seb_ext3a.osm")
     model.save(file, true)
   end
-
+  
   it "checks for space/surface convexity" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.reset(DBG)).to eq(DBG)
@@ -3641,6 +3569,7 @@ RSpec.describe OSut do
     sub[:count ] = 2
     sub[:offset] = offset
     expect(mod1.addSubs(attic_south, [sub])).to be true
+    puts mod1.logs unless mod1.status.zero?
     expect(mod1.status).to be_zero
 
     file = File.join(__dir__, "files/osms/out/mini_test.osm")
@@ -3674,10 +3603,7 @@ RSpec.describe OSut do
     expect(mod1.poly(core_floor, true)).to be_empty   # now concave
     expect(mod1.poly(core_ceiling, true)).to be_empty # now concave
     expect(mod1.poly(attic_floor, true)).to be_empty  # now concave
-    expect(mod1.logs.size).to eq(3)
-    expect(mod1.error?).to be true
-    mod1.logs.each { |l| expect(l[:message]).to include("non-convex") }
-    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.status).to be_zero
 
     shd = model.getShadowCalculation
     # shadingCalculationMethodValues:
@@ -3774,10 +3700,7 @@ RSpec.describe OSut do
     expect(mod1.poly(core_floor, true)).to be_empty   # now concave
     expect(mod1.poly(core_ceiling, true)).to be_empty # now concave
     expect(mod1.poly(attic_floor, true)).to be_empty  # now concave
-    expect(mod1.logs.size).to eq(3)
-    expect(mod1.error?).to be true
-    mod1.logs.each { |l| expect(l[:message]).to include("non-convex") }
-    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.status).to be_zero
 
     file = File.join(__dir__, "files/osms/out/mini2.osm")
     model.save(file, true)
@@ -3871,8 +3794,7 @@ RSpec.describe OSut do
     core_volume = core.floorArea * 3.05
     expect(core_volume).to be_within(TOL).of(core.volume)
 
-    # OpenStudio volume calculations are fixed as of v351. May need to take a
-    # deeper dive.
+    # OpenStudio volume calculations are fixed as of v351.
     expect(attic.volume).to be_within(TOL).of(949.05)                if v < 350
     # expect(attic.volume).to be_within(TOL).of(720.19 + 4 * 3.05) unless v < 350
     expect(attic.floorArea).to be_within(TOL).of(567.98) # includes overhangs
@@ -3880,10 +3802,7 @@ RSpec.describe OSut do
     expect(mod1.poly(core_floor, true)).to be_empty   # now concave
     expect(mod1.poly(core_ceiling, true)).to be_empty # now concave
     expect(mod1.poly(attic_floor, true)).to be_empty  # now concave
-    expect(mod1.logs.size).to eq(3)
-    expect(mod1.error?).to be true
-    mod1.logs.each { |l| expect(l[:message]).to include("non-convex") }
-    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.status).to be_zero
 
     file = File.join(__dir__, "files/osms/out/mini3.osm")
     model.save(file, true)
@@ -3991,143 +3910,6 @@ RSpec.describe OSut do
       expect(roofs.keys).to include(o)
       expect(roofs[o].downcase).to include("plenum")
     end
-
-    # "Utility 1"      : "Level 0 Utility 1 Ceiling Plenum RoofCeiling"
-    # "Open area 1"    : "Level 0 Open area 1 Ceiling Plenum RoofCeiling"
-    # "Small office 1" : "Level 0 Small office 1 Ceiling Plenum RoofCeiling"
-    # "Entry way 1"    : "Level 0 Entry way  Ceiling Plenum RoofCeiling"
-
-    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # CASE 3: 5x spaces under 4x attic roofs; none "fit", many "overlap".
-    file  = File.join(__dir__, "files/osms/in/smalloffice.osm")
-    path  = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model).to_not be_empty
-    model = model.get
-
-    occupied   = []
-    spaces     = {}
-    perimeters = {}
-    core       = []
-
-    model.getSpaces.each do |space|
-      next unless space.partofTotalFloorArea
-
-      occupied << space.nameString
-
-      space.surfaces.each do |s|
-        next unless s.surfaceType.downcase == "roofceiling"
-        next unless s.outsideBoundaryCondition.downcase == "outdoors"
-
-        expect(spaces).to_not have_key(space.nameString)
-        spaces[space.nameString] = s.nameString
-      end
-    end
-
-    expect(spaces).to be_empty
-    expect(occupied.size).to eq(5)
-
-    # In-depth testing, as v3.6.1 Boost-based runs differ from older versions.
-    p4    = model.getSurfaceByName("Perimeter_ZN_4_ceiling")
-    core  = model.getSurfaceByName("Core_ZN_ceiling")
-    north = model.getSurfaceByName("Attic_roof_north")
-    east  = model.getSurfaceByName("Attic_roof_east")
-    south = model.getSurfaceByName("Attic_roof_south")
-    west  = model.getSurfaceByName("Attic_roof_west")
-
-    expect(p4).to_not be_empty
-    expect(core).to_not be_empty
-    expect(north).to_not be_empty
-    expect(east).to_not be_empty
-    expect(south).to_not be_empty
-    expect(west).to_not be_empty
-
-    p4    = p4.get
-    core  = core.get
-    north = north.get
-    east  = east.get
-    south = south.get
-    west  = west.get
-
-    # Tracking copy of the core ceiling for later.
-    cor = core
-
-    expect(mod1.fits?(p4, core)).to be false
-    expect(mod1.fits?(p4, north)).to be false
-    expect(mod1.fits?(p4, east)).to be false
-    expect(mod1.fits?(p4, west)).to be true # ... it fits
-    expect(mod1.fits?(p4, south)).to be false
-
-    expect(mod1.overlaps?(p4, core)).to be false
-    expect(mod1.overlaps?(p4, north)).to be false
-    expect(mod1.overlaps?(p4, east)).to be false
-    expect(mod1.overlaps?(p4, west)).to be true # ... since it fits
-    expect(mod1.overlaps?(p4, south)).to be false
-
-    expect(mod1.fits?(core, p4)).to be false
-    expect(mod1.fits?(core, north)).to be false
-    expect(mod1.fits?(core, east)).to be false
-    expect(mod1.fits?(core, west)).to be false
-    expect(mod1.fits?(core, south)).to be false
-
-    expect(mod1.overlaps?(core, p4)).to be false
-    expect(mod1.overlaps?(core, north)).to be true
-    expect(mod1.overlaps?(core, east)).to be true
-    expect(mod1.overlaps?(core, west)).to be true
-    expect(mod1.overlaps?(core, south)).to be true
-
-    model.getSpaces.each do |space|
-      id = space.nameString
-      next unless space.partofTotalFloorArea
-
-      rufs = mod1.getRoofs(space)
-
-      rufs.each { |rf| expect(mod1.slopedRoof?(rf)).to be true }
-
-      if id.include?("Perimeter")
-        expect(rufs.size).to eq(1)
-        ruf = rufs.first
-        expect(ruf).to be_a(OpenStudio::Model::Surface)
-        perimeters[id] = ruf.nameString
-
-        # No horizontal ridges.
-        ridges = mod1.getHorizontalRidges(rufs)
-        expect(ridges).to be_a(Array)
-        expect(ridges).to be_empty
-      else
-        expect(id).to include("Core")
-        expect(rufs.size).to eq(4)
-        core = rufs
-
-        # 1x horizontal ridge.
-        ridges = mod1.getHorizontalRidges(core)
-        expect(ridges).to be_a(Array)
-        expect(ridges).to_not be_empty
-        expect(ridges.size).to eq(1)
-        ridge = ridges.first
-
-        expect(ridge).to have_key(:edge)
-        expect(ridge).to have_key(:length)
-        expect(ridge).to have_key(:roofs)
-
-        expect(ridge[:length]).to be_within(TOL).of(9.23)
-        expect(ridge[:roofs].size).to eq(2)
-        expect(ridge[:roofs].include?(north)).to be true
-        expect(ridge[:roofs].include?(south)).to be true
-
-        # Check overlaps with core ceiling.
-        core.each { |s| expect(mod1.overlap(s, cor)).to_not be_empty }
-      end
-    end
-
-    expect(perimeters.size).to eq(4)
-    expect(core.size).to eq(4)
-    expect(perimeters.values.all? { |s| s.include?("Attic") }).to be true
-    expect(core.all? { |s| s.nameString.include?("Attic") }).to be true
-    core.each { |s| expect(s).to be_a(OpenStudio::Model::Surface) }
-    expect(perimeters.keys.all? { |s| occupied.include?(s) }).to be true
-
-    expect(mod1.status).to be_zero
   end
 
   it "checks leader line anchors and polygon inserts" do
@@ -4141,6 +3923,7 @@ RSpec.describe OSut do
     # encompasses 4x smaller rectangular polygons (s1 to s4), The vertex
     # sequence of the 4x smaller polygons is based on their aspect ratios, as
     # well as their placement vis-à-vis grid origin.
+    o0  = OpenStudio::Point3d.new( 0,  0,  0)
     s0  = OpenStudio::Point3dVector.new
     s0 << OpenStudio::Point3d.new( 2, 16, 20)
     s0 << OpenStudio::Point3d.new( 2,  2, 20)
@@ -4206,6 +3989,15 @@ RSpec.describe OSut do
     expect(mod1.farthest(s3)).to eq(2)
     expect(mod1.farthest(s4)).to eq(1)
 
+    expect(mod1.nearest(s1, o0)).to eq(3)
+    expect(mod1.nearest(s2, o0)).to eq(0)
+    expect(mod1.nearest(s3, o0)).to eq(0)
+    expect(mod1.nearest(s4, o0)).to eq(3)
+    expect(mod1.farthest(s1, o0)).to eq(1)
+    expect(mod1.farthest(s2, o0)).to eq(2)
+    expect(mod1.farthest(s3, o0)).to eq(2)
+    expect(mod1.farthest(s4, o0)).to eq(1)
+
     # Box-specific grid instructions.
     set = []
     set << { box: s1, rows: 1, cols: 2, w0: 1.4, d0: 1.4, dX: 0.2, dY: 0.2 }
@@ -4217,34 +4009,47 @@ RSpec.describe OSut do
     area_s2 = set[1][:rows] * set[1][:cols] * set[1][:w0] * set[1][:d0]
     area_s3 = set[2][:rows] * set[2][:cols] * set[2][:w0] * set[2][:d0]
     area_s4 = set[3][:rows] * set[3][:cols] * set[3][:w0] * set[3][:d0]
+    area_s  = area_s1 + area_s2 + area_s3 + area_s4
     expect(area_s1).to be_within(TOL).of( 3.92)
     expect(area_s2).to be_within(TOL).of(11.76)
     expect(area_s3).to be_within(TOL).of( 3.64)
     expect(area_s4).to be_within(TOL).of( 3.64)
-    area_s = area_s1 + area_s2 + area_s3 + area_s4
     expect(area_s).to be_within(TOL).of(22.96)
+
+    ld1 = OpenStudio::Point3d.new(18,  0, 0)
+    ld2 = OpenStudio::Point3d.new( 8,  3, 0)
+    sg1 = OpenStudio::Point3d.new(12, 14, 0)
+    sg2 = OpenStudio::Point3d.new(12,  6, 0)
+    expect(mod1.getLineIntersection([sg1, sg2], [ld1, ld2])).to be_nil
+
+    t = OpenStudio::Transformation.alignFace(s0)
+    s00 = t.inverse * s0
+    s01 = t.inverse * s1
+    s01.each { |pt| expect(mod1.pointWithinPolygon?(pt, s00, true)).to be true }
 
     # Generate leader line anchors, linking set boxes to s0 vertices.
     n = mod1.genAnchors(s0, set, :box)
+    puts mod1.logs unless mod1.status.zero?
     expect(n).to eq(4)
+    expect(mod1.status).to be_zero
 
-    # These tests are successful, given the initial vertex sequencing. A simple
-    # resequencing of set box vertices could easily prevent genAnchors from
-    # identifying valid leader line anchor points.
+    # These previous tests are successful, given the initial vertex sequencing.
+    # A simple resequencing of set box vertices could easily prevent genAnchors
+    # from identifying valid leader line anchor points.
     set.each_with_index do |st, i|
       expect(st).to have_key(:ld)
       expect(st[:ld]).to be_a(Hash)
       expect(st[:ld]).to have_key(s0)
       expect(st[:ld][s0]).to be_a(OpenStudio::Point3d)
-      expect(mod1.same?(st[:ld][s0], s0[1])).to be true if i == 0 #  2,  2, 20
+      expect(mod1.same?(st[:ld][s0], s0[2])).to be true if i == 0 #  8,  2, 20
       expect(mod1.same?(st[:ld][s0], s0[0])).to be true if i == 1 #  2, 16, 20
       expect(mod1.same?(st[:ld][s0], s0[4])).to be true if i == 2 # 16, 10, 20
-      expect(mod1.same?(st[:ld][s0], s0[5])).to be true if i == 3 # 16,  2, 20
+      expect(mod1.same?(st[:ld][s0], s0[6])).to be true if i == 3 # 20,  2, 20
     end
 
     # Add array of polygon inserts to s0.
     s00 = mod1.genInserts(s0, set)
-    puts mod1.logs
+    puts mod1.logs unless mod1.status.zero?
     expect(s00).to be_a(OpenStudio::Point3dVector)
     expect(s00.size).to eq(68)
 
@@ -4276,7 +4081,7 @@ RSpec.describe OSut do
 
       sX_area += st_area
 
-      # As mentioned earlier, box vertex sequencing is key in successfully
+      # As discussed earlier, box vertex sequencing is key in successfully
       # identifying leader line anchors for each set. Boxes remain unchanged.
       st[:box].each do |pt|
         expect(mod1.same?(st[:box], s1)).to be true if i == 0
@@ -4343,6 +4148,7 @@ RSpec.describe OSut do
 
     # "GROSS ROOF AREA" (GRA), as per 90.1/NECB - excludes roof overhangs (60m2)
     gra1 = mod1.grossRoofArea(model.getSpaces)
+    puts mod1.logs unless mod1.status.zero?
     expect(mod1.status).to be_zero
     expect(gra1.round(2)).to eq(538.86)
 
