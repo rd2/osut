@@ -1,6 +1,6 @@
 # BSD 3-Clause License
 #
-# Copyright (c) 2022-2023, Denis Bourgeois
+# Copyright (c) 2022-2024, Denis Bourgeois
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -29,5 +29,5 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 module OSut
-  VERSION = "0.4.0".freeze # OSut version
+  VERSION = "0.5.0".freeze # OSut version
 end
