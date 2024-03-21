@@ -3383,7 +3383,7 @@ RSpec.describe OSut do
     file = File.join(__dir__, "files/osms/out/seb_ext3a.osm")
     model.save(file, true)
   end
-  
+
   it "checks for space/surface convexity" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.reset(DBG)).to eq(DBG)
@@ -4655,5 +4655,18 @@ RSpec.describe OSut do
 
     file = File.join(__dir__, "files/osms/out/seb_ext5.osm")
     model.save(file, true)
+  end
+
+  it "checks building structure, constructions sets" do
+    # Placeholder for testing default construction set generation & assignment
+    # based on building 'structure' selection (e.g. wood-framed construction,
+    # vs concrete post+beam). The overall idea is that in most cases, OpenStudio
+    # surface Construction choices (in addition to InternalMass definitions),
+    # usually depend greatly on underlying structural choices (which are
+    # typically not defined in OpenStudio). Ensuring consistency between
+    # building structures, envelope selection, internal mass definitions is key
+    # to ensuring consistency between predicted energy use, peak demand, GHG
+    # emissions, thermal resilience and embodied energy/GHG tallies. More to
+    # come ...
   end
 end
