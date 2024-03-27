@@ -47,7 +47,7 @@ module OSut
   SILL = 0.762 # standard 30" window sill
 
   # General surface orientations (see facets method)
-  SIDZ = [:bottom, # e.g. ground-facing, exposed floros
+  SIDZ = [:bottom, # e.g. ground-facing, exposed floors
              :top, # e.g. roof/ceiling
            :north, # NORTH
             :east, # EAST

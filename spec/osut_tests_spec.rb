@@ -4658,15 +4658,471 @@ RSpec.describe OSut do
   end
 
   it "checks building structure, constructions sets" do
+    # CONTEXT
+    #
     # Placeholder for testing default construction set generation & assignment
-    # based on building 'structure' selection (e.g. wood-framed construction,
-    # vs concrete post+beam). The overall idea is that in most cases, OpenStudio
-    # surface Construction choices (in addition to InternalMass definitions),
-    # usually depend greatly on underlying structural choices (which are
-    # typically not defined in OpenStudio). Ensuring consistency between
-    # building structures, envelope selection, internal mass definitions is key
-    # to ensuring consistency between predicted energy use, peak demand, GHG
-    # emissions, thermal resilience and embodied energy/GHG tallies. More to
-    # come ...
+    # based on building 'structure' options (e.g. wood-framed load-bearing, vs
+    # concrete post+beam), more specifically for Canadian and American contexts.
+    # The overarching idea is that (in most cases) OpenStudio surface
+    # Construction/Material choices (in addition to InternalMass definitions),
+    # mostly stem from underlying structural design choices (which aren't
+    # natively defined in OpenStudio). Structural choices have more to do with
+    # fire safety considerations, practicality (low-rise vs high-rise),
+    # durability, and of course costing.
+    #
+    # Although wood-framed walls (in addition to wood-engineered floor joists
+    # and rafters), constitute the load-bearing components of a "wood-framed"
+    # building structure (ex. low-rise housing), they can equally be found as
+    # non-structural components in CLT post-beam structures. Light gauge steel-
+    # framed walls are much more common in non-residential buildings (e.g. steel
+    # post/frame, concrete post & beam, and often CLT), though rarely found in
+    # low-rise housing. Although there is some flexibility when mixing/matching
+    # structure vs envelope construction in a building, it remains somewhat
+    # deterministic. In short, designers recommend envelope choices (framing,
+    # insulation), taking building structure selection into consideration (not
+    # the other way 'round).
+    #
+    # Ensuring consistency between building structure, envelope selection and
+    # internal mass definitions is key to ensuring coherence between predicted
+    # energy use, peak demand, GHG emissions, vs thermal resilience and embodied
+    # energy/GHG tallies.
+    #
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # STRUCTURES
+    #
+    # A limited selection of building STRUCTURE options (new construction):
+    #
+    #   identifier  description
+    #   __________  ___________________________________________________________
+    #      "steel"  conventional steel, post/frame (default)
+    #      "metal"  pre-fabricated, panelized steel structure (++)
+    #   "concrete"  conventional post/beam, reinforced concrete
+    #       "wood"  conventional wood-framed and/or -engineered, load-bearing
+    #        "clt"  pre-fabricated, post/beam mass/cross-laminated-timber
+    #
+    #   ++ ASHRAE 90.1 2022 definitions of:
+    #
+    #      "metal building: a complete integrated set of mutually dependent
+    #       components and assemblies that form a building, which consists of a
+    #       steel-framed superstructure and metal skin".
+    #
+    #      "metal building roof": a roof that:
+    #         a. is constructed with a metal, structural, weathering surface;
+    #         b. has no ventilated cavity; and
+    #         c. has the insulation entirely below deck (i.e., does not include
+    #            composite concrete and metal deck construction nor a roof
+    #            framing system that is separated from the superstructure by a
+    #            wood substrate) and whose structure consists of one or more of
+    #            the following configurations:
+    #            1. Metal roofing in direct contact with the steel framing
+    #               members
+    #            2. Metal roofing separated from the steel framing members by
+    #               insulation
+    #            3. Insulated metal roofing panels installed as described in
+    #               subitems (a) or (b)
+    #
+    #      "metal building wall": a wall whose structure consists of metal
+    #       spanning members supported by steel structural members (i.e. does
+    #       not include spandrel glass or metal panels in curtain wall systems).
+    #
+    # Why so much attention on metal buildings? There's a clear need to contrast
+    # this option against steel post/beam. Like wood-framed, they differ in that
+    # perimeter structure and envelope are indistinguishable, i.e. no mixing and
+    # matching between structure and envelope.
+
+    # Hashes are retained for the initial version/tests (these could evolve
+    # into distinct classes in the final implementation).
+    structure                  = {}
+    structure["OSut|steel"   ] = {co2: 200, set: "OSut|steel|steel-framed"}
+    structure["OSut|metal"   ] = {co2: 200, set: "OSut|metal"}
+    structure["OSut|concrete"] = {co2: 200, set: "OSut|concrete/steel-framed"}
+    structure["OSut|wood"    ] = {co2: 200, set: "OSut|wood-framed"}
+    structure["OSut|clt"     ] = {co2: 200, set: "OSut|clt|wood-framed"}
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # EMBODIED CARBON
+    #
+    # Each STRUCTURE inherits an OpenStudio::Model::DefaultConstructionSet by
+    # default (that may be overriden by the user). These are describe in greater
+    # detail further on. Each STRUCTURE also holds a "co2:" key-value pair.
+    # These carbon intensity estimates (in CO2-e kg/m2) are placeholders for now
+    # (to be replaced at some point by 3rd-party sources). They're meant to
+    # specifically track the carbon footprint of the STRUCTURE (not the envelope
+    # nor interior partitions). These estimates should include the embodied
+    # carbon of structural floors per se, in addition to the embodied carbon of
+    # structural elements that can't be represented explicitely in an OpenStudio
+    # model, e.g. columns, bracing, stairwells and elevator shafts. Once refined,
+    # these unit CO2-e kg/m2 estimates are expected to differ considerably
+    # between structural options, and also affected by regional considerations,
+    # number of building stories, structural requirements, and so on (to deploy
+    # algorithmically).
+
+    # Buildings are often composites or hybrids (e.g. steel post/beam structure
+    # with prefab concrete bleachers in a sports arena). Such real-world
+    # combinations are set aside here to favour a more direct apples-to-apples
+    # comparison between structural design choices (e.g. embodied carbon,
+    # thermal intertia), in the context of building stock assessments.
+    #
+    # There are of course several other (smaller scale) structural options,
+    # often load-bearing envelopes like concrete masonry units (CMU),
+    # adobe/hemp/straw bale construction, etc. Yet most would agree that these
+    # are either fading in actual use (e.g. vs 30 years ago), or constitute
+    # somewhat rare occurrences for the purpose of (new) commercial building
+    # stock assessments. One could state the same when it comes to the current
+    # marginal use of cross-laminated (or mass) timber (CLT). Yet this option
+    # is rapidly becoming a robust low-carbon alternative to steel and concrete
+    # options (hence its inclusion in the initial list). Regardless, additional
+    # options may be added in the future.
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # BUILDING TYPES
+    #
+    # To simplify data management, building TYPES (e.g. those listed in Table
+    # A-8.4.3.2.(2)-A of the NECB 2020) are proposed to fall into larger
+    # building CATEGORIES:
+    #
+    #     identifier   examples
+    # _______________  _______________________________________________________
+    #      "dwelling"  MURB, long-term stay, hotel, dormitory
+    #     "detention"  penitentiary
+    # "institutional"  office, museum, town hall, education, convention centre
+    #    "commercial"  dining, retail, gym, dealership, theatre, transportation
+    #    "industrial"  automotive, manufacturing, fire station, storage
+    #     "athletics"  ice arena, indoor soccer, indoor pool, gymnastics
+    #
+    # Each CATEGORY holds "small"(-scale) and "large"(-scale) STRUCTURE options
+    # (defaults), depending on the characteristics of the building.
+    category                  = {}
+    category["OSut|dwelling"     ] = {small: "OSut|wood"    , large: "OSut|concrete"}
+    category["OSut|detention"    ] = {small: "OSut|concrete", large: "OSut|concrete"}
+    category["OSut|institutional"] = {small: "OSut|steel"   , large: "OSut|concrete"}
+    category["OSut|commercial"   ] = {small: "OSut|steel"   , large: "OSut|steel"}
+    category["OSut|industrial"   ] = {small: "OSut|concrete", large: "OSut|metal"}
+    category["OSut|athletics"    ] = {small: "OSut|metal"   , large: "OSut|steel"}
+
+    # What consitutes small- vs large-scale is different for each CATEGORY,
+    # depending either on the maximum number of stories or the total height of
+    # the building.
+    category["OSut|dwelling"     ][:stories] =  5
+    category["OSut|institutional"][:stories] =  3
+    category["OSut|industrial"   ][:height ] =  4
+    category["OSut|athletics"    ][:height ] = 10
+
+    # For instance, (by default) all multi-unit residential buildings (MURBs)
+    # have typical wood-framed structures up to (and including) 5 stories above-
+    # grade. This default STRUCTURE assignment switches to reinforced concrete
+    # post & flat slab beyond 5 stories. Building CATEGORIES that hold neither
+    # :stories nor :height key:value pairs simply retain the same STRUCTURE
+    # option by default (e.g. "detention", "commercial"), regardless of scale.
+    #
+    # This default STRUCTURE assignment (per building CATEGORY) does not imply
+    # one cannot investigate the pros/cons of CLT construction in MURBs, offices
+    # or athletic facilities. It rather reflects our assessment of the current
+    # state of affairs (i.e. 'dominant' STRUCTURE option per building CATEGORY
+    # in large parts of the US and Canada). Users always have the option of
+    # overridding these.
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # EXAMPLE IMPLEMENTATION
+    #
+    # A final implementation of these concepts involve module (or class)
+    # methods, automating the generation of complete default construction sets
+    # (based on the aformentioned building STRUCTURE and building CATEGORY). An
+    # example (to illustrate):
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+    file  = File.join(__dir__, "files/osms/out/office_attic.osm")
+    path  = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model).to_not be_empty
+    model = model.get
+    bldg  = model.getBuilding
+
+    # For the purpose of the test, the 'office_attic.osm' model is retained for
+    # geometry, schedules, etc. A small, regional museum is instead considered
+    # for testing, using the NECB 2020 building/space types as an example. NECB
+    # building/space type strings vary among vintages 2011 through 2020, as well
+    # as the MNECB1997, although they refer conceptually to the same activities.
+    # To simplify, the solution retains concise keywords for activities.
+    #
+    #  OS:Spaces      activities     NECB Space Types          keywords
+    #  _____________  _____________  _________________________ ________________
+    #  Core_ZN        exhibition     "general exhibition area" "exhibit"
+    #  Perimeter_ZN_1 entrance/café  "dining area - other"     "dining"
+    #  Perimeter_ZN_2 office/tickets "office"                  "office"
+    #  Perimeter_ZN_3 storage        "storage room >= 5m2"     "storage"
+    #  Perimeter_ZN_4 WC/services    "washroom - other"        "washroom"
+
+    sptype_office = model.getSpaceTypeByName("Office WholeBuilding - Sm Office")
+    sptype_attic  = model.getSpaceTypeByName("Office Attic")
+    expect(sptype_office).to_not be_empty
+    expect(sptype_attic).to_not be_empty
+    sptype_office = sptype_office.get
+    sptype_attic  = sptype_attic.get
+
+    exhibit  = model.getSpaceByName("Core_ZN")
+    dining   = model.getSpaceByName("Perimeter_ZN_1")
+    office   = model.getSpaceByName("Perimeter_ZN_2")
+    storage  = model.getSpaceByName("Perimeter_ZN_3")
+    washroom = model.getSpaceByName("Perimeter_ZN_4")
+    expect(exhibit).to_not be_empty
+    expect(dining).to_not be_empty
+    expect(office).to_not be_empty
+    expect(storage).to_not be_empty
+    expect(washroom).to_not be_empty
+    exhibit  = exhibit.get
+    dining   = dining.get
+    office   = office.get
+    storage  = storage.get
+    washroom = washroom.get
+    expect(exhibit.spaceType).to_not be_empty
+    expect(dining.spaceType).to_not be_empty
+    expect(office.spaceType).to_not be_empty
+    expect(storage.spaceType).to_not be_empty
+    expect(washroom.spaceType).to_not be_empty
+    expect(exhibit.spaceType.get).to eq(sptype_office)
+    expect(dining.spaceType.get).to eq(sptype_office)
+    expect(office.spaceType.get).to eq(sptype_office)
+    expect(storage.spaceType.get).to eq(sptype_office)
+    expect(washroom.spaceType.get).to eq(sptype_office)
+
+    # Purge all materials, constructions, default sets, etc.
+    model.getDefaultConstructionSets.each { |item| item.remove }
+    model.getConstructionBases.each { |item| item.remove }
+    model.getMaterials.each { |item| item.remove }
+    expect(model.getDefaultConstructionSets).to be_empty
+    expect(model.getConstructionBases).to be_empty
+    expect(model.getMaterials).to be_empty
+
+    # The proposed solution doesn't rely on all OpenStudio::Model::Building
+    # Standards' methods. Purging it nonetheless to avoid confusion.
+    bldg.resetStandardsBuildingType
+    nb_stories = bldg.standardsNumberOfStories.get
+    expect(nb_stories).to eq(1)
+
+    # Clone space type entries - not interested in resetting OA, schedules, etc.
+    sptype_office = model.getSpaceTypeByName("Office WholeBuilding - Sm Office")
+    sptype_attic  = model.getSpaceTypeByName("Office Attic")
+    expect(sptype_office).to_not be_empty
+    expect(sptype_attic).to_not be_empty
+    sptype_office = sptype_office.get
+    sptype_attic  = sptype_attic.get
+    expect(sptype_office.defaultConstructionSet).to be_empty
+    expect(sptype_attic.defaultConstructionSet).to be_empty
+    sptype_office.resetStandardsBuildingType
+    sptype_attic.resetStandardsBuildingType
+    sptype_office.resetStandardsSpaceType
+    sptype_attic.resetStandardsSpaceType
+    sptype_office.setName("OSut|office")
+    sptype_attic.setName("OSut|attic")
+
+    sptype_exhibit  = sptype_office.clone.to_SpaceType.get
+    sptype_dining   = sptype_office.clone.to_SpaceType.get
+    sptype_storage  = sptype_office.clone.to_SpaceType.get
+    sptype_washroom = sptype_office.clone.to_SpaceType.get
+    sptype_exhibit.setName("OSut|exhibit")
+    sptype_dining.setName("OSut|dining")
+    sptype_storage.setName("OSut|storage")
+    sptype_washroom.setName("OSut|washroom")
+    expect(sptype_exhibit.setStandardsSpaceType("NECB2020|exhibit")).to be true
+    expect(sptype_dining.setStandardsSpaceType("NECB2020|dining")).to be true
+    expect(sptype_office.setStandardsSpaceType("NECB2020|office")).to be true
+    expect(sptype_storage.setStandardsSpaceType("NECB2020|storage")).to be true
+    expect(sptype_washroom.setStandardsSpaceType("NECB2020|washroom")).to be true
+    expect(exhibit.setSpaceType(sptype_exhibit)).to be true
+    expect(dining.setSpaceType(sptype_dining)).to be true
+    expect(storage.setSpaceType(sptype_storage)).to be true
+    expect(washroom.setSpaceType(sptype_washroom)).to be true
+
+    # Most buildings are in actuality mixed-use (rather single-use) facilities.
+    # A building may harbour spaces that are mainly commercial in nature (e.g.
+    # restaurant), yet also host non-commercial ancillary spaces like a small
+    # art gallery, an office, etc. If such ancillary spaces are open or closed
+    # as a function of the main dining activity, energy codes typically require
+    # that operating schedules of all spaces remain in sync. If however, the art
+    # gallery were to remain open when the restaurant is closed (e.g. Mondays),
+    # then it's often required to assign independent scheduling.
+    #
+    # There is of course no direct relationship between the above space types,
+    # hours of operation, etc. ... and building structure, as well as consequent
+    # construction choices. They serve as a example or basis to infer building
+    # CATEGORY classification from space type allocation. By assigning
+    # categories to the selected activities in this model, we can infer that the
+    # building predominantly falls into the "institutional" CATEGORY, as the
+    # overall floor area would not lean towards "commercial". We could have
+    # instead nilled both "office" and "exhibit" activities, making the
+    # facility "commercial".
+    activities = {}
+    activities["OSut|exhibit" ] = {category: "OSut|institutional"}
+    activities["OSut|dining"  ] = {category: "OSut|commercial"}
+    activities["OSut|office"  ] = {category: "OSut|institutional"}
+    activities["OSut|storage" ] = {category: nil}
+    activities["OSut|washroom"] = {category: nil}
+
+    expect(category["OSut|institutional"]).to_not have_key(:height)
+    expect(category["OSut|institutional"]).to have_key(:stories)
+    nb_story = category["OSut|institutional"][:stories]
+    expect(nb_stories).to be < nb_story # 1 < 3
+    scale = nb_stories < nb_story ? :small : :large
+    expect(scale).to eq(:small)
+    opt = category["OSut|institutional"][scale]
+    expect(opt).to eq("OSut|steel")
+
+    # Assign the model's building STRUCTURE using AdditionalProperties.
+    tag = "OSut|structure"
+    expect(bldg.additionalProperties.hasFeature("OSut|structure")).to be false
+    expect(bldg.additionalProperties.setFeature(tag, opt)).to be true
+    expect(bldg.additionalProperties.hasFeature("OSut|structure")).to be true
+    choice = bldg.additionalProperties.getFeatureAsString(tag)
+    expect(choice).to_not be_empty
+    choice = choice.get
+    expect(choice).to eq("OSut|steel")
+
+    # Retrieve associated construction set.
+    expect(structure).to have_key(choice)
+    c_set = structure[choice][:set]
+    expect(c_set).to eq("OSut|steel|steel-framed")
+
+    # Generate the associated default construction set.
+    ext_srf  = OpenStudio::Model::DefaultSurfaceConstructions.new(model)
+    int_srf  = OpenStudio::Model::DefaultSurfaceConstructions.new(model)
+    grnd_srf = OpenStudio::Model::DefaultSurfaceConstructions.new(model)
+    ext_sub  = OpenStudio::Model::DefaultSubSurfaceConstructions.new(model)
+
+    # Exterior surfaces (e.g. climate zone 7A).
+    specs         = {}
+    specs[:id   ] = "OSut|steel|steel-framed|ext-wall"
+    specs[:type ] = :wall
+    specs[:clad ] = :medium
+    specs[:uo   ] = 0.215
+    ext_wall      = mod1.genConstruction(model, specs)
+
+    specs         = {}
+    specs[:id   ] = "OSut|steel|steel-framed|ext-roof"
+    specs[:type ] = :roof
+    specs[:uo   ] = 0.121
+    ext_roof      = mod1.genConstruction(model, specs)
+
+    specs         = {}
+    specs[:id   ] = "OSut|steel|steel-framed|ext-floor"
+    specs[:type ] = :floor
+    specs[:frame] = :medium
+    specs[:uo   ] = 0.138
+    ext_floor     = mod1.genConstruction(model, specs)
+
+    expect(ext_srf.setWallConstruction(ext_floor)).to be true
+    expect(ext_srf.setRoofCeilingConstruction(ext_floor)).to be true
+    expect(ext_srf.setFloorConstruction(ext_floor)).to be true
+
+    # Interior surfaces.
+    specs         = {}
+    specs[:id   ] = "OSut|steel|steel-framed|int-wall"
+    specs[:type ] = :partition
+    specs[:uo   ] = 0.5
+    int_wall      = mod1.genConstruction(model, specs)
+
+    specs         = {}
+    specs[:id   ] = "OSut|steel|steel-framed|int-ceiling"
+    specs[:type ] = :roof
+    specs[:uo   ] = 0.5
+    int_ceiling   = mod1.genConstruction(model, specs)
+
+    specs         = {}
+    specs[:id   ] = "OSut|steel|steel-framed|int-floor"
+    specs[:type ] = :floor
+    specs[:frame] = :medium
+    specs[:uo   ] = 0.5
+    int_floor     = mod1.genConstruction(model, specs)
+
+    expect(int_srf.setWallConstruction(int_wall)).to be true
+    expect(int_srf.setRoofCeilingConstruction(int_ceiling)).to be true
+    expect(int_srf.setFloorConstruction(int_floor)).to be true
+
+    # Ground surfaces.
+    specs         = {}
+    specs[:id   ] = "OSut|steel|steel-framed|grnd-wall"
+    specs[:type ] = :basement
+    specs[:frame] = :heavy
+    specs[:uo   ] = 0.284
+    grnd_wall     = mod1.genConstruction(model, specs)
+
+    specs         = {}
+    specs[:id   ] = "OSut|steel|steel-framed|grnd-roof"
+    specs[:type ] = :roof
+    specs[:frame] = :heavy
+    specs[:uo   ] = 0.284
+    grnd_roof     = mod1.genConstruction(model, specs)
+
+    specs         = {}
+    specs[:id   ] = "OSut|steel|steel-framed|grnd-floor"
+    specs[:type ] = :slab
+    specs[:frame] = :heavy
+    specs[:uo   ] = 0.5
+    grnd_floor    = mod1.genConstruction(model, specs)
+
+    expect(grnd_srf.setWallConstruction(grnd_wall)).to be true
+    expect(grnd_srf.setRoofCeilingConstruction(grnd_roof)).to be true
+    expect(grnd_srf.setFloorConstruction(grnd_floor)).to be true
+
+    # Exterior sub-surfaces.
+    specs         = {}
+    specs[:id   ] = "OSut|steel|steel-framed|fenestration"
+    specs[:type ] = :window
+    specs[:uo   ] = 1.73
+    ext_window    = mod1.genConstruction(model, specs)
+
+    specs         = {}
+    specs[:id   ] = "OSut|steel|steel-framed|door"
+    specs[:type ] = :door
+    specs[:uo   ] = 1.90
+    ext_door      = mod1.genConstruction(model, specs)
+
+    specs         = {}
+    specs[:id   ] = "OSut|steel|steel-framed|skylight"
+    specs[:type ] = :skylight
+    specs[:uo   ] = 2.41
+    ext_sky       = mod1.genConstruction(model, specs)
+
+    expect(ext_sub.setFixedWindowConstruction(ext_window)).to be true
+    expect(ext_sub.setOperableWindowConstruction(ext_window)).to be true
+    expect(ext_sub.setDoorConstruction(ext_door)).to be true
+    expect(ext_sub.setGlassDoorConstruction(ext_window)).to be true
+    expect(ext_sub.setOverheadDoorConstruction(ext_door)).to be true
+    expect(ext_sub.setSkylightConstruction(ext_sky)).to be true
+
+    set = OpenStudio::Model::DefaultConstructionSet.new(model)
+    expect(set.setDefaultExteriorSurfaceConstructions(ext_srf)).to be true
+    expect(set.setDefaultInteriorSurfaceConstructions(int_srf)).to be true
+    expect(set.setDefaultGroundContactSurfaceConstructions(grnd_srf)).to be true
+    expect(set.setDefaultExteriorSubSurfaceConstructions(ext_sub)).to be true
+    expect(set.setInteriorPartitionConstruction(int_wall)).to be true
+
+    # Other default construction set items, such as shading, interior windows
+    # and doors, adiabatic surfaces, etc., require similar treatment. See:
+    #   - OSut.genShade
+    #   - OSut.genMass
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # On the embodied carbon of surfaces and internal mass ...
+    #
+    # The STRUCTURE Hash holds CO2-e kg/m2 intensities for floor and ancillary
+    # structural elements that aren't explicitely represented in an OpenStudio
+    # model. A similar treatment is required for the preceding surfaces (except
+    # floors) and internal mass objects. As with structures, these intensities
+    # need to be provided by 3rd-parties. Internal mass objects are slightly
+    # different from surfaces as they are composites of multiple items, some
+    # linked to real-estate assets (e.g. integrated furniture, partitions not
+    # explicitely modelled), others not (e.g. non-integrated furniture, books).
+    # Min, ave & max dead load estimates (kg/m2 of floor area), required for
+    # structural engineering calculations could be surveyed as a means to
+    # establish internal mass definitions as whole, then reverse engineered into
+    # separate items. Each real-estate item requires a carbon intensity, e.g. on
+    # a m2 basis, on a linear length basis (e.g. major thermal bridging) or on
+    # a list of individual objects (e.g. elevators, escalators, rooftop HVAC).
+
+    file = File.join(__dir__, "files/osms/out/museum.osm")
+    model.save(file, true)
   end
 end
