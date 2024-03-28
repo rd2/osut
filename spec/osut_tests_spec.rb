@@ -4743,14 +4743,14 @@ RSpec.describe OSut do
     # EMBODIED CARBON
     #
     # Each STRUCTURE inherits an OpenStudio::Model::DefaultConstructionSet by
-    # default (that may be overriden by the user). These are describe in greater
+    # default (that may be overridden by the user). These are described in greater
     # detail further on. Each STRUCTURE also holds a "co2:" key-value pair.
     # These carbon intensity estimates (in CO2-e kg/m2) are placeholders for now
     # (to be replaced at some point by 3rd-party sources). They're meant to
     # specifically track the carbon footprint of the STRUCTURE (not the envelope
     # nor interior partitions). These estimates should include the embodied
     # carbon of structural floors per se, in addition to the embodied carbon of
-    # structural elements that can't be represented explicitely in an OpenStudio
+    # structural elements that can't be represented explicitly in an OpenStudio
     # model, e.g. columns, bracing, stairwells and elevator shafts. Once refined,
     # these unit CO2-e kg/m2 estimates are expected to differ considerably
     # between structural options, and also affected by regional considerations,
@@ -4800,7 +4800,7 @@ RSpec.describe OSut do
     category["OSut|industrial"   ] = {small: "OSut|concrete", large: "OSut|metal"}
     category["OSut|athletics"    ] = {small: "OSut|metal"   , large: "OSut|steel"}
 
-    # What consitutes small- vs large-scale is different for each CATEGORY,
+    # What constitutes small- vs large-scale is different for each CATEGORY,
     # depending either on the maximum number of stories or the total height of
     # the building.
     category["OSut|dwelling"     ][:stories] =  5
@@ -4820,7 +4820,7 @@ RSpec.describe OSut do
     # or athletic facilities. It rather reflects our assessment of the current
     # state of affairs (i.e. 'dominant' STRUCTURE option per building CATEGORY
     # in large parts of the US and Canada). Users always have the option of
-    # overridding these.
+    # overriding these.
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # EXAMPLE IMPLEMENTATION
@@ -4936,7 +4936,7 @@ RSpec.describe OSut do
     expect(storage.setSpaceType(sptype_storage)).to be true
     expect(washroom.setSpaceType(sptype_washroom)).to be true
 
-    # Most buildings are in actuality mixed-use (rather single-use) facilities.
+    # Most buildings are in actuality mixed-use (rather than single-use) facilities.
     # A building may harbour spaces that are mainly commercial in nature (e.g.
     # restaurant), yet also host non-commercial ancillary spaces like a small
     # art gallery, an office, etc. If such ancillary spaces are open or closed
@@ -4947,7 +4947,7 @@ RSpec.describe OSut do
     #
     # There is of course no direct relationship between the above space types,
     # hours of operation, etc. ... and building structure, as well as consequent
-    # construction choices. They serve as a example or basis to infer building
+    # construction choices. They serve as an example or basis to infer building
     # CATEGORY classification from space type allocation. By assigning
     # categories to the selected activities in this model, we can infer that the
     # building predominantly falls into the "institutional" CATEGORY, as the
@@ -5108,13 +5108,13 @@ RSpec.describe OSut do
     # On the embodied carbon of surfaces and internal mass ...
     #
     # The STRUCTURE Hash holds CO2-e kg/m2 intensities for floor and ancillary
-    # structural elements that aren't explicitely represented in an OpenStudio
+    # structural elements that aren't explicitly represented in an OpenStudio
     # model. A similar treatment is required for the preceding surfaces (except
     # floors) and internal mass objects. As with structures, these intensities
     # need to be provided by 3rd-parties. Internal mass objects are slightly
     # different from surfaces as they are composites of multiple items, some
     # linked to real-estate assets (e.g. integrated furniture, partitions not
-    # explicitely modelled), others not (e.g. non-integrated furniture, books).
+    # explicitly modelled), others not (e.g. non-integrated furniture, books).
     # Min, ave & max dead load estimates (kg/m2 of floor area), required for
     # structural engineering calculations could be surveyed as a means to
     # establish internal mass definitions as whole, then reverse engineered into
