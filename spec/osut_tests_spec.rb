@@ -1847,8 +1847,8 @@ RSpec.describe OSut do
     expect(mod1.same?(sg1[3], sg2[2])).to be true
     expect(mod1.fits?(sg1, sg2)).to be true
     expect(mod1.fits?(sg2, sg1)).to be false
-    expect( mod1.same?( mod1.overlap(sg1, sg2), sg1) ).to be true
-    expect( mod1.same?( mod1.overlap(sg2, sg1), sg1) ).to be true
+    expect(mod1.same?(mod1.overlap(sg1, sg2), sg1)).to be true
+    expect(mod1.same?(mod1.overlap(sg2, sg1), sg1)).to be true
 
     sg1.each_with_index do |pt, i|
       expect(mod1.pointWithinPolygon?(pt, sg2)).to be true
@@ -2048,7 +2048,6 @@ RSpec.describe OSut do
     expect(soffit.plane.outwardNormal.dot(n1)).to be_within(TOL).of(1)
     expect(  roof.plane.outwardNormal.dot(n2)).to be_within(TOL).of(1)
 
-
     # When surfaces are neither parallel nor share any edges (e.g. sloped roof
     # vs horizontal floor), the generated overlap is more likely to hold extra
     # vertices, depending on which surface it is cast onto.
@@ -2151,6 +2150,174 @@ RSpec.describe OSut do
     area1 = area1.get
     area2 = area2.get
     expect((100 * area2 / area1).to_i).to eq(68) # %
+    expect(mod1.status).to be_zero
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Testing more complex cases, e.g. triangular windows, irregular 4-side
+    # windows, rough opening edges overlapping parent surface edges. These tests
+    # were initially part of the TBD Tests repository (github.com/rd2/tbd_tests),
+    # yet have been upgraded and are now tested here.
+    model = OpenStudio::Model::Model.new
+    space = OpenStudio::Model::Space.new(model)
+    space.setName("Space")
+
+    # Windows are SimpleGlazing constructions.
+    fen     = OpenStudio::Model::Construction.new(model)
+    glazing = OpenStudio::Model::SimpleGlazing.new(model)
+    layers  = OpenStudio::Model::MaterialVector.new
+    fen.setName("FD fen")
+    glazing.setName("FD glazing")
+    expect(glazing.setUFactor(2.0)).to be true
+    layers << glazing
+    expect(fen.setLayers(layers)).to be true
+
+    # Frame & Divider object.
+    w000 = 0.000
+    w200 = 0.200 # 0mm to 200mm (wide!) around glazing
+    fd   = OpenStudio::Model::WindowPropertyFrameAndDivider.new(model)
+    fd.setName("FD")
+    expect(fd.setFrameConductance(0.500)).to be true
+    expect(fd.isFrameWidthDefaulted).to be true
+    expect(fd.frameWidth).to be_within(TOL).of(w000)
+
+    # A square base wall surface:
+    v0  = OpenStudio::Point3dVector.new
+    v0 << OpenStudio::Point3d.new( 0.00, 0.00, 10.00)
+    v0 << OpenStudio::Point3d.new( 0.00, 0.00,  0.00)
+    v0 << OpenStudio::Point3d.new(10.00, 0.00,  0.00)
+    v0 << OpenStudio::Point3d.new(10.00, 0.00, 10.00)
+
+    # A first triangular window:
+    v1  = OpenStudio::Point3dVector.new
+    v1 << OpenStudio::Point3d.new( 2.00, 0.00, 8.00)
+    v1 << OpenStudio::Point3d.new( 1.00, 0.00, 6.00)
+    v1 << OpenStudio::Point3d.new( 4.00, 0.00, 9.00)
+
+    # A larger, irregular window:
+    v2  = OpenStudio::Point3dVector.new
+    v2 << OpenStudio::Point3d.new( 7.00, 0.00, 4.00)
+    v2 << OpenStudio::Point3d.new( 4.00, 0.00, 1.00)
+    v2 << OpenStudio::Point3d.new( 8.00, 0.00, 2.00)
+    v2 << OpenStudio::Point3d.new( 9.00, 0.00, 3.00)
+
+    # A final triangular window, near the wall's upper right corner:
+    v3  = OpenStudio::Point3dVector.new
+    v3 << OpenStudio::Point3d.new( 9.00, 0.00, 9.80)
+    v3 << OpenStudio::Point3d.new( 9.80, 0.00, 9.00)
+    v3 << OpenStudio::Point3d.new( 9.80, 0.00, 9.80)
+
+    w0 = OpenStudio::Model::Surface.new(v0, model)
+    w1 = OpenStudio::Model::SubSurface.new(v1, model)
+    w2 = OpenStudio::Model::SubSurface.new(v2, model)
+    w3 = OpenStudio::Model::SubSurface.new(v3, model)
+    w0.setName("w0")
+    w1.setName("w1")
+    w2.setName("w2")
+    w3.setName("w3")
+    expect(w0.setSpace(space)).to be true
+    sub_gross = 0
+
+    [w1, w2, w3].each do |w|
+      expect(w.setSubSurfaceType("FixedWindow")).to be true
+      expect(w.setSurface(w0)).to be true
+      expect(w.setConstruction(fen)).to be true
+      expect(w.uFactor).to_not be_empty
+      expect(w.uFactor.get).to be_within(0.1).of(2.0)
+      expect(w.allowWindowPropertyFrameAndDivider).to be true
+      expect(w.setWindowPropertyFrameAndDivider(fd)).to be true
+      width = w.windowPropertyFrameAndDivider.get.frameWidth
+      expect(width).to be_within(TOL).of(w000)
+
+      sub_gross += w.grossArea
+    end
+
+    expect(w1.grossArea).to be_within(TOL).of(1.50)
+    expect(w2.grossArea).to be_within(TOL).of(6.00)
+    expect(w3.grossArea).to be_within(TOL).of(0.32)
+    expect(w0.grossArea).to be_within(TOL).of(100.00)
+    expect(w1.netArea).to be_within(TOL).of(w1.grossArea)
+    expect(w2.netArea).to be_within(TOL).of(w2.grossArea)
+    expect(w3.netArea).to be_within(TOL).of(w3.grossArea)
+    expect(w0.netArea).to be_within(TOL).of(w0.grossArea - sub_gross)
+
+    # Applying 2 sets of alterations:
+    #   - without, then with Frame & Dividers (F&D)
+    #   - 3 successive 20° rotations around:
+    angle  = Math::PI / 9
+    origin = OpenStudio::Point3d.new(0, 0, 0)
+    east   = OpenStudio::Point3d.new(1, 0, 0) - origin
+    up     = OpenStudio::Point3d.new(0, 0, 1) - origin
+    north  = OpenStudio::Point3d.new(0, 1, 0) - origin
+
+    4.times.each do |i| # successive rotations
+      unless i.zero?
+        r = OpenStudio.createRotation(origin,  east, angle) if i == 1
+        r = OpenStudio.createRotation(origin,    up, angle) if i == 2
+        r = OpenStudio.createRotation(origin, north, angle) if i == 3
+        expect(w0.setVertices(r.inverse * w0.vertices)).to be true
+        expect(w1.setVertices(r.inverse * w1.vertices)).to be true
+        expect(w2.setVertices(r.inverse * w2.vertices)).to be true
+        expect(w3.setVertices(r.inverse * w3.vertices)).to be true
+      end
+
+      2.times.each do |j| # F&D
+        if j.zero?
+          wx = w000
+          fd.resetFrameWidth unless i.zero?
+        else
+          wx = w200
+          expect(fd.setFrameWidth(wx)).to be true
+
+          [w1, w2, w3].each do |w|
+            width = w.windowPropertyFrameAndDivider.get.frameWidth
+            expect(width).to be_within(TOL).of(wx)
+          end
+        end
+
+        # F&D widths offset window vertices.
+        w1o = mod1.offset(w1.vertices, wx, 300)
+        w2o = mod1.offset(w2.vertices, wx, 300)
+        w3o = mod1.offset(w3.vertices, wx, 300)
+
+        w1o_m2 = OpenStudio.getArea(w1o)
+        w2o_m2 = OpenStudio.getArea(w2o)
+        w3o_m2 = OpenStudio.getArea(w3o)
+        expect(w1o_m2).to_not be_empty
+        expect(w2o_m2).to_not be_empty
+        expect(w3o_m2).to_not be_empty
+        w1o_m2 = w1o_m2.get
+        w2o_m2 = w2o_m2.get
+        w3o_m2 = w3o_m2.get
+
+        if j.zero?
+          expect(w1o_m2).to be_within(TOL).of(w1.grossArea) # 1.50 m2
+          expect(w2o_m2).to be_within(TOL).of(w2.grossArea) # 6.00 m2
+          expect(w3o_m2).to be_within(TOL).of(w3.grossArea) # 0.32 m2
+        else
+          expect(w1o_m2).to be_within(TOL).of(3.75)
+          expect(w2o_m2).to be_within(TOL).of(8.64)
+          expect(w3o_m2).to be_within(TOL).of(1.10)
+        end
+
+        # All windows entirely fit within the wall (without F&D).
+        [w1, w2, w3].each { |w| expect(mod1.fits?(w, w0, true)).to be true }
+
+        # All windows fit within the wall (with F&D).
+        [w1o, w2o].each { |w| expect(mod1.fits?(w, w0)).to be true }
+
+        # If F&D frame width == 200mm, w3o aligns along the wall top & side,
+        # so not entirely within wall polygon.
+        expect(mod1.fits?(w3, w0, true)).to be true
+        expect(mod1.fits?(w3o, w0)).to be true
+        expect(mod1.fits?(w3o, w0, true)).to be true      if j.zero?
+        expect(mod1.fits?(w3o, w0, true)).to be false unless j.zero?
+
+        # None of the windows conflict with each other.
+        expect(mod1.overlaps?(w1o, w2o)).to be false
+        expect(mod1.overlaps?(w1o, w3o)).to be false
+        expect(mod1.overlaps?(w2o, w3o)).to be false
+      end
+    end
 
     expect(mod1.status).to be_zero
   end
@@ -3383,7 +3550,7 @@ RSpec.describe OSut do
     file = File.join(__dir__, "files/osms/out/seb_ext3a.osm")
     model.save(file, true)
   end
-  
+
   it "checks for space/surface convexity" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.reset(DBG)).to eq(DBG)
