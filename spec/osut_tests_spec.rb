@@ -1818,7 +1818,62 @@ RSpec.describe OSut do
     expect(mod1.reset(DBG)).to eq(DBG)
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
+    v = OpenStudio.openStudioVersion.split(".").join.to_i
 
+    p1 = OpenStudio::Point3dVector.new
+    p2 = OpenStudio::Point3dVector.new
+
+    p1 << OpenStudio::Point3d.new(3.63, 0, 4.03)
+    p1 << OpenStudio::Point3d.new(3.63, 0, 2.44)
+    p1 << OpenStudio::Point3d.new(7.34, 0, 2.44)
+    p1 << OpenStudio::Point3d.new(7.34, 0, 4.03)
+
+    t = OpenStudio::Transformation.alignFace(p1)
+
+    if v < 340
+      p2 << OpenStudio::Point3d.new(3.63, 0, 2.49)
+      p2 << OpenStudio::Point3d.new(3.63, 0, 1.00)
+      p2 << OpenStudio::Point3d.new(7.34, 0, 1.00)
+      p2 << OpenStudio::Point3d.new(7.34, 0, 2.49)
+    else
+      p2 << OpenStudio::Point3d.new(3.63, 0, 2.47)
+      p2 << OpenStudio::Point3d.new(3.63, 0, 1.00)
+      p2 << OpenStudio::Point3d.new(7.34, 0, 1.00)
+      p2 << OpenStudio::Point3d.new(7.34, 0, 2.47)
+    end
+
+    area1 = OpenStudio.getArea(p1)
+    area2 = OpenStudio.getArea(p2)
+    expect(area1).to_not be_empty
+    expect(area2).to_not be_empty
+    area1 = area1.get
+    area2 = area2.get
+
+    p1a = t.inverse * p1
+    p2a = t.inverse * p2
+
+    union = OpenStudio.join(p1a.reverse, p2a.reverse, TOL2)
+    expect(union).to_not be_empty
+    union = union.get
+    area  = OpenStudio.getArea(union)
+    expect(area).to_not be_empty
+    area  = area.get
+    delta = area1 + area2 - area
+
+    res  = OpenStudio.intersect(p1a.reverse, p2a.reverse, TOL)
+    expect(res).to_not be_empty
+    res  = res.get
+    res1 = res.polygon1
+    expect(res1).to_not be_empty
+
+    res1_m2 = OpenStudio.getArea(res1)
+    expect(res1_m2).to_not be_empty
+    res1_m2 = res1_m2.get
+    expect(res1_m2).to be_within(TOL2).of(delta)
+    expect(mod1.overlaps?(p1a, p2a)).to be true
+    expect(mod1.status).to be_zero
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Tests line intersecting line segments.
     sg1 = OpenStudio::Point3dVector.new
     sg1 << OpenStudio::Point3d.new(18, 0, 0)
