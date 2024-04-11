@@ -4392,14 +4392,14 @@ RSpec.describe OSut do
     # CASE 1:
     # Retrieve core GRA. As with overhangs, only the attic roof sections
     # directly-above the core are retained for SRR% calculations. Here, the
-    # GRA is substantially lower (than gra1). For now, calculated GRA is only
-    # valid BEFORE adding skylight wells.
+    # GRA is substantially lower (than previously-calculated gra1). For now,
+    # calculated GRA is only valid BEFORE adding skylight wells.
     gra_attic = mod1.grossRoofArea(core)
     expect(mod1.status).to be_zero
     expect(gra_attic.round(2)).to eq(157.77)
 
     # The method returns the GRA, calculated BEFORE adding skylights/wells.
-    rm2 = mod1.addSkyLights(core, {srr: srr })
+    rm2 = mod1.addSkyLights(core, {srr: srr})
     puts mod1.logs unless mod1.status.zero?
     expect(mod1.status).to be_zero
     expect(rm2.round(2)).to eq(gra_attic.round(2))
@@ -4453,7 +4453,7 @@ RSpec.describe OSut do
     # New core skylight areas. Although the total skylight area is greater than
     # in CASE 1, the method is unable to meet the requested SRR 5%. This is
     # understandable given the constrained roof/core overlap vs the ~4x greater
-    # roof area. A plenum vastly larger than the room(s) it serves would is rare.
+    # roof area. A plenum vastly larger than the room(s) it serves is rare.
     core_skies = mod1.facets(core, "Outdoors", "Skylight")
     sky_area2  = core_skies.sum(&:grossArea)
     expect(sky_area2.round(2)).to eq(8.93)
@@ -4505,6 +4505,72 @@ RSpec.describe OSut do
     core_skies = mod1.facets(core, "Outdoors", "Skylight")
     sky_area2  = core_skies.sum(&:grossArea)
     expect(sky_area2.round(2)).to eq(0.00)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # SEB case (flat ceiling plenum).
+    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    path  = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model).to_not be_empty
+    model = model.get
+
+    entry   = model.getSpaceByName("Entry way 1")
+    office  = model.getSpaceByName("Small office 1")
+    open    = model.getSpaceByName("Open area 1")
+    utility = model.getSpaceByName("Utility 1")
+    plenum  = model.getSpaceByName("Level 0 Ceiling Plenum")
+    expect(entry).to_not be_empty
+    expect(office).to_not be_empty
+    expect(open).to_not be_empty
+    expect(utility).to_not be_empty
+    expect(plenum).to_not be_empty
+    entry   = entry.get
+    office  = office.get
+    open    = open.get
+    utility = utility.get
+    plenum  = plenum.get
+    expect(plenum.partofTotalFloorArea).to be false
+    expect(mod1.unconditioned?(plenum)).to be false
+
+    # TOTAL plenum roof area (4x surfaces), no overhangs.
+    roofs = mod1.facets(plenum, "Outdoors", "RoofCeiling")
+    total = roofs.sum(&:grossArea)
+    expect(total.round(2)).to eq(82.21)
+
+    gra_seb = mod1.grossRoofArea(model.getSpaces)
+    expect(mod1.status).to be_zero
+    expect(gra_seb.round(2)).to eq(total.round(2))
+
+    srr = 0.04
+
+    # The method returns the GRA, calculated BEFORE adding skylights/wells.
+    rm2 = mod1.addSkyLights(model.getSpaces, {srr: srr})
+    puts mod1.logs unless mod1.status.zero?
+    expect(mod1.status).to be_zero
+    expect(rm2.round(2)).to eq(gra_seb.round(2))
+
+    entry_skies   = mod1.facets(entry, "Outdoors", "Skylight")
+    office_skies  = mod1.facets(office, "Outdoors", "Skylight")
+    utility_skies = mod1.facets(utility, "Outdoors", "Skylight")
+    open_skies    = mod1.facets(open, "Outdoors", "Skylight")
+
+    expect(entry_skies).to be_empty
+    expect(office_skies).to be_empty
+    expect(utility_skies.size).to eq(1)
+    expect(open_skies.size).to eq(1)
+    utility_sky = utility_skies.first
+    open_sky    = open_skies.first
+
+    skm2 = utility_sky.grossArea + open_sky.grossArea
+    expect((skm2 / rm2).round(2)).to eq(srr)
+
+    # Assign construction to skylights.
+    construction = mod1.genConstruction(model, {type: :skylight, uo: 2.8})
+    expect(utility_sky.setConstruction(construction)).to be true
+    expect(open_sky.setConstruction(construction)).to be true
+
+    file = File.join(__dir__, "files/osms/out/seb_sky.osm")
+    model.save(file, true)
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     file  = File.join(__dir__, "files/osms/in/warehouse.osm")
@@ -4561,8 +4627,8 @@ RSpec.describe OSut do
 
     bulk_skies = mod1.facets(bulk, "Outdoors", "Skylight")
     sky_area2  = bulk_skies.sum(&:grossArea)
-    ratio2     = sky_area2 / rm2
     expect(sky_area2.round(2)).to eq(128.19)
+    ratio2     = sky_area2 / rm2
     expect(ratio2.round(2)).to eq(srr)
 
     file = File.join(__dir__, "files/osms/out/warehouse_sky.osm")

@@ -7077,8 +7077,8 @@ module OSut
           set[:d      ] = set[pattern][:wy  ]
           set[:w0     ] = set[pattern][:wxl ]
           set[:d0     ] = set[pattern][:wyl ]
-          set[:dX     ] = set[pattern][:dX  ]
-          set[:dY     ] = set[pattern][:dY  ]
+          set[:dX     ] = set[pattern][:dX  ] if set[pattern][:dX]
+          set[:dY     ] = set[pattern][:dY  ] if set[pattern][:dY]
         end
       end
     end
@@ -7264,6 +7264,7 @@ module OSut
       end
     end
 
+
     # New direct roof loop. No overlaps, so no need for relative space
     # coordinate adjustments.
     rooms.each do |space, room|
@@ -7276,8 +7277,6 @@ module OSut
           next unless set.key?(:rows)
           next unless set.key?(:d)
           next unless set.key?(:w)
-          next unless set.key?(:dX)
-          next unless set.key?(:dY)
           next unless set.key?(:tight)
           next unless set[:roof] == roof
 
