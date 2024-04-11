@@ -264,6 +264,7 @@ module OSut
       a[:clad][:d  ] = d
       a[:clad][:id ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
 
+      # TO DO: replace sheathing by mineral below a certain Uo factor. 
       mt = :sheathing
       a[:compo][:mat] = @@mats[mt]
       a[:compo][:d  ] = d

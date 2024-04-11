@@ -4411,6 +4411,45 @@ RSpec.describe OSut do
     ratio      = sky_area1 / rm2
     expect(ratio.round(2)).to eq(srr)
 
+    # Assign insulated constructions to new skylight well walls.
+    drywall = OpenStudio::Model::StandardOpaqueMaterial.new(model)
+    drywall.setName("drywall")
+    expect(drywall.setThickness(0.015))
+    expect(drywall.setRoughness("MediumSmooth"))
+    expect(drywall.setConductivity(0.160))
+    expect(drywall.setDensity(785))
+    expect(drywall.setSpecificHeat(1090))
+    expect(drywall.setThermalAbsorptance(0.9))
+    expect(drywall.setSolarAbsorptance(0.7))
+    expect(drywall.setVisibleAbsorptance(0.7))
+
+    composite = OpenStudio::Model::StandardOpaqueMaterial.new(model)
+    composite.setName("composite")
+    expect(composite.setThickness(0.100))
+    expect(composite.setRoughness("MediumSmooth"))
+    expect(composite.setConductivity(0.030))
+    expect(composite.setDensity(40))
+    expect(composite.setSpecificHeat(960))
+    expect(composite.setThermalAbsorptance(0.9))
+    expect(composite.setSolarAbsorptance(0.7))
+    expect(composite.setVisibleAbsorptance(0.7))
+
+    layers = OpenStudio::Model::OpaqueMaterialVector.new
+    layers << drywall
+    layers << composite
+    layers << drywall
+    construction = OpenStudio::Model::Construction.new(layers)
+    expect(mod1.rsi(construction, 0.240)).to be_within(TOL).of(3.76)
+
+    mod1.facets(attic, "Surface", "Wall").each do |wall|
+      expect(wall.setConstruction(construction)).to be true
+      adj = wall.adjacentSurface
+      expect(adj).to_not be_empty
+      adj = adj.get
+      expect(wall.setConstruction(construction)).to be true
+      expect(adj.setConstruction(construction)).to be true
+    end
+
     file = File.join(__dir__, "files/osms/out/office_attic.osm")
     model.save(file, true)
 
@@ -4564,7 +4603,7 @@ RSpec.describe OSut do
     skm2 = utility_sky.grossArea + open_sky.grossArea
     expect((skm2 / rm2).round(2)).to eq(srr)
 
-    # Assign construction to skylights.
+    # Assign construction to new skylights.
     construction = mod1.genConstruction(model, {type: :skylight, uo: 2.8})
     expect(utility_sky.setConstruction(construction)).to be true
     expect(open_sky.setConstruction(construction)).to be true
@@ -4615,8 +4654,7 @@ RSpec.describe OSut do
     expect(sky_area1.round(2)).to eq(47.57)
     expect(ratio1.round(2)).to eq(0.01)
 
-    srr = 0.04
-
+    srr  = 0.04
     opts = {}
     opts[:srr  ] = srr
     opts[:size ] = 2.4
