@@ -20,167 +20,277 @@ RSpec.describe OSut do
     expect(cls1.reset(DBG)).to eq(DBG)
     expect(cls1.level).to eq(DBG)
     expect(cls1.clean!).to eq(DBG)
+    mass  = cls1.class_variable_get(:@@mass)
+    mats  = cls1.class_variable_get(:@@mats)
+    film  = cls1.class_variable_get(:@@film)
+    uo    = cls1.class_variable_get(:@@uo)
+    model = OpenStudio::Model::Model.new
+    uo1   = 2.140
+    uo2   = 0.214
+    uo3   = 3.566
+    uo4   = 4.812
+    uo5   = 3.765
+    uo6   = 3.698
+    uo7   = 4.244
+    uo8   = uo[:door]
+    uo9   = 0.900
 
-    model          = OpenStudio::Model::Model.new
-    specs          = {}
-    specs[:type  ] = :wall
-    specs[:uo    ] = 0.210 # NECB2017
-    surface        = cls1.genConstruction(model, specs)
+    # Typical uninsulated, framed cavity wall, suitable for light interzone
+    # assemblies (i.e. symmetrical, 3-layer construction).
+    specs   = {type: :partition}
+    surface = cls1.genConstruction(model, specs)
     expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(3)
+    u = 1 / cls1.rsi(surface, film[:partition])
+    expect(u).to be_within(TOL).of(uo1)
+    expect(surface.layers.first).to eq(surface.layers.last)
+
+    # An alternative to (uninsulated) :partition (+inputs, same outcome).
+    specs   = {type: :wall, clad: :none, uo: nil}
+    surface = cls1.genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(3)
+    u = 1 / cls1.rsi(surface, film[:wall])
+    expect(u).to be_within(TOL).of(uo1)
+    expect(surface.layers.first).to eq(surface.layers.last)
+
+    # Insulated :partition variant.
+    specs   = {type: :partition, uo: uo2}
+    surface = cls1.genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(3)
+    u = 1 / cls1.rsi(surface, film[:partition])
+    expect(u).to be_within(TOL).of(uo2)
+    expect(surface.layers.first).to eq(surface.layers.last)
+
+    # An alternative to (insulated) :partition (+inputs, same outcome).
+    specs   = {type: :wall, uo: uo2, clad: :none}
+    surface = cls1.genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(3)
+    u = 1 / cls1.rsi(surface, film[:wall])
+    expect(u).to be_within(TOL).of(uo2)
+    expect(surface.layers.first).to eq(surface.layers.last)
+
+    # A wall inherits a 4th (cladding) layer, by default.
+    specs   = {type: :wall, uo: uo2}
+    surface = cls1.genConstruction(model, specs)
+    expect(surface).to_not be_nil
     expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(4)
-    u = 1 / cls1.rsi(surface, 0.140)
-    expect(u).to be_within(TOL).of(specs[:uo])
+    u = 1 / cls1.rsi(surface, film[:wall])
+    expect(u).to be_within(TOL).of(uo2)
+    expect(surface.layers.first).to_not eq(surface.layers.last)
 
-    specs[:type  ] = :roof
-    specs[:uo    ] = 1 / 5.46 # CCQ I1
-    surface        = cls1::genConstruction(model, specs)
+    # Otherwise, a wall has a minimum of 2 layers.
+    specs   = {type: :wall, uo: uo2, clad: :none, finish: :none}
+    surface = cls1.genConstruction(model, specs)
     expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
-    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
-    expect(surface.layers.size).to eq(4)
-    u = 1 / cls1::rsi(surface, 0.140)
-    expect(u).to be_within(TOL).of(specs[:uo])
-
-    specs          = {}
-    specs[:type  ] = :roof
-    specs[:frame ] = :medium
-    specs[:finish] = :heavy
-    specs[:uo    ] = 1 / 5.46 # CCQ I1
-    surface        = cls1::genConstruction(model, specs)
-    expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
-    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
-    expect(surface.layers.size).to eq(4)
-    u = 1 / cls1::rsi(surface, 0.140)
-    expect(u).to be_within(TOL).of(specs[:uo])
-
-    specs          = {}
-    specs[:type  ] = :floor
-    specs[:frame ] = :medium
-    specs[:uo    ] = 1 / 5.46 # CCQ I1
-    surface        = cls1::genConstruction(model, specs)
-    expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
-    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
-    expect(surface.layers.size).to eq(4)
-    u = 1 / cls1::rsi(surface, 0.190)
-    expect(u).to be_within(TOL).of(specs[:uo])
-
-    specs          = {}
-    specs[:type  ] = :slab
-    specs[:frame ] = :none
-    specs[:finish] = :none
-    surface        = cls1::genConstruction(model, specs)
-    expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
     expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(2)
+    u = 1 / cls1.rsi(surface, film[:wall])
+    expect(u).to be_within(TOL).of(uo2)
+    expect(surface.layers.first).to_not eq(surface.layers.last)
 
-    specs          = {}
-    specs[:type  ] = :slab
-    specs[:finish] = :none
-    specs[:uo    ] = 0.379 # NECB2020, ZC8
-    surface        = cls1::genConstruction(model, specs)
+    # Default shading material.
+    specs   = {type: :shading}
+    surface = cls1.genConstruction(model, specs)
     expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
-    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
-    expect(surface.layers.size).to eq(3)
-    u = 1 / cls1::rsi(surface, 0.160)
-    expect(u).to be_within(TOL).of(specs[:uo])
-
-    specs          = {}
-    specs[:type  ] = :slab
-    specs[:uo    ] = 0.379 # NECB2020, ZC8
-    surface        = cls1::genConstruction(model, specs)
-    expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
-    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
-    expect(surface.layers.size).to eq(4)
-    u = 1 / cls1::rsi(surface, 0.160)
-    expect(u).to be_within(TOL).of(specs[:uo])
-
-    specs          = {}
-    specs[:type  ] = :basement
-    specs[:clad  ] = :heavy
-    specs[:uo    ] = 1 / 2.64 # CCQ I1
-    surface        = cls1::genConstruction(model, specs)
-    expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
-    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
-    expect(surface.layers.size).to eq(3)
-    u = 1 / cls1::rsi(surface, 0.120)
-    expect(u).to be_within(TOL).of(specs[:uo])
-
-    specs          = {}
-    specs[:type  ] = :basement
-    specs[:clad  ] = :none
-    specs[:finish] = :light
-    specs[:uo    ] = 1 / 2.64 # CCQ I1
-    surface        = cls1::genConstruction(model, specs)
-    expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
-    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
-    expect(surface.layers.size).to eq(3)
-    u = 1 / cls1::rsi(surface, 0.120)
-    expect(u).to be_within(TOL).of(specs[:uo])
-
-    specs          = {}
-    specs[:type  ] = :door
-    specs[:frame ] = :medium # ... should be ignored
-    specs[:uo    ] = 1.8
-    surface        = cls1::genConstruction(model, specs)
-    expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
     expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(1)
-    u = 1 / cls1::rsi(surface, 0.150)
-    expect(u).to be_within(TOL).of(specs[:uo])
+    expect(surface.layers.first.nameString).to eq("OSut|material|015")
 
-    specs          = {}
-    specs[:type  ] = :door
-    specs[:uo    ] = 0.9 # CCQ I1
-    surface        = cls1::genConstruction(model, specs)
+    # A single-layered, uninsulated e.g. 5/8" :partition (alternative :shading).
+    specs   = {type: :partition, clad: :none, finish: :none}
+    surface = cls1.genConstruction(model, specs)
     expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
     expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(1)
-    u = 1 / cls1::rsi(surface, 0.150)
-    expect(u).to be_within(TOL).of(specs[:uo])
+    u = 1 / cls1.rsi(surface, film[:wall])
+    expect(u).to be_within(TOL).of(uo3)
+    expect(surface.layers.first.nameString).to eq("OSut|material|015")
 
-    specs          = {}
-    specs[:type  ] = :window
-    specs[:uo    ] = 2.0
-    surface        = cls1::genConstruction(model, specs)
+    # A single-layered, uninsulated e.g. 4" concrete :partition.
+    specs   = {type: :partition, clad: :none, finish: :none, frame: :medium}
+    surface = cls1.genConstruction(model, specs)
     expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(1)
+    u = 1 / cls1.rsi(surface, film[:wall])
+    expect(u).to be_within(TOL).of(uo4)
+    expect(surface.layers.first.nameString).to eq("OSut|concrete|100")
+
+    # A single-layered, uninsulated e.g. 8" concrete :partition.
+    specs   = {type: :partition, clad: :none, finish: :none, frame: :heavy}
+    surface = cls1.genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(1)
+    u = 1 / cls1.rsi(surface, film[:wall])
+    expect(u).to be_within(TOL).of(uo5)
+    expect(surface.layers.first.nameString).to eq("OSut|concrete|200")
+
+    # A light (minimal, 1x layer), uninsulated attic roof (alternative: shading).
+    specs   = {type: :roof, uo: nil, clad: :none, finish: :none}
+    surface = cls1.genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(1)
+    u = 1 / cls1.rsi(surface, film[:roof])
+    expect(u).to be_within(TOL).of(uo6)
+
+    # Insulated, cathredral ceiling construction (alternative :shading).
+    specs   = {type: :roof, uo: uo2}
+    surface = cls1.genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(3)
+    u = 1 / cls1.rsi(surface, film[:roof])
+    expect(u).to be_within(TOL).of(uo2)
+
+    # Insulated, unfinished outdoor-facing plenum roof (polyiso above 4" slab).
+    specs   = {type: :roof, uo: uo2, frame: :medium, finish: :medium}
+    surface = cls1.genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(3)
+    u = 1 / cls1.rsi(surface, film[:roof])
+    expect(u).to be_within(TOL).of(uo2)
+    expect(surface.layers[1].nameString).to eq("OSut|polyiso|108")
+    expect(surface.layers[2].nameString).to eq("OSut|concrete|100")
+
+    # Insulated, parking garage roof (polyiso above 8" slab).
+    specs   = {type: :roof, uo: uo2, clad: :heavy, frame: :medium, finish: :none}
+    surface = cls1.genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(2)
+    u = 1 / cls1.rsi(surface, film[:roof])
+    expect(u).to be_within(TOL).of(uo2)
+    expect(surface.layers[0].nameString).to eq("OSut|concrete|200")
+    expect(surface.layers[1].nameString).to eq("OSut|polyiso|110")
+
+    # Uninsulated plenum ceiling tiles (alternative :shading).
+    specs   = {type: :roof, uo: nil, clad: :none, finish: :none}
+    surface = cls1.genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(1)
+    u = 1 / cls1.rsi(surface, film[:roof])
+    expect(u).to be_within(TOL).of(uo6)
+
+    # Unfinished, insulated, framed attic floor (blown cellulose).
+    specs   = {type: :floor, uo: uo2, frame: :heavy, finish: :none}
+    surface = cls1.genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(2)
+    u = 1 / cls1.rsi(surface, film[:floor])
+    expect(u).to be_within(TOL).of(uo2)
+    expect(surface.layers[1].nameString).to eq("OSut|cellulose|217")
+
+    # Finished, insulated exposed floor (e.g. wood-framed, residential).
+    specs   = {type: :floor, uo: uo2}
+    surface = cls1.genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(3)
+    u = 1 / cls1.rsi(surface, film[:floor])
+    expect(u).to be_within(TOL).of(uo2)
+    expect(surface.layers[1].nameString).to eq("OSut|mineral|211")
+
+    # Finished, insulated exposed floor (e.g. 4" slab, steel web joists).
+    specs   = {type: :floor, uo: uo2, finish: :medium}
+    surface = cls1.genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(3)
+    u = 1 / cls1.rsi(surface, film[:floor])
+    expect(u).to be_within(TOL).of(uo2)
+    expect(surface.layers[1].nameString).to eq("OSut|mineral|214")
+    expect(surface.layers[2].nameString).to eq("OSut|concrete|100")
+
+    # Uninsulated slab-on-grade.
+    specs   = {type: :slab, frame: :none, finish: :none}
+    surface = cls1::genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(2)
+    expect(surface.layers[0].nameString).to eq("OSut|sand|100")
+    expect(surface.layers[1].nameString).to eq("OSut|concrete|100")
+
+    # Insulated slab-on-grade.
+    specs   = {type: :slab, uo: uo2, finish: :none}
+    surface = cls1::genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(3)
+    u = 1 / cls1::rsi(surface, film[:slab])
+    expect(u).to be_within(TOL).of(uo2)
+    expect(surface.layers[0].nameString).to eq("OSut|sand|100")
+    expect(surface.layers[1].nameString).to eq("OSut|polyiso|109")
+    expect(surface.layers[2].nameString).to eq("OSut|concrete|100")
+
+    # 8" uninsulated basement wall.
+    specs   = {type: :basement, clad: :none, finish: :none}
+    surface = cls1::genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(1)
+    u = 1 / cls1::rsi(surface, film[:basement])
+    expect(surface.layers[0].nameString).to eq("OSut|concrete|200")
+    expect(u).to be_within(TOL).of(uo7)
+
+    # 8" interior-insulated, finished basement wall.
+    specs   = {type: :basement, uo: 2 * uo2, clad: :none}
+    surface = cls1::genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(3)
+    u = 1 / cls1::rsi(surface, film[:basement])
+    expect(u).to be_within(TOL).of(2 * uo2)
+    expect(surface.layers[0].nameString).to eq("OSut|concrete|200")
+    expect(surface.layers[1].nameString).to eq("OSut|mineral|100")
+    expect(surface.layers[2].nameString).to eq("OSut|drywall|015")
+
+    # Standard, insulated steel door (default Uo = 1.8 W/K•m).
+    specs   = {type: :door}
+    surface = cls1::genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(1)
+    u = 1 / cls1::rsi(surface, film[:door])
+    expect(u).to be_within(TOL).of(uo8)
+
+    specs   = {type: :door, uo: uo9}
+    surface = cls1::genConstruction(model, specs)
+    expect(surface).to_not be_nil
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(1)
+    u = 1 / cls1::rsi(surface, film[:door])
+    expect(u).to be_within(TOL).of(uo9)
+
+    specs   = {type: :window, uo: uo9}
+    surface = cls1::genConstruction(model, specs)
+    expect(surface).to_not be_nil
     expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(1)
     u = 1 / cls1::rsi(surface) # not necessary to specify film
-    expect(u).to be_within(TOL).of(specs[:uo])
+    expect(u).to be_within(TOL).of(uo9)
 
-    specs          = {}
-    specs[:type  ] = :window
-    specs[:uo    ] = 0.9 # CCQ I1
-    surface        = cls1::genConstruction(model, specs)
+    specs   = {type: :skylight, uo: uo9}
+    surface = cls1::genConstruction(model, specs)
     expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
     expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(1)
     u = 1 / cls1::rsi(surface)
-    expect(u).to be_within(TOL).of(specs[:uo])
+    expect(u).to be_within(TOL).of(uo9)
 
-    specs          = {}
-    specs[:type  ] = :skylight
-    specs[:uo    ] = 2.8 # CCQ I1
-    surface        = cls1::genConstruction(model, specs)
-    expect(surface).to_not be_nil
-    expect(cls1.status).to be_zero
-    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
-    expect(surface.layers.size).to eq(1)
-    u = 1 / cls1::rsi(surface)
-    expect(u).to be_within(TOL).of(specs[:uo])
+    expect(cls1.status.zero?).to be true
   end
 
   it "checks internal mass" do
