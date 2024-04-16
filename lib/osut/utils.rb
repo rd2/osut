@@ -7267,7 +7267,6 @@ module OSut
       end
     end
 
-
     # New direct roof loop. No overlaps, so no need for relative space
     # coordinate adjustments.
     rooms.each do |space, room|

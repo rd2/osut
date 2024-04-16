@@ -425,7 +425,7 @@ RSpec.describe OSut do
     expect(cls1.status).to be_zero
     expect(cls1.logs).to be_empty
   end
-
+  
   it "checks if a set holds a construction" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.clean!).to eq(DBG)
@@ -4450,6 +4450,30 @@ RSpec.describe OSut do
     core  = []
     attic = []
 
+    # Fetch default construction sets.
+    oID = "90.1-2010 - SmOffice - ASHRAE 169-2013-3B" # building
+    aID = "90.1-2010 -  - Attic - ASHRAE 169-2013-3B" # attic spacetype level
+    o_set = model.getDefaultConstructionSetByName(oID)
+    a_set = model.getDefaultConstructionSetByName(oID)
+    expect(o_set).to_not be_empty
+    expect(a_set).to_not be_empty
+    o_set = o_set.get
+    a_set = a_set.get
+    expect(o_set.defaultInteriorSurfaceConstructions).to_not be_empty
+    expect(a_set.defaultInteriorSurfaceConstructions).to_not be_empty
+    io_set = o_set.defaultInteriorSurfaceConstructions.get
+    ia_set = a_set.defaultInteriorSurfaceConstructions.get
+    expect(io_set.wallConstruction).to_not be_empty
+    expect(ia_set.wallConstruction).to_not be_empty
+    io_wall = io_set.wallConstruction.get.to_LayeredConstruction
+    ia_wall = ia_set.wallConstruction.get.to_LayeredConstruction
+    expect(io_wall).to_not be_empty
+    expect(ia_wall).to_not be_empty
+    io_wall = io_wall.get
+    ia_wall = ia_wall.get
+    expect(io_wall).to eq(ia_wall) # 2x drywall layers
+    expect(mod1.rsi(io_wall, 0.150)).to be_within(TOL).of(0.31)
+
     model.getSpaces.each do |space|
       id = space.nameString
 
@@ -4480,7 +4504,6 @@ RSpec.describe OSut do
 
     # "GROSS ROOF AREA" (GRA), as per 90.1/NECB - excludes roof overhangs (60m2)
     gra1 = mod1.grossRoofArea(model.getSpaces)
-    puts mod1.logs unless mod1.status.zero?
     expect(mod1.status).to be_zero
     expect(gra1.round(2)).to eq(538.86)
 
@@ -4494,8 +4517,8 @@ RSpec.describe OSut do
     #   2. INDIRECTLY-CONDITIONED (e.g. plenum)
     #
     # For testing purposes, only the core zone is targeted for skylight wells.
-    # Context: NECBs and 90.1 require separate SRR% calculations for spaces
-    # conditioned differently (SEMI-CONDITIONED vs CONDITIONED).
+    # Context: NECBs and 90.1 require separate SRR% calculations for
+    # differently conditioned spaces (SEMI-CONDITIONED vs CONDITIONED).
     # See 'addSkyLights' doc.
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
@@ -4505,13 +4528,10 @@ RSpec.describe OSut do
     # GRA is substantially lower (than previously-calculated gra1). For now,
     # calculated GRA is only valid BEFORE adding skylight wells.
     gra_attic = mod1.grossRoofArea(core)
-    expect(mod1.status).to be_zero
     expect(gra_attic.round(2)).to eq(157.77)
 
     # The method returns the GRA, calculated BEFORE adding skylights/wells.
     rm2 = mod1.addSkyLights(core, {srr: srr})
-    puts mod1.logs unless mod1.status.zero?
-    expect(mod1.status).to be_zero
     expect(rm2.round(2)).to eq(gra_attic.round(2))
 
     # New core skylight areas. Successfully achieved SRR%.
@@ -4521,44 +4541,11 @@ RSpec.describe OSut do
     ratio      = sky_area1 / rm2
     expect(ratio.round(2)).to eq(srr)
 
-    # Assign insulated constructions to new skylight well walls.
-    drywall = OpenStudio::Model::StandardOpaqueMaterial.new(model)
-    drywall.setName("drywall")
-    expect(drywall.setThickness(0.015))
-    expect(drywall.setRoughness("MediumSmooth"))
-    expect(drywall.setConductivity(0.160))
-    expect(drywall.setDensity(785))
-    expect(drywall.setSpecificHeat(1090))
-    expect(drywall.setThermalAbsorptance(0.9))
-    expect(drywall.setSolarAbsorptance(0.7))
-    expect(drywall.setVisibleAbsorptance(0.7))
-
-    composite = OpenStudio::Model::StandardOpaqueMaterial.new(model)
-    composite.setName("composite")
-    expect(composite.setThickness(0.100))
-    expect(composite.setRoughness("MediumSmooth"))
-    expect(composite.setConductivity(0.030))
-    expect(composite.setDensity(40))
-    expect(composite.setSpecificHeat(960))
-    expect(composite.setThermalAbsorptance(0.9))
-    expect(composite.setSolarAbsorptance(0.7))
-    expect(composite.setVisibleAbsorptance(0.7))
-
-    layers = OpenStudio::Model::OpaqueMaterialVector.new
-    layers << drywall
-    layers << composite
-    layers << drywall
-    construction = OpenStudio::Model::Construction.new(layers)
-    expect(mod1.rsi(construction, 0.240)).to be_within(TOL).of(3.76)
-
-    mod1.facets(attic, "Surface", "Wall").each do |wall|
-      expect(wall.setConstruction(construction)).to be true
-      adj = wall.adjacentSurface
-      expect(adj).to_not be_empty
-      adj = adj.get
-      expect(wall.setConstruction(construction)).to be true
-      expect(adj.setConstruction(construction)).to be true
-    end
+    # Reset attic default construction set for insulated interzone walls.
+    construction = mod1.genConstruction(model, {type: :partition, uo: 0.3})
+    expect(mod1.rsi(construction, 0.150)).to be_within(TOL).of(1/0.3)
+    expect(ia_set.setWallConstruction(construction)).to be true
+    expect(mod1.status).to be_zero
 
     file = File.join(__dir__, "files/osms/out/office_attic.osm")
     model.save(file, true)
@@ -4588,21 +4575,18 @@ RSpec.describe OSut do
     expect(mod1.setpoints(attic)[:cooling]).to be_within(TOL).of(23.89)
 
     # Here, GRA includes ALL plenum roof surfaces (not just vertically-cast
-    # areas onto core ceiling). This will make meeting the SRR% of 5% much
-    # harder.
+    # areas onto core ceiling). This makes meeting the SRR% of 5% much harder.
     gra_plenum = mod1.grossRoofArea(core)
-    expect(mod1.status).to be_zero
     expect(gra_plenum.round(2)).to eq(total.round(2))
 
     rm2 = mod1.addSkyLights(core, {srr: srr})
-    puts mod1.logs unless mod1.status.zero?
-    expect(mod1.status).to be_zero
     expect(rm2.round(2)).to eq(total.round(2))
 
-    # New core skylight areas. Although the total skylight area is greater than
-    # in CASE 1, the method is unable to meet the requested SRR 5%. This is
+    # New core skylight areas. The total skylight area is greater than in CASE 1,
+    # and the method is unable to meet the requested SRR 5%. This is
     # understandable given the constrained roof/core overlap vs the ~4x greater
-    # roof area. A plenum vastly larger than the room(s) it serves is rare.
+    # roof area. A plenum vastly larger than the room(s) it serves is rare, but
+    # certainly problematic for the application of the NECBs.
     core_skies = mod1.facets(core, "Outdoors", "Skylight")
     sky_area2  = core_skies.sum(&:grossArea)
     expect(sky_area2.round(2)).to eq(8.93)
@@ -4628,7 +4612,7 @@ RSpec.describe OSut do
     core  = core.get
     attic = attic.get
 
-    # Again, tag attic as an INDIRECTLY-CONDITIONED space.
+    # Again, tagging attic as an INDIRECTLY-CONDITIONED space.
     key = "indirectlyconditioned"
     val = core.nameString
     expect(attic.additionalProperties.setFeature(key, val)).to be true
@@ -4636,24 +4620,21 @@ RSpec.describe OSut do
     expect(mod1.unconditioned?(attic)).to be false
     expect(mod1.setpoints(attic)[:heating]).to be_within(TOL).of(21.11)
     expect(mod1.setpoints(attic)[:cooling]).to be_within(TOL).of(23.89)
-    expect(mod1.status).to be_zero
 
     gra_plenum = mod1.grossRoofArea(core)
-    expect(mod1.status).to be_zero
     expect(gra_plenum.round(2)).to eq(total.round(2))
 
-    # Conflicting argument case: Here, the method can only add skylight wells
-    # through model "plenums" (in this context, :plenum is an all encompassing
-    # keyword for any INDIRECTLY-CONDITIONED, unoccupied space). Yet by passing
-    # option "plenum: false", the method is instructed to skip "plenum"
-    # skylight wells altogether.
+    # Conflicting argument case: Here, skylight wells must traverse plenums (in
+    # this context, :plenum is an all encompassing keyword for any INDIRECTLY-
+    # CONDITIONED, unoccupied space). Yet by passing option "plenum: false",
+    # the method is instructed to skip "plenum" skylight wells altogether.
     rm2 = mod1.addSkyLights(core, {srr: srr, plenum: false})
-    expect(mod1.status).to be_zero
     expect(rm2.round(2)).to eq(total.round(2))
 
     core_skies = mod1.facets(core, "Outdoors", "Skylight")
     sky_area2  = core_skies.sum(&:grossArea)
     expect(sky_area2.round(2)).to eq(0.00)
+    expect(mod1.status).to be_zero
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # SEB case (flat ceiling plenum).
@@ -4687,15 +4668,12 @@ RSpec.describe OSut do
     expect(total.round(2)).to eq(82.21)
 
     gra_seb = mod1.grossRoofArea(model.getSpaces)
-    expect(mod1.status).to be_zero
     expect(gra_seb.round(2)).to eq(total.round(2))
 
     srr = 0.04
 
     # The method returns the GRA, calculated BEFORE adding skylights/wells.
     rm2 = mod1.addSkyLights(model.getSpaces, {srr: srr})
-    puts mod1.logs unless mod1.status.zero?
-    expect(mod1.status).to be_zero
     expect(rm2.round(2)).to eq(gra_seb.round(2))
 
     entry_skies   = mod1.facets(entry, "Outdoors", "Skylight")
@@ -4717,6 +4695,7 @@ RSpec.describe OSut do
     construction = mod1.genConstruction(model, {type: :skylight, uo: 2.8})
     expect(utility_sky.setConstruction(construction)).to be true
     expect(open_sky.setConstruction(construction)).to be true
+    expect(mod1.status).to be_zero
 
     file = File.join(__dir__, "files/osms/out/seb_sky.osm")
     model.save(file, true)
@@ -4753,7 +4732,6 @@ RSpec.describe OSut do
 
     bulk_roof_m2 = mod1.getRoofs(bulk).sum(&:grossArea)
     fine_roof_m2 = mod1.getRoofs(fine).sum(&:grossArea)
-    expect(mod1.status).to be_zero
     expect(gra_bulk.round(2)).to eq(bulk_roof_m2.round(2))
     expect(gra_fine.round(2)).to eq(fine_roof_m2.round(2))
 
@@ -4770,14 +4748,13 @@ RSpec.describe OSut do
     opts[:size ] = 2.4
     opts[:clear] = true
     rm2 = mod1.addSkyLights(bulk, opts)
-    puts mod1.logs unless mod1.status.zero?
-    expect(mod1.status).to be_zero
 
     bulk_skies = mod1.facets(bulk, "Outdoors", "Skylight")
     sky_area2  = bulk_skies.sum(&:grossArea)
     expect(sky_area2.round(2)).to eq(128.19)
     ratio2     = sky_area2 / rm2
     expect(ratio2.round(2)).to eq(srr)
+    expect(mod1.status).to be_zero
 
     file = File.join(__dir__, "files/osms/out/warehouse_sky.osm")
     model.save(file, true)
