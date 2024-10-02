@@ -20,6 +20,7 @@ RSpec.describe OSut do
     expect(cls1.reset(DBG)).to eq(DBG)
     expect(cls1.level).to eq(DBG)
     expect(cls1.clean!).to eq(DBG)
+
     mass  = cls1.class_variable_get(:@@mass)
     mats  = cls1.class_variable_get(:@@mats)
     film  = cls1.class_variable_get(:@@film)
@@ -374,6 +375,25 @@ RSpec.describe OSut do
     expect(model).to_not be_empty
     model = model.get
 
+    # -- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- cleanup   #
+    # This is the first test relying on the 'seb.osm' file, which ships with
+    # OpenStudio. The v1.11.5 model (2016) holds a number of artefacts that
+    # would be frowned upon today (e.g. plenum floors tagged as roofs/ceilings).
+    plenum = model.getSpaceByName("Level 0 Ceiling Plenum")
+    expect(plenum).to_not be_empty
+    plenum = plenum.get
+
+    plenum.surfaces.each do |s|
+      next if s.outsideBoundaryCondition.downcase == "outdoors"
+
+      expect(s.setSurfaceType("Floor")).to be true
+      expect(s.setVertices(s.vertices.reverse)).to be true
+    end
+
+    file = File.join(__dir__, "files/osms/out/seb2.osm")
+    model.save(file, true)
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- end of cleanup   #
+
     m  = "OSut::thickness"
     m1 = "holds non-StandardOpaqueMaterial(s) (#{m})"
 
@@ -396,7 +416,7 @@ RSpec.describe OSut do
       next if id.include?("Air Wall")
       next if id.include?("Double pane")
 
-      expect(th > 0).to be true
+      expect(th).to be > 0
     end
 
     cls1.logs.each { |l| expect(l[:message]).to include(m1) }
@@ -417,7 +437,7 @@ RSpec.describe OSut do
       next if id.include?("Double pane")
 
       th = cls2.thickness(c)
-      expect(th > 0).to be true
+      expect(th).to be > 0
     end
 
     expect(cls2.status).to be_zero
@@ -425,7 +445,7 @@ RSpec.describe OSut do
     expect(cls1.status).to be_zero
     expect(cls1.logs).to be_empty
   end
-  
+
   it "checks if a set holds a construction" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.clean!).to eq(DBG)
@@ -517,7 +537,7 @@ RSpec.describe OSut do
     end
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -537,7 +557,7 @@ RSpec.describe OSut do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.clean!).to eq(DBG)
 
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -623,7 +643,7 @@ RSpec.describe OSut do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.clean!).to eq(DBG)
 
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -706,7 +726,7 @@ RSpec.describe OSut do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.clean!).to eq(DBG)
 
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -793,7 +813,7 @@ RSpec.describe OSut do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.clean!).to eq(DBG)
 
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -845,7 +865,7 @@ RSpec.describe OSut do
     expect(cls1.level).to eq(DBG)
     expect(cls1.clean!).to eq(DBG)
 
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -918,7 +938,7 @@ RSpec.describe OSut do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(cls1.clean!).to eq(DBG)
 
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -991,7 +1011,7 @@ RSpec.describe OSut do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.clean!).to eq(DBG)
 
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -1069,7 +1089,7 @@ RSpec.describe OSut do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(M.clean!).to eq(DBG)
 
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -1231,7 +1251,7 @@ RSpec.describe OSut do
     m   = "'model' #{cl2}? expecting #{cl1} (OSut::airLoopsHVAC?)"
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -1266,7 +1286,7 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
 
     # Tag "Entry way 1" in SEB as a vestibule.
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -1322,7 +1342,21 @@ RSpec.describe OSut do
     expect(mod1.logs.first[:message]).to eq(ms3)
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    file   = File.join(__dir__, "files/osms/in/seb.osm")
+    file   = File.join(__dir__, "files/osms/in/warehouse.osm")
+    path   = OpenStudio::Path.new(file)
+    model  = translator.loadModel(path)
+    expect(model).to_not be_empty
+    model  = model.get
+
+    # Despite different heating setpoints, all 3 thermal spaces/zones have some
+    # heating and some cooling, i.e. not strictly REFRIGERATED nor SEMIHEATED.
+    model.getSpaces.each do |space|
+      expect(mod1.refrigerated?(space)).to be false
+      expect(mod1.semiheated?(space)).to be false
+    end
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    file   = File.join(__dir__, "files/osms/out/seb2.osm")
     path   = OpenStudio::Path.new(file)
     model  = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -1479,7 +1513,9 @@ RSpec.describe OSut do
     expect(attic.additionalProperties.setFeature(key, val)).to be true
     expect(mod1.plenum?(attic)).to be false
     expect(mod1.unconditioned?(attic)).to be false
-    expect(mod1.setpoints(attic)[:heating]).to be_within(TOL).of(15.00)
+    expect(mod1.semiheated?(attic)).to be true
+    expect(mod1.refrigerated?(attic)).to be false
+    expect(mod1.setpoints(attic)[:heating]).to be_within(TOL).of(14.00)
     expect(mod1.setpoints(attic)[:cooling]).to be_nil
     expect(mod1.status).to be_zero
     expect(attic.additionalProperties.hasFeature(key)).to be true
@@ -1488,7 +1524,7 @@ RSpec.describe OSut do
     expect(cnd.get).to eq(val)
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # TO DO: Consider adding LargeOffice model to test SDK's "isPlenum".
+    # Consider adding LargeOffice model to test SDK's "isPlenum" ... @todo
   end
 
   it "checks availability schedule generation" do
@@ -1497,7 +1533,7 @@ RSpec.describe OSut do
 
     mdl   = OpenStudio::Model::Model.new
     v     = OpenStudio.openStudioVersion.split(".").join.to_i
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -1708,7 +1744,7 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
 
     # Successful test.
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -1921,6 +1957,97 @@ RSpec.describe OSut do
     expect(bounded_area).to_not be_empty
     expect(bounding_area).to_not be_empty
     expect(bounded_area.get).to be_within(TOL).of(bounding_area.get)
+    expect(mod1.status).to be_zero
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Aligned box (wide).
+    vtx  = OpenStudio::Point3dVector.new
+    vtx << OpenStudio::Point3d.new(  2,  4,  0)
+    vtx << OpenStudio::Point3d.new(  2,  2,  0)
+    vtx << OpenStudio::Point3d.new(  6,  2,  0)
+    vtx << OpenStudio::Point3d.new(  6,  4,  0)
+
+    output9 = mod1.getRealignedFace(vtx)
+    ubox9   = output9[ :box]
+    ubbox9  = output9[:bbox]
+
+    output10 = mod1.getRealignedFace(vtx, true) # no impact
+    ubox10   = output10[ :box]
+    ubbox10  = output10[:bbox]
+    expect(mod1.same?(ubox9, ubox10)).to be true
+    expect(mod1.same?(ubbox9, ubbox10)).to be true
+
+    # ... vs aligned box (narrow).
+    vtx  = OpenStudio::Point3dVector.new
+    vtx << OpenStudio::Point3d.new(  2,  6,  0)
+    vtx << OpenStudio::Point3d.new(  2,  2,  0)
+    vtx << OpenStudio::Point3d.new(  4,  2,  0)
+    vtx << OpenStudio::Point3d.new(  4,  6,  0)
+
+    output11 = mod1.getRealignedFace(vtx)
+    ubox11   = output11[ :box]
+    ubbox11  = output11[:bbox]
+
+    output12 = mod1.getRealignedFace(vtx, true) # narrow, now wide
+    ubox12   = output12[ :box]
+    ubbox12  = output12[:bbox]
+    expect(mod1.same?(ubox11, ubox12)).to be false
+    expect(mod1.same?(ubbox11, ubbox12)).to be false
+    expect(mod1.same?(ubox12, ubox10)).to be true
+    expect(mod1.same?(ubbox12, ubbox10)).to be true
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Irregular surface (parallelogram).
+    vtx  = OpenStudio::Point3dVector.new
+    vtx << OpenStudio::Point3d.new(  4,  0,  0)
+    vtx << OpenStudio::Point3d.new(  6,  4,  0)
+    vtx << OpenStudio::Point3d.new(  3,  8,  0)
+    vtx << OpenStudio::Point3d.new(  1,  4,  0)
+
+    output13 = mod1.getRealignedFace(vtx)
+    uset13   = output13[ :set]
+    ubox13   = output13[ :box]
+    ubbox13  = output13[:bbox]
+
+    # Pre-isolate bounded box (preferable with irregular surfaces).
+    box      = mod1.boundedBox(vtx)
+    output14 = mod1.getRealignedFace(box)
+    uset14   = output14[ :set]
+    ubox14   = output14[ :box]
+    ubbox14  = output14[:bbox]
+    expect(mod1.same?(uset14, ubox14)).to be true
+    expect(mod1.same?(uset14, ubbox14)).to be true
+    expect(mod1.same?(uset13, uset14)).to be false
+    expect(mod1.same?(ubox13, ubox14)).to be false
+    expect(mod1.same?(ubbox13, ubbox14)).to be false
+
+    rset14 = output14[:r] * (output14[:t] * uset14)
+    expect(mod1.same?(box, rset14)).to be true
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Bounded box from an irregular, non-convex, "J"-shaped corridor roof. This
+    # is a VERY EXPENSIVE method when dealing with HIGHLY CONVOLUTED polygons !
+    vtx  = OpenStudio::Point3dVector.new
+    vtx << OpenStudio::Point3d.new(  0.0000000,  0.0000, 3.658)
+    vtx << OpenStudio::Point3d.new(  0.0000000, 35.3922, 3.658)
+    vtx << OpenStudio::Point3d.new(  7.4183600, 35.3922, 3.658)
+    vtx << OpenStudio::Point3d.new(  7.8150800, 35.2682, 3.658)
+    vtx << OpenStudio::Point3d.new( 13.8611000, 35.2682, 3.658)
+    vtx << OpenStudio::Point3d.new( 13.8611000, 38.9498, 3.658)
+    vtx << OpenStudio::Point3d.new(  7.8150800, 38.9498, 3.658)
+    vtx << OpenStudio::Point3d.new(  7.8150800, 38.6275, 3.658)
+    vtx << OpenStudio::Point3d.new( -0.0674713, 38.6275, 3.658)
+    vtx << OpenStudio::Point3d.new( -0.0674713, 48.6247, 3.658)
+    vtx << OpenStudio::Point3d.new( -2.5471900, 48.6247, 3.658)
+    vtx << OpenStudio::Point3d.new( -2.5471900, 38.5779, 3.658)
+    vtx << OpenStudio::Point3d.new( -6.7255500, 38.5779, 3.658)
+    vtx << OpenStudio::Point3d.new( -2.5471900,  2.7700, 3.658)
+    vtx << OpenStudio::Point3d.new(-14.9024000,  2.7700, 3.658)
+    vtx << OpenStudio::Point3d.new(-14.9024000,  0.0000, 3.658)
+
+    bbx = mod1.boundedBox(vtx)
+    expect(mod1.fits?(bbx, vtx)).to be true
+    puts mod1.logs unless mod1.logs.empty?
     expect(mod1.status).to be_zero
   end
 
@@ -2206,8 +2333,8 @@ RSpec.describe OSut do
     area1 = area1.get
     area2 = area2.get
     expect((area1 - area2).abs).to be > TOL
-    pl1 = OpenStudio::Plane.new(mod1.getNonCollinears(olap1, 3))
-    pl2 = OpenStudio::Plane.new(mod1.getNonCollinears(olap2, 3))
+    pl1 = OpenStudio::Plane.new(olap1)
+    pl2 = OpenStudio::Plane.new(olap2)
     n1  = pl1.outwardNormal
     n2  = pl2.outwardNormal
     expect(soffit.plane.outwardNormal.dot(n1)).to be_within(TOL).of(1)
@@ -2231,16 +2358,16 @@ RSpec.describe OSut do
     area1 = area1.get
     area2 = area2.get
     expect(area2 - area1).to be > TOL
-    pl1 = OpenStudio::Plane.new(mod1.getNonCollinears(olap1, 3))
-    pl2 = OpenStudio::Plane.new(mod1.getNonCollinears(olap2, 3))
+    pl1 = OpenStudio::Plane.new(olap1)
+    pl2 = OpenStudio::Plane.new(olap2)
     n1  = pl1.outwardNormal
     n2  = pl2.outwardNormal
     expect(floor.plane.outwardNormal.dot(n1)).to be_within(TOL).of(1)
     expect( roof.plane.outwardNormal.dot(n2)).to be_within(TOL).of(1)
 
     # Alternative: first 'cast' vertically one polygon onto the other.
-    pl1    = OpenStudio::Plane.new(mod1.getNonCollinears(ceiling, 3))
-    pl2    = OpenStudio::Plane.new(mod1.getNonCollinears(roof, 3))
+    pl1    = OpenStudio::Plane.new(ceiling.vertices)
+    pl2    = OpenStudio::Plane.new(roof.vertices)
     up     = OpenStudio::Point3d.new(0, 0, 1) - OpenStudio::Point3d.new(0, 0, 0)
     down   = OpenStudio::Point3d.new(0, 0,-1) - OpenStudio::Point3d.new(0, 0, 0)
     cast00 = mod1.cast(roof, ceiling, down)
@@ -2871,7 +2998,7 @@ RSpec.describe OSut do
     expect(v).to be_empty
     expect(mod1.error?).to be true
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to include("Empty 'polygon'")
+    expect(mod1.logs.first[:message]).to include("non-collinears < 3")
     expect(mod1.clean!).to eq(INF)
 
     # 3x non-unique points (not a polygon).
@@ -2885,7 +3012,7 @@ RSpec.describe OSut do
     expect(v).to be_empty
     expect(mod1.error?).to be true
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to include("Empty 'polygon'")
+    expect(mod1.logs.first[:message]).to include("non-collinears < 3")
     expect(mod1.clean!).to eq(INF)
 
     # 4th non-planar point (not a polygon).
@@ -2933,7 +3060,7 @@ RSpec.describe OSut do
     expect(v).to be_empty
     expect(mod1.error?).to be true
     expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to include("Empty 'plane'")
+    expect(mod1.logs.first[:message]).to include("Empty 'plane' (OSut::poly)")
     expect(mod1.clean!).to eq(INF)
 
     # Ensure uniqueness & OpenStudio's counterclockwise ULC sequence.
@@ -3077,8 +3204,7 @@ RSpec.describe OSut do
 
   it "checks subsurface insertions on (seb) tilted surfaces" do
     # Examples of how to harness OpenStudio's Boost geometry methods to safely
-    # insert subsurfaces along rotated/tilted/slanted host/parent/base
-    # surfaces. First step, modify SEB.osm model.
+    # insert subsurfaces along rotated/tilted/slanted host/parent/base surfaces.
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.reset(DBG)).to eq(DBG)
@@ -3086,7 +3212,7 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
 
     v     = OpenStudio.openStudioVersion.split(".").join.to_i
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -3388,11 +3514,19 @@ RSpec.describe OSut do
     sub[:head  ] = head
     sub[:count ] = 3
     sub[:offset] = offset
-    # sub[:type  ] = "FixedWindow" # defaulted if not specified.
-    expect(mod1.addSubs(tilt_wall, [sub])).to be true
-    expect(mod1.status).to be_zero
 
-    tilted = model.getSubSurfaceByName("Tilted window|0")
+    # The simplest argument set for 'addSubs' is:
+    expect(mod1.addSubs(tilt_wall, sub)).to be true
+
+    # As the base surface is tilted, OpenStudio's 'alignFace' + 'alignZPrime'
+    # behave in a very intuitive manner: there is no point requesting 'addSubs'
+    # first realigns and/or concentrates on the polygon's bounded box - the
+    # outcome would be the same in all cases, e.g.:
+    #
+    #   expect(mod1.addSubs(tilt_wall, sub, false, false, true)).to be true
+    #   expect(mod1.addSubs(tilt_wall, sub, false, true)).to be true
+    expect(mod1.status).to be_zero
+    tilted = model.getSubSurfaceByName("Tilted window:0")
     expect(tilted).to_not be_empty
     tilted = tilted.get
 
@@ -3406,12 +3540,14 @@ RSpec.describe OSut do
     sub[:id  ] = ""
     sub[:sill] = 0.0 # will be reset to 5mm
     sub[:type] = "Skylight"
-    expect(mod1.addSubs(roof, [sub])).to be true
+    expect(mod1.addSubs(roof, sub)).to be true
     expect(mod1.warn?).to be true
-    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.size).to eq(2)
 
-    message = "' sill height to 0.005 m (OSut::addSubs)"
-    expect(mod1.logs.first[:message]).to include(message)
+    mod1.logs.each do |lg|
+      expect(lg[:message].downcase).to include("reset")
+      expect(lg[:message].downcase).to include("sill")
+    end
 
     file = File.join(__dir__, "files/osms/out/seb_ext2.osm")
     model.save(file, true)
@@ -3423,7 +3559,7 @@ RSpec.describe OSut do
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
 
-    # Modeified NREL SEB model'
+    # Modified NREL SEB model'
     file  = File.join(__dir__, "files/osms/out/seb_ext2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
@@ -3696,11 +3832,15 @@ RSpec.describe OSut do
     file = File.join(__dir__, "files/osms/out/seb_ext3.osm")
     model.save(file, true)
 
-    # Fetch a (flat) plenum roof surface.
+    # Fetch a (flat) plenum roof surface, and add a single skylight.
     id = "Level 0 Open area 1 ceiling Plenum RoofCeiling"
     ruf1 = model.getSurfaceByName(id)
     expect(ruf1).to_not be_empty
     ruf1 = ruf1.get
+
+    construction = model.getConstructions.select { |cc| cc.isFenestration }
+    expect(construction.size).to eq(1)
+    construction = construction.first
 
     a8              = {}
     a8[:id        ] = "ruf skylight"
@@ -3708,10 +3848,15 @@ RSpec.describe OSut do
     a8[:count     ] = 1
     a8[:width     ] = 1.2
     a8[:height    ] = 1.2
+    a8[:assembly  ] = construction
 
     expect(mod1.addSubs(ruf1, [a8])).to be true
     expect(mod1.status).to be_zero
 
+    # The plenum roof inherits a single skylight (without any skylight well).
+    # See "checks generated skylight wells" to compare "seb_ext3a" vs "seb_sky":
+    #   - more sensible alignment of skylight(s) wrt to roof geometry
+    #   - automated skylight well generation
     file = File.join(__dir__, "files/osms/out/seb_ext3a.osm")
     model.save(file, true)
   end
@@ -4198,7 +4343,7 @@ RSpec.describe OSut do
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # CASE 2: None of the occupied spaces have outdoor-facing roofs, yet the
     # plenum above has 4x outdoor-facing roofs (each matches 1x space ceiling).
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -4251,11 +4396,9 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
-    # A larger polygon (s0), defined UpperLeftCorner (ULC). Polygon s0 entirely
-    # encompasses 4x smaller rectangular polygons (s1 to s4), The vertex
-    # sequence of the 4x smaller polygons is based on their aspect ratios, as
-    # well as their placement vis-à-vis grid origin.
     o0  = OpenStudio::Point3d.new( 0,  0,  0)
+
+    # A larger polygon (s0, an upside-down "U"), defined UpperLeftCorner (ULC).
     s0  = OpenStudio::Point3dVector.new
     s0 << OpenStudio::Point3d.new( 2, 16, 20)
     s0 << OpenStudio::Point3d.new( 2,  2, 20)
@@ -4266,6 +4409,7 @@ RSpec.describe OSut do
     s0 << OpenStudio::Point3d.new(20,  2, 20)
     s0 << OpenStudio::Point3d.new(20, 16, 20)
 
+    # Polygon s0 entirely encompasses 4x smaller rectangular polygons, s1 to s4.
     s1  = OpenStudio::Point3dVector.new
     s1 << OpenStudio::Point3d.new( 7,  3, 20)
     s1 << OpenStudio::Point3d.new( 7,  7, 20)
@@ -4330,7 +4474,7 @@ RSpec.describe OSut do
     expect(mod1.farthest(s3, o0)).to eq(2)
     expect(mod1.farthest(s4, o0)).to eq(1)
 
-    # Box-specific grid instructions.
+    # Box-specific grid instructions, i.e. 'subsets'.
     set = []
     set << { box: s1, rows: 1, cols: 2, w0: 1.4, d0: 1.4, dX: 0.2, dY: 0.2 }
     set << { box: s2, rows: 2, cols: 3, w0: 1.4, d0: 1.4, dX: 0.2, dY: 0.2 }
@@ -4348,42 +4492,91 @@ RSpec.describe OSut do
     expect(area_s4).to be_within(TOL).of( 3.64)
     expect(area_s).to be_within(TOL).of(22.96)
 
+    # Side test.
     ld1 = OpenStudio::Point3d.new(18,  0, 0)
     ld2 = OpenStudio::Point3d.new( 8,  3, 0)
     sg1 = OpenStudio::Point3d.new(12, 14, 0)
     sg2 = OpenStudio::Point3d.new(12,  6, 0)
     expect(mod1.getLineIntersection([sg1, sg2], [ld1, ld2])).to be_nil
 
+    # To support multiple polygon inserts within a larger polygon, subset boxes
+    # must be first 'aligned' (along a temporary XY plane) in a systematic way
+    # to ensure consistent treatment between sequential methods, e.g.:
     t = OpenStudio::Transformation.alignFace(s0)
     s00 = t.inverse * s0
-    s01 = t.inverse * s1
+    s01 = t.inverse * s4
     s01.each { |pt| expect(mod1.pointWithinPolygon?(pt, s00, true)).to be true }
 
-    # Generate leader line anchors, linking set boxes to s0 vertices.
-    n = mod1.genAnchors(s0, set, :box)
+    # Reiterating that if one simply 'aligns' an already flat surface, what ends
+    # up being considered a BottomLeftCorner (BLC) vs ULC is contingent on how
+    # OpenStudio's 'alignFace' rotates the original surface. Although
+    # 'alignFace' operates in a systematic and reliable way, its output isn't
+    # always intuitive when dealing with flat surfaces. Here, instead of the
+    # original upside-down "U" shape of s0, an aligned s00 presents a
+    # conventional "U" shape (i.e. 180° rotation).
+    #
+    # s00.each_with_index { |sv, i| puts "#{sv} ... vs #{s0[i]}" }; puts
+    #   [18,  0, 0] ... vs [ 2, 16, 20]
+    #   [18, 14, 0] ... vs [ 2,  2, 20]
+    #   [12, 14, 0] ... vs [ 8,  2, 20]
+    #   [12,  6, 0] ... vs [ 8, 10, 20]
+    #   [ 4,  6, 0] ... vs [16, 10, 20]
+    #   [ 4, 14, 0] ... vs [16,  2, 20]
+    #   [ 0, 14, 0] ... vs [20,  2, 20]
+    #   [ 0,  0, 0] ... vs [20, 16, 20]
+
+    # 'Leader line anchors' are required to safely integrate cutouts (in s0) to
+    # accommodate subset inserts.
+    expect(mod1.genAnchors(s0, set)).to eq(set.size)
     puts mod1.logs unless mod1.status.zero?
-    expect(n).to eq(4)
     expect(mod1.status).to be_zero
 
-    # These previous tests are successful, given the initial vertex sequencing.
-    # A simple resequencing of set box vertices could easily prevent genAnchors
-    # from identifying valid leader line anchor points.
+    # To ensure consistent treatment for subsequent operations, 'genAnchors'
+    # resequences subset boxes (s1 to s4), once 'aligned' with the larger
+    # polygon. Each subset is then 'realigned' with regards to its respective
+    # 'bounded box', and finally BLC-sequenced. This is done only once per set
+    # - any subsequent calls to 'genAnchors' systematically rely on the first
+    # BLC-sequenced box. This is key when generating skylight wells in attics
+    # or plenum spaces.
     set.each_with_index do |st, i|
       expect(st).to have_key(:ld)
       expect(st[:ld]).to be_a(Hash)
       expect(st[:ld]).to have_key(s0)
-      expect(st[:ld][s0]).to be_a(OpenStudio::Point3d)
-      expect(mod1.same?(st[:ld][s0], s0[2])).to be true if i == 0 #  8,  2, 20
-      expect(mod1.same?(st[:ld][s0], s0[0])).to be true if i == 1 #  2, 16, 20
-      expect(mod1.same?(st[:ld][s0], s0[4])).to be true if i == 2 # 16, 10, 20
-      expect(mod1.same?(st[:ld][s0], s0[6])).to be true if i == 3 # 20,  2, 20
+      # puts "SET #{i+1} (#{st[:ld][s0]}):"; puts st[:box]; puts
     end
+    #
+    # SET 1 ([8, 10, 20]):
+    #   [ 5,  7, 20]
+    #   [ 5,  3, 20]
+    #   [ 7,  3, 20]
+    #   [ 7,  7, 20]
+    #
+    # SET 2 ([2, 16, 20]):
+    #   [10, 15, 20]
+    #   [ 3, 15, 20]
+    #   [ 3, 11, 20]
+    #   [10, 11, 20]
+    #
+    # SET 3 ([16, 10, 20]):
+    #   [17, 13, 20]
+    #   [13, 15, 20]
+    #   [12, 13, 20]
+    #   [16, 11, 20]
+    #
+    # SET 4 ([16, 10, 20]):
+    #   [17,  6, 20]
+    #   [17,  3, 20]
+    #   [19,  3, 20]
+    #   [19,  6, 20]
 
     # Add array of polygon inserts to s0.
     s00 = mod1.genInserts(s0, set)
     puts mod1.logs unless mod1.status.zero?
+    expect(mod1.status).to be_zero
     expect(s00).to be_a(OpenStudio::Point3dVector)
     expect(s00.size).to eq(68)
+
+    # s00.each {|ppts| puts ppts}
 
     area00  = OpenStudio.getArea(s00)
     expect(area00).to_not be_empty
@@ -4440,13 +4633,15 @@ RSpec.describe OSut do
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
 
+    srr     = 0.05
+    version = OpenStudio.openStudioVersion.split(".").join.to_i
+
     file  = File.join(__dir__, "files/osms/in/smalloffice.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
     model = model.get
 
-    srr   = 0.05
     core  = []
     attic = []
 
@@ -4498,9 +4693,12 @@ RSpec.describe OSut do
     expect(mod1.unconditioned?(attic)).to be true
 
     # TOTAL attic roof area, including overhangs.
-    roofs = mod1.facets(attic, "Outdoors", "RoofCeiling")
-    total = roofs.sum(&:grossArea)
-    expect(total.round(2)).to eq(598.76)
+    roofs  = mod1.facets(attic, "Outdoors", "RoofCeiling")
+    rufs   = mod1.getRoofs(model.getSpaces)
+    total1 = roofs.sum(&:grossArea)
+    total2 = rufs.sum(&:grossArea)
+    expect(total1.round(2)).to eq(total2.round(2))
+    expect(total2.round(2)).to eq(598.76)
 
     # "GROSS ROOF AREA" (GRA), as per 90.1/NECB - excludes roof overhangs (60m2)
     gra1 = mod1.grossRoofArea(model.getSpaces)
@@ -4516,10 +4714,11 @@ RSpec.describe OSut do
     #   1. UNCONDITIONED (attic, as is)
     #   2. INDIRECTLY-CONDITIONED (e.g. plenum)
     #
-    # For testing purposes, only the core zone is targeted for skylight wells.
-    # Context: NECBs and 90.1 require separate SRR% calculations for
+    # For testing purposes, only the core zone here is targeted for skylight
+    # wells. Context: NECBs and 90.1 require separate SRR% calculations for
     # differently conditioned spaces (SEMI-CONDITIONED vs CONDITIONED).
-    # See 'addSkyLights' doc.
+    # Consider this as practice - see 'addSkyLights' doc.
+
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # CASE 1:
@@ -4532,6 +4731,7 @@ RSpec.describe OSut do
 
     # The method returns the GRA, calculated BEFORE adding skylights/wells.
     rm2 = mod1.addSkyLights(core, {srr: srr})
+    puts mod1.logs unless mod1.logs.empty?
     expect(rm2.round(2)).to eq(gra_attic.round(2))
 
     # New core skylight areas. Successfully achieved SRR%.
@@ -4549,6 +4749,79 @@ RSpec.describe OSut do
 
     file = File.join(__dir__, "files/osms/out/office_attic.osm")
     model.save(file, true)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Side test/comment: why does 'addSkylights' return gross roof area?
+    # First, retrieving (newly-added) core roofs (i.e. skylight base surfaces).
+    rfs1 = mod1.facets(core, "Outdoors", "RoofCeiling")
+    tot1 = rfs1.sum(&:grossArea)
+    net  = rfs1.sum(&:netArea)
+    expect(rfs1.size).to eq(4)
+    expect(tot1.round(2)).to eq(9.06) # 4x 2.265 m2
+    expect((tot1 - net).round(2)).to eq(sky_area1.round(2))
+
+    # In absence of skylight wells (more importantly, in absence of leader lines
+    # anchoring skylight base surfaces), OSut's 'getRoofs' & 'grossRoofArea'
+    # report not only on newly-added base surfaces (or their areas), but also
+    # overalpping areas of attic roofs above. Unfortunately, these become
+    # unreliable with newly-added skylight wells.
+    rfs2 = mod1.getRoofs(core)
+    tot2 = rfs2.sum(&:grossArea)
+    expect(tot2.round(2)).to eq(tot1.round(2))
+    expect(tot2.round(2)).to eq(mod1.grossRoofArea(core).round(2))
+
+    # Fortunately, the addition of leader lines does not affect how OpenStudio
+    # reports surface areas.
+    rfs3 = mod1.facets(attic, "Outdoors", "RoofCeiling")
+    tot3 = rfs3.sum(&:grossArea)
+    expect((tot3 + tot2).round(2)).to eq(total2.round(2)) # 598.76
+
+    # However, as discussed elsewhere (see 'addSkylights'), these otherwise
+    # valid areas are often overestimated for SRR% calculations (e.g. when
+    # overhangs and soffits are explicitely modelled). It is for this reason
+    # 'addSkylights' reports gross roof area BEFORE adding skylight wells. Best
+    # if a higher-level application, relying on 'addSkylights' (e.g. an
+    # OpenStudio measure), stores its output for subsequent reporting purposes.
+
+    # Deeper dive: Why are OSut's 'getRoofs' and 'grossRoofArea' unreliable
+    # with leader lines? Both rely on OSut's 'overlaps?', itself relying on
+    # OpenStudio's 'join' and 'intersect': if neither are successful in joining
+    # (or intersecting) 2x polygons (e.g. attic roof vs cast core ceiling),
+    # there can be no identifiable overlap. In such cases, both 'getRoofs' and
+    # 'grossRoofArea' ignore overlapping attic roofs. A demo:
+    roof_north   = model.getSurfaceByName("Attic_roof_north")
+    core_ceiling = model.getSurfaceByName("Core_ZN_ceiling")
+    expect(roof_north).to_not be_empty
+    expect(core_ceiling).to_not be_empty
+    roof_north   = roof_north.get
+    core_ceiling = core_ceiling.get
+
+    t  = OpenStudio::Transformation.alignFace(roof_north.vertices)
+    up = OpenStudio::Point3d.new(0,0,1) - OpenStudio::Point3d.new(0,0,0)
+
+    a_roof_north   = t.inverse * roof_north.vertices
+    a_core_ceiling = t.inverse * core_ceiling.vertices
+    c_core_ceiling = mod1.cast(a_core_ceiling, a_roof_north, up)
+
+    north_m2   = OpenStudio.getArea(a_roof_north)
+    ceiling_m2 = OpenStudio.getArea(c_core_ceiling)
+    expect(north_m2).to_not be_empty
+    expect(ceiling_m2).to_not be_empty
+    expect(north_m2.get.round(2)).to eq(192.98)
+    expect(ceiling_m2.get.round(2)).to eq(133.81)
+
+    # So far so good. Ensure clockwise winding.
+    a_roof_north   = a_roof_north.to_a.reverse
+    c_core_ceiling = c_core_ceiling.to_a.reverse
+    expect(OpenStudio.join(a_roof_north, c_core_ceiling, TOL2)).to be_empty
+    expect(OpenStudio.intersect(a_roof_north, c_core_ceiling, TOL)).to be_empty
+
+    # A future revision of OSut's 'getRoofs' and 'grossRoofArea' would require:
+    #   - a new method identifying leader lines amongts surface vertices
+    #   - a new method identifying surface cutouts amongst surface vertices
+    #   - a method to purge both leader lines and cutouts from surface vertices
+    #   - have 'getRoofs' & 'grossRoofArea' rely on the remaining outer vertices
+    #     ... @todo?
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # CASE 2:
@@ -4577,21 +4850,22 @@ RSpec.describe OSut do
     # Here, GRA includes ALL plenum roof surfaces (not just vertically-cast
     # areas onto core ceiling). This makes meeting the SRR% of 5% much harder.
     gra_plenum = mod1.grossRoofArea(core)
-    expect(gra_plenum.round(2)).to eq(total.round(2))
+    expect(gra_plenum.round(2)).to eq(total1.round(2))
 
     rm2 = mod1.addSkyLights(core, {srr: srr})
-    expect(rm2.round(2)).to eq(total.round(2))
+    puts mod1.logs unless mod1.logs.empty?
+    expect(rm2.round(2)).to eq(total1.round(2))
 
-    # New core skylight areas. The total skylight area is greater than in CASE 1,
-    # and the method is unable to meet the requested SRR 5%. This is
-    # understandable given the constrained roof/core overlap vs the ~4x greater
-    # roof area. A plenum vastly larger than the room(s) it serves is rare, but
-    # certainly problematic for the application of the NECBs.
+    # The total skylight area is greater than in CASE 1. Nonetheless, the method
+    # is able to meet the requested SRR 5%. This may not be achievable in other
+    # circumstances, given the constrained roof/core overlap. Although a plenum
+    # vastly larger than the room(s) it serves is rare, it remains certainly
+    # problematic for the application of the NECBs.
     core_skies = mod1.facets(core, "Outdoors", "Skylight")
     sky_area2  = core_skies.sum(&:grossArea)
-    expect(sky_area2.round(2)).to eq(8.93)
+    expect(sky_area2.round(2)).to eq(29.94)
     ratio2     = sky_area2 / rm2
-    expect(ratio2.round(2)).to eq(0.01) # not 5%
+    expect(ratio2.round(2)).to eq(srr.round(2))
     expect(mod1.status).to be_zero
 
     file = File.join(__dir__, "files/osms/out/office_plenum.osm")
@@ -4622,23 +4896,27 @@ RSpec.describe OSut do
     expect(mod1.setpoints(attic)[:cooling]).to be_within(TOL).of(23.89)
 
     gra_plenum = mod1.grossRoofArea(core)
-    expect(gra_plenum.round(2)).to eq(total.round(2))
+    expect(gra_plenum.round(2)).to eq(total1.round(2))
 
     # Conflicting argument case: Here, skylight wells must traverse plenums (in
     # this context, :plenum is an all encompassing keyword for any INDIRECTLY-
     # CONDITIONED, unoccupied space). Yet by passing option "plenum: false",
     # the method is instructed to skip "plenum" skylight wells altogether.
     rm2 = mod1.addSkyLights(core, {srr: srr, plenum: false})
-    expect(rm2.round(2)).to eq(total.round(2))
+    expect(mod1.warn?).to be true
+    expect(mod1.logs.size).to eq(1)
+    msg = mod1.logs.first[:message]
+    expect(msg).to include("Empty 'sets (3)' (OSut::addSkyLights)")
+    expect(rm2.round(2)).to eq(total1.round(2))
 
     core_skies = mod1.facets(core, "Outdoors", "Skylight")
     sky_area2  = core_skies.sum(&:grossArea)
     expect(sky_area2.round(2)).to eq(0.00)
-    expect(mod1.status).to be_zero
+    expect(mod1.clean!).to eq(DBG)
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # SEB case (flat ceiling plenum).
-    file  = File.join(__dir__, "files/osms/in/seb.osm")
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
     expect(model).to_not be_empty
@@ -4667,14 +4945,35 @@ RSpec.describe OSut do
     total = roofs.sum(&:grossArea)
     expect(total.round(2)).to eq(82.21)
 
-    gra_seb = mod1.grossRoofArea(model.getSpaces)
-    expect(gra_seb.round(2)).to eq(total.round(2))
+    # A single plenum above all 4 occupied rooms. Reports same GRA.
+    gra_seb1 = mod1.grossRoofArea(model.getSpaces)
+    gra_seb2 = mod1.grossRoofArea(entry)
+    expect(gra_seb1.round(2)).to eq(gra_seb2.round(2))
+    expect(gra_seb1.round(2)).to eq(total.round(2))
 
-    srr = 0.04
+    sky_area = srr * total
+
+    # Before adding skylight wells.
+    unless version < 350
+      [plenum, entry, office, open, utility].each do |sp|
+        expect(sp.isEnclosedVolume).to be true
+        expect(sp.isVolumeDefaulted).to be true
+        expect(sp.isVolumeAutocalculated).to be true
+        expect(sp.volume).to be > 0
+
+        zn = sp.thermalZone
+        expect(zn).to_not be_empty
+        zn = zn.get
+        expect(zn.isVolumeDefaulted).to be true
+        expect(zn.isVolumeAutocalculated).to be true
+        expect(zn.volume).to be_empty
+      end
+    end
 
     # The method returns the GRA, calculated BEFORE adding skylights/wells.
-    rm2 = mod1.addSkyLights(model.getSpaces, {srr: srr})
-    expect(rm2.round(2)).to eq(gra_seb.round(2))
+    rm2 = mod1.addSkyLights(model.getSpaces, {area: sky_area})
+    puts mod1.logs unless mod1.logs.empty?
+    expect(rm2.round(2)).to eq(total.round(2))
 
     entry_skies   = mod1.facets(entry, "Outdoors", "Skylight")
     office_skies  = mod1.facets(office, "Outdoors", "Skylight")
@@ -4683,22 +4982,38 @@ RSpec.describe OSut do
 
     expect(entry_skies).to be_empty
     expect(office_skies).to be_empty
-    expect(utility_skies.size).to eq(1)
+    expect(utility_skies).to be_empty
     expect(open_skies.size).to eq(1)
-    utility_sky = utility_skies.first
-    open_sky    = open_skies.first
+    open_sky = open_skies.first
 
-    skm2 = utility_sky.grossArea + open_sky.grossArea
+    skm2 = open_sky.grossArea
     expect((skm2 / rm2).round(2)).to eq(srr)
 
     # Assign construction to new skylights.
     construction = mod1.genConstruction(model, {type: :skylight, uo: 2.8})
-    expect(utility_sky.setConstruction(construction)).to be true
     expect(open_sky.setConstruction(construction)).to be true
     expect(mod1.status).to be_zero
 
+    # No change after adding skylight wells.
+    unless version < 350
+      [plenum, entry, office, open, utility].each do |sp|
+        expect(sp.isEnclosedVolume).to be true
+        expect(sp.isVolumeDefaulted).to be true
+        expect(sp.isVolumeAutocalculated).to be true
+        expect(sp.volume).to be > 0
+
+        zn = sp.thermalZone
+        expect(zn).to_not be_empty
+        zn = zn.get
+        expect(zn.isVolumeDefaulted).to be true
+        expect(zn.isVolumeAutocalculated).to be true
+        expect(zn.volume).to be_empty
+      end
+    end
+
     file = File.join(__dir__, "files/osms/out/seb_sky.osm")
     model.save(file, true)
+
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     file  = File.join(__dir__, "files/osms/in/warehouse.osm")
@@ -4772,6 +5087,10 @@ RSpec.describe OSut do
     expect(model).to_not be_empty
     model  = model.get
     spaces = model.getSpaces
+    surfs  = model.getSurfaces
+    subs   = model.getSubSurfaces
+    expect(surfs.size).to eq(59)
+    expect(subs.size).to eq(14)
 
     # The solution is similar to:
     #   OpenStudio::Model::Space::findSurfaces(minDegreesFromNorth,
@@ -4784,23 +5103,45 @@ RSpec.describe OSut do
     #   #a0cf3c265ac314c1c846ee4962e852a3e
     #
     # ... yet it offers filters such as surface type and boundary conditions.
+    windows    = mod1.facets(spaces, "Outdoors", "FixedWindow")
+    skylights  = mod1.facets(spaces, "Outdoors", "Skylight")
+    walls      = mod1.facets(spaces, "Outdoors", "Wall")
     northsouth = mod1.facets(spaces, "Outdoors", "Wall", [:north, :south])
+    northeast  = mod1.facets(spaces, "Outdoors", "Wall", [:north, :east])
+    north      = mod1.facets(spaces, "Outdoors", "Wall", :north)
+    floors1a   = mod1.facets(spaces, "Ground", "Floor", :bottom)
+    floors1b   = mod1.facets(spaces, "Surface", "Floor") # plenum
+    roofs1     = mod1.facets(spaces, "Outdoors", "RoofCeiling", :top)
+    roofs2     = mod1.facets(spaces, "Outdoors", "RoofCeiling", :foo)
+    expect(windows.size).to eq(11)
+    expect(skylights.size).to eq(3)
+    expect(walls.size).to eq(28)
     expect(northsouth).to be_empty
-
-    north = mod1.facets(spaces, "Outdoors", "Wall", [:north])
-    expect(north.size).to eq(14)
-
-    northeast = mod1.facets(spaces, "Outdoors", "Wall", [:north, :east])
     expect(northeast.size).to eq(8)
+    expect(north.size).to eq(14)
+    expect(floors1a.size).to eq(4)
+    expect(floors1b.size).to eq(4)
+    expect(roofs1.size).to eq(5)
+    expect(roofs2).to be_empty
 
-    floors = mod1.facets(spaces, "Ground", "Floor", [:bottom])
-    expect(floors.size).to eq(4)
+    # Concise variants, same output. In the SEB model, only floors face "Ground".
+    floors2 = mod1.facets(spaces, "Ground", "Floor")
+    floors3 = mod1.facets(spaces, "Ground")
+    roofs3  = mod1.facets(spaces, "Outdoors", "RoofCeiling")
+    expect(floors2).to eq(floors1a)
+    expect(floors3).to eq(floors1a)
+    expect(roofs3).to eq(roofs1)
 
-    roofs = mod1.facets(spaces, "Outdoors", "RoofCeiling", [:top])
-    expect(roofs.size).to eq(5)
+    # Dropping filters, 'envelope' includes all above-grade envelope surfaces.
+    nb       = walls.size + roofs3.size + windows.size + skylights.size
+    floors4  = mod1.facets(spaces, "ALL", "Floor")
+    envelope = mod1.facets(spaces, "Outdoors", "ALL")
+    floors1a.each { |fl| expect(floors4.include?(fl)).to be true }
+    floors1b.each { |fl| expect(floors4.include?(fl)).to be true }
+    expect(envelope.size).to eq(nb)
 
-    roofs = mod1.facets(spaces, "Outdoors", "RoofCeiling", [:foo])
-    expect(roofs).to be_empty
+    # Without arguments, the method returns ALL surfaces and subsurfaces.
+    expect(mod1.facets(spaces).size).to eq(surfs.size + subs.size)
   end
 
   it "checks slab generation" do
@@ -5015,7 +5356,7 @@ RSpec.describe OSut do
     expect(slanted.nameString).to eq("Openarea slanted roof")
     skylights = slanted.subSurfaces
 
-    tilted  = mod1.facets(spaces, "Outdoors", "Wall", [:bottom])
+    tilted  = mod1.facets(spaces, "Outdoors", "Wall", :bottom)
     expect(tilted.size).to eq(1)
     tilted  = tilted.first
     expect(tilted.nameString).to eq("Openarea tilted wall")
