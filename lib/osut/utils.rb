@@ -34,14 +34,14 @@ module OSut
   # DEBUG for devs; WARN/ERROR for users (bad OS input), see OSlg
   extend OSlg
 
-  TOL  = 0.01         # default distance tolerance (m)
-  TOL2 = TOL * TOL    # default area tolerance (m2)
-  DBG  = OSlg::DEBUG  # see github.com/rd2/oslg
-  INF  = OSlg::INFO   # see github.com/rd2/oslg
-  WRN  = OSlg::WARN   # see github.com/rd2/oslg
-  ERR  = OSlg::ERROR  # see github.com/rd2/oslg
-  FTL  = OSlg::FATAL  # see github.com/rd2/oslg
-  NS   = "nameString" # OpenStudio object identifier method
+  TOL  = 0.01             # default distance tolerance (m)
+  TOL2 = TOL * TOL        # default area tolerance (m2)
+  DBG  = OSlg::DEBUG.dup  # see github.com/rd2/oslg
+  INF  = OSlg::INFO.dup   # see github.com/rd2/oslg
+  WRN  = OSlg::WARN.dup   # see github.com/rd2/oslg
+  ERR  = OSlg::ERROR.dup  # see github.com/rd2/oslg
+  FTL  = OSlg::FATAL.dup  # see github.com/rd2/oslg
+  NS   = "nameString"     # OpenStudio object identifier method
 
   HEAD = 2.032 # standard 80" door
   SILL = 0.762 # standard 30" window sill
@@ -4335,7 +4335,7 @@ module OSut
   # cloned polygon vertices are rotated so the longest axis of symmetry of its
   # bounded box lies parallel to the X-axis; :o being the midpoint of the narrow
   # side (of the bounded box) nearest to grid origin (0,0,0). If the axis of
-  # symmetry of the boudned box is already parallel to the X-axis, then the
+  # symmetry of the bounded box is already parallel to the X-axis, then the
   # rotation step is skipped (unless force == true). Whether rotated or not,
   # polygon vertices are then translated as to ensure one or more vertices are
   # aligned along the X-axis and one or more vertices are aligned along the
@@ -4489,7 +4489,7 @@ module OSut
   # corner of one or more (smaller) subsets (free-floating within the parent)
   # - see follow-up 'genInserts'. Subsets may hold several 'tagged' vertices
   # (e.g. :box, :cbox). By default, the solution seeks to anchor subset :box
-  # vertices. Users can select other tags, e.g. tag == :cbox). The solution
+  # vertices. Users can select other tags, e.g. tag == :cbox. The solution
   # minimally validates individual subsets (e.g. no self-intersecting polygons,
   # coplanarity, no inter-subset conflicts, must fit within larger set).
   # Potential leader lines cannot intersect each other, similarly tagged subsets
@@ -4972,7 +4972,7 @@ module OSut
   # 'sides' rely on space coordinates (not building or site coordinates). Also,
   # 'sides' are exclusive (not inclusive), e.g. walls strictly north-facing or
   # strictly east-facing would not be returned if 'sides' holds [:north, :east].
-  # No outside boundary consition filters if 'boundary' argument == "all". No
+  # No outside boundary condition filters if 'boundary' argument == "all". No
   # surface type filters if 'type' argument == "all".
   #
   # @param spaces [Set<OpenStudio::Model::Space>] target spaces
@@ -6114,7 +6114,7 @@ module OSut
     # modellers to correctly flag such cases - can't safely guess in lieu of
     # design/modelling team.
     #
-    # A friendly reminder: 'addSkylights 'should be called separately for
+    # A friendly reminder: 'addSkylights' should be called separately for
     # strictly SEMIHEATED spaces vs REGRIGERATED spaces vs all other CONDITIONED
     # spaces, as per 90.1 and NECB requirements.
     if spaces.respond_to?(:spaceType) || spaces.respond_to?(:to_a)

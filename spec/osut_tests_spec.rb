@@ -1,15 +1,15 @@
 require "osut"
 
 RSpec.describe OSut do
-  TOL  = OSut::TOL
-  TOL2 = TOL * TOL
-  DBG  = OSut::DEBUG
-  INF  = OSut::INFO
-  WRN  = OSut::WARN
-  ERR  = OSut::ERR
-  FTL  = OSut::FATAL
-  HEAD = OSut::HEAD
-  SILL = OSut::SILL
+  TOL  = OSut::TOL.dup
+  TOL2 = OSut::TOL2.dup
+  DBG  = OSut::DEBUG.dup
+  INF  = OSut::INFO.dup
+  WRN  = OSut::WARN.dup
+  ERR  = OSut::ERR.dup
+  FTL  = OSut::FATAL.dup
+  HEAD = OSut::HEAD.dup
+  SILL = OSut::SILL.dup
 
   let(:cls1) { Class.new  { extend OSut } }
   let(:cls2) { Class.new  { extend OSut } }
