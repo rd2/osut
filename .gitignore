@@ -8,6 +8,8 @@ _yardoc
 doc/
 rdoc
 
+.ruby-version
+
 spec/files/osms/out/
 
 .DS_Store
