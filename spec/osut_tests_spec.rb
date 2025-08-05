@@ -291,6 +291,22 @@ RSpec.describe OSut do
     u = 1 / cls1::rsi(surface)
     expect(u).to be_within(TOL).of(uo9)
 
+    # Invalid Uo (here, skylights and windows inherit default Uo values)
+    specs   = {type: :skylight, uo: nil}
+    surface = cls1::genConstruction(model, specs)
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(1)
+    u = 1 / cls1::rsi(surface)
+    expect(u).to be_within(TOL).of(uo[:skylight])
+
+    # Invalid Uo (here, Uo-adjustments are ignored altogether)
+    specs   = {type: :wall, uo: nil}
+    surface = cls1::genConstruction(model, specs)
+    expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
+    expect(surface.layers.size).to eq(4)
+    u = 1 / cls1::rsi(surface)
+    expect(u).to be_within(TOL).of(2.23) # not matching any defaults
+
     expect(cls1.status.zero?).to be true
   end
 
@@ -790,8 +806,12 @@ RSpec.describe OSut do
     expect(model).to_not be_empty
     model = model.get
 
-    m  = "OSut::insulatingLayer"
-    m1 = "Invalid 'lc' arg #1 (#{m})"
+    m   = "OSut::insulatingLayer"
+    cl1 = OpenStudio::Model::Surface
+    cl2 = OpenStudio::Model::LayeredConstruction
+    n1  = "Entryway  Wall 1"
+    m1  = "Invalid 'lc' arg #1 (#{m})"
+    m2  = "'#{n1}' #{cl1}? expecting #{cl2} (#{m})"
 
     model.getLayeredConstructions.each do |lc|
       lyr = mod1.insulatingLayer(lc)
@@ -838,7 +858,6 @@ RSpec.describe OSut do
     end
 
     lyr = mod1.insulatingLayer(nil)
-    expect(mod1.debug?).to be true
     expect(lyr[:index]).to be_nil
     expect(lyr[:type ]).to be_nil
     expect(lyr[:r    ]).to be_zero
@@ -848,7 +867,6 @@ RSpec.describe OSut do
 
     expect(mod1.clean!).to eq(DBG)
     lyr = mod1.insulatingLayer("")
-    expect(mod1.debug?).to be true
     expect(lyr[:index]).to be_nil
     expect(lyr[:type ]).to be_nil
     expect(lyr[:r    ]).to be_zero
@@ -858,13 +876,25 @@ RSpec.describe OSut do
 
     expect(mod1.clean!).to eq(DBG)
     lyr = mod1.insulatingLayer(model)
-    expect(mod1.debug?).to be true
     expect(lyr[:index]).to be_nil
     expect(lyr[:type ]).to be_nil
     expect(lyr[:r    ]).to be_zero
     expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m1)
+
+    eWall1 = model.getSurfaceByName(n1)
+    expect(eWall1).to_not be_empty
+    eWall1 = eWall1.get
+
+    expect(mod1.clean!).to eq(DBG)
+    lyr = mod1.insulatingLayer(eWall1)
+    expect(lyr[:index]).to be_nil
+    expect(lyr[:type ]).to be_nil
+    expect(lyr[:r    ]).to be_zero
+    expect(mod1.debug?).to be true
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m2)
   end
 
   it "checks for spandrels" do

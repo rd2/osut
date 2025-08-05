@@ -220,13 +220,14 @@ module OSut
     chk = @@uo.keys.include?(specs[:type])
     return invalid("surface type", mth, 2, ERR) unless chk
 
-    specs[:uo] = @@uo[ specs[:type] ] unless specs.key?(:uo)
+    specs[:uo] = @@uo[ specs[:type] ] unless specs.key?(:uo) # can be nil
     u = specs[:uo]
 
     if u
-      return mismatch("#{id} Uo", u, Numeric, mth)  unless u.is_a?(Numeric)
-      return invalid("#{id} Uo (> 5.678)", mth, 2, ERR) if u > 5.678
-      return negative("#{id} Uo"         , mth,    ERR) if u < 0
+      return mismatch("#{id} Uo", u, Numeric, mth)     unless u.is_a?(Numeric)
+      return invalid("#{id} Uo (> 5.678)",    mth, 2, ERR) if u > 5.678
+      return zero("#{id} Uo",                 mth,    ERR) if u.round(2) == 0.00
+      return negative("#{id} Uo",             mth,    ERR) if u < 0
     end
 
     # Optional specs. Log/reset if invalid.
@@ -466,14 +467,14 @@ module OSut
       a[:compo  ][:d   ] = d
       a[:compo  ][:id  ] = "OSut|#{mt}|#{format('%03d', d*1000)[-3..-1]}"
     when :window
-      a[:glazing][:u   ]  = specs[:uo  ]
+      a[:glazing][:u   ]  = u ? u : @@uo[:window]
       a[:glazing][:shgc]  = 0.450
       a[:glazing][:shgc]  = specs[:shgc] if specs.key?(:shgc)
       a[:glazing][:id  ]  = "OSut|window"
       a[:glazing][:id  ] += "|U#{format('%.1f', a[:glazing][:u])}"
       a[:glazing][:id  ] += "|SHGC#{format('%d', a[:glazing][:shgc]*100)}"
     when :skylight
-      a[:glazing][:u   ] = specs[:uo  ]
+      a[:glazing][:u   ] = u ? u : @@uo[:skylight]
       a[:glazing][:shgc] = 0.450
       a[:glazing][:shgc] = specs[:shgc] if specs.key?(:shgc)
       a[:glazing][:id  ]  = "OSut|skylight"
@@ -482,25 +483,11 @@ module OSut
     end
 
     # Initiate layers.
-    glazed = true
-    glazed = false if a[:glazing].empty?
-    layers = OpenStudio::Model::OpaqueMaterialVector.new   unless glazed
-    layers = OpenStudio::Model::FenestrationMaterialVector.new if glazed
+    unglazed = a[:glazing].empty? ? true : false
 
-    if glazed
-      u    = a[:glazing][:u   ]
-      shgc = a[:glazing][:shgc]
-      lyr  = model.getSimpleGlazingByName(a[:glazing][:id])
+    if unglazed
+      layers = OpenStudio::Model::OpaqueMaterialVector.new
 
-      if lyr.empty?
-        lyr = OpenStudio::Model::SimpleGlazing.new(model, u, shgc)
-        lyr.setName(a[:glazing][:id])
-      else
-        lyr = lyr.get
-      end
-
-      layers << lyr
-    else
       # Loop through each layer spec, and generate construction.
       a.each do |i, l|
         next if l.empty?
@@ -524,44 +511,68 @@ module OSut
 
         layers << lyr
       end
+    else
+      layers = OpenStudio::Model::FenestrationMaterialVector.new
+
+      u0   = a[:glazing][:u   ]
+      shgc = a[:glazing][:shgc]
+      lyr  = model.getSimpleGlazingByName(a[:glazing][:id])
+
+      if lyr.empty?
+        lyr = OpenStudio::Model::SimpleGlazing.new(model, u0, shgc)
+        lyr.setName(a[:glazing][:id])
+      else
+        lyr = lyr.get
+      end
+
+      layers << lyr
     end
 
     c  = OpenStudio::Model::Construction.new(layers)
     c.setName(id)
 
     # Adjust insulating layer thickness or conductivity to match requested Uo.
-    unless glazed
-      ro = 0
-      ro = 1 / specs[:uo] - @@film[ specs[:type] ] if specs[:uo]
+    if u and unglazed
+      ro = 1 / u - film
 
-      if specs[:type] == :door # 1x layer, adjust conductivity
-        layer = c.getLayer(0).to_StandardOpaqueMaterial
-        return invalid("#{id} standard material?", mth, 0) if layer.empty?
+      if ro > 0
+        if specs[:type] == :door # 1x layer, adjust conductivity
+          layer = c.getLayer(0).to_StandardOpaqueMaterial
+          return invalid("#{id} standard material?", mth, 0) if layer.empty?
 
-        layer = layer.get
-        k     = layer.thickness / ro
-        layer.setConductivity(k)
-      elsif ro > 0 # multiple layers, adjust insulating layer thickness
-        lyr = insulatingLayer(c)
-        return invalid("#{id} construction", mth, 0) if lyr[:index].nil?
-        return invalid("#{id} construction", mth, 0) if lyr[:type ].nil?
-        return invalid("#{id} construction", mth, 0) if lyr[:r    ].zero?
+          layer = layer.get
+          k     = layer.thickness / ro
+          layer.setConductivity(k)
+        else # multiple layers, adjust insulating layer thickness
+          lyr = insulatingLayer(c)
+          return invalid("#{id} construction", mth, 0) if lyr[:index].nil?
+          return invalid("#{id} construction", mth, 0) if lyr[:type ].nil?
+          return invalid("#{id} construction", mth, 0) if lyr[:r    ].zero?
 
-        index = lyr[:index]
-        layer = c.getLayer(index).to_StandardOpaqueMaterial
-        return invalid("#{id} material @#{index}", mth, 0) if layer.empty?
+          index = lyr[:index]
+          layer = c.getLayer(index).to_StandardOpaqueMaterial
+          return invalid("#{id} material @#{index}", mth, 0) if layer.empty?
 
-        layer = layer.get
-        k     = layer.conductivity
-        d     = (ro - rsi(c) + lyr[:r]) * k
-        return invalid("#{id} adjusted m", mth, 0) if d < 0.03
+          layer = layer.get
+          k     = layer.conductivity
+          d     = (ro - rsi(c) + lyr[:r]) * k
+          return invalid("#{id} adjusted m", mth, 0) if d < 0.03
 
-        nom   = "OSut|"
-        nom  += layer.nameString.gsub(/[^a-z]/i, "").gsub("OSut", "")
-        nom  += "|"
-        nom  += format("%03d", d*1000)[-3..-1]
-        layer.setName(nom) if model.getStandardOpaqueMaterialByName(nom).empty?
-        layer.setThickness(d)
+          nom   = "OSut|"
+          nom  += layer.nameString.gsub(/[^a-z]/i, "").gsub("OSut", "")
+          nom  += "|"
+          nom  += format("%03d", d*1000)[-3..-1]
+
+          lyr = model.getStandardOpaqueMaterialByName(nom)
+
+          if lyr.empty?
+            layer.setName(nom)
+            layer.setThickness(d)
+          else
+            omat = lyr.get
+            c.setLayer(index, omat)
+          end
+        end
       end
     end
 
@@ -746,7 +757,7 @@ module OSut
   # Validates if a default construction set holds a base construction.
   #
   # @param set [OpenStudio::Model::DefaultConstructionSet] a default set
-  # @param bse [OpensStudio::Model::ConstructionBase] a construction base
+  # @param bse [OpenStudio::Model::ConstructionBase] a construction base
   # @param gr [Bool] if ground-facing surface
   # @param ex [Bool] if exterior-facing surface
   # @param tp [#to_s] a surface type
@@ -1048,7 +1059,7 @@ module OSut
     return invalid("lc", mth, 1, DBG, res) unless lc.respond_to?(NS)
 
     id   = lc.nameString
-    return mismatch(id, lc, cl1, mth, DBG, res) unless lc.is_a?(cl)
+    return mismatch(id, lc, cl, mth, DBG, res) unless lc.is_a?(cl)
 
     lc.layers.each do |m|
       unless m.to_MasslessOpaqueMaterial.empty?
