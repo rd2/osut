@@ -164,7 +164,7 @@ RSpec.describe OSut do
     expect(surface.layers[1].nameString).to eq("OSut|polyiso|108")
     expect(surface.layers[2].nameString).to eq("OSut|concrete|100")
 
-    # Insulated, parking garage roof (polyiso above 8" slab).
+    # Roof above conditioned parking garage (polyiso under 8" slab).
     specs   = {type: :roof, uo: uo2, clad: :heavy, frame: :medium, finish: :none}
     surface = cls1.genConstruction(model, specs)
     expect(surface).to_not be_nil
@@ -982,7 +982,7 @@ RSpec.describe OSut do
     expect(minmax).to have_key(:min)
     expect(minmax).to have_key(:max)
     expect(minmax[:min]).to be_within(TOL).of(23.89)
-    expect(minmax[:min]).to be_within(TOL).of(23.89)
+    expect(minmax[:max]).to be_within(TOL).of(23.89)
     expect(cls1.status).to be_zero
     expect(cls1.logs).to be_empty
 
@@ -1289,9 +1289,27 @@ RSpec.describe OSut do
     expect(cc.setTemperatureCalculationRequestedAfterLayerNumber(1)).to be true
     expect(floor.setConstruction(cc)).to be true
 
+    # Test 'fixed interval' schedule. Annual time series - no variation.
+    start  = model.getYearDescription.makeDate(1, 1)
+    inter  = OpenStudio::Time.new(0, 1, 0, 0)
+    values = OpenStudio.createVector(Array.new(8760, 22.78))
+    series = OpenStudio::TimeSeries.new(start, inter, values, "")
+    limits = OpenStudio::Model::ScheduleTypeLimits.new(model)
+    limits.setName("Radiant Electric Heating Setpoint Schedule Type Limits")
+    expect(limits.setNumericType("Continuous")).to be true
+    expect(limits.setUnitType("Temperature")).to be true
+
+    schedule = OpenStudio::Model::ScheduleFixedInterval.new(model)
+    schedule.setName("Radiant Electric Heating Setpoint Schedule")
+    expect(schedule.setTimeSeries(series)).to be true
+    expect(schedule.setTranslatetoScheduleFile(false)).to be true
+    expect(schedule.setScheduleTypeLimits(limits)).to be true
+
+    tvals = schedule.timeSeries.values
+    expect(tvals).is_a?(OpenStudio::Vector)
+    tvals.each { |tval| expect(tval.is_a?(Numeric)) }
+
     availability = M.availabilitySchedule(model)
-    schedule = OpenStudio::Model::ScheduleConstant.new(model)
-    expect(schedule.setValue(22.78)).to be true # reuse cooling setpoint
 
     # Create radiant electric heating.
     ht = OpenStudio::Model::ZoneHVACLowTemperatureRadiantElectric.new(

@@ -1113,7 +1113,7 @@ module OSut
     id = s.nameString
     m1  = "#{id}:spandrel"
     m2  = "#{id}:spandrel:boolean"
-    return mismatch(id, s, cl, mth) unless s.is_a?(cl)
+    return mismatch(id, s, cl, mth, false) unless s.is_a?(cl)
 
     if s.additionalProperties.hasFeature("spandrel")
       val = s.additionalProperties.getFeatureAsBoolean("spandrel")
@@ -1140,7 +1140,7 @@ module OSut
     return invalid("subsurface", mth, 1, DBG, false) unless s.respond_to?(NS)
 
     id = s.nameString
-    return mismatch(id, s, cl, mth, false) unless s.is_a?(cl)
+    return mismatch(id, s, cl, mth, DBG, false) unless s.is_a?(cl)
 
     # OpenStudio::Model::SubSurface.validSubSurfaceTypeValues
     # "FixedWindow"              : fenestration
@@ -1433,7 +1433,15 @@ module OSut
     id = sched.nameString
     return mismatch(id, sched, cl, mth, DBG, res) unless sched.is_a?(cl)
 
-    vals = sched.timeSeries.values
+    values = sched.timeSeries.values
+
+    values.each do |value|
+      if value.respond_to?(:to_f)
+        vals << value.to_f
+      else
+        invalid("numerical at #{i}", mth, 1, ERR)
+      end
+    end
 
     res[:min] = vals.min.is_a?(Numeric) ? vals.min : nil
     res[:max] = vals.max.is_a?(Numeric) ? vals.min : nil
@@ -1540,6 +1548,16 @@ module OSut
           res[:spt] = max     if res[:spt] < max
         end
       end
+
+      unless sched.to_ScheduleInterval.empty?
+        sched = sched.to_ScheduleInterval.get
+        max = scheduleIntervalMinMax(sched)[:max]
+
+        if max
+          res[:spt] = max unless res[:spt]
+          res[:spt] = max     if res[:spt] < max
+        end
+      end
     end
 
     return res if zone.thermostat.empty?
@@ -1590,6 +1608,16 @@ module OSut
         unless sched.to_ScheduleCompact.empty?
           sched = sched.to_ScheduleCompact.get
           max = scheduleCompactMinMax(sched)[:max]
+
+          if max
+            res[:spt] = max unless res[:spt]
+            res[:spt] = max     if res[:spt] < max
+          end
+        end
+
+        unless sched.to_ScheduleInterval.empty?
+          sched = sched.to_ScheduleInterval.get
+          max = scheduleIntervalMinMax(sched)[:max]
 
           if max
             res[:spt] = max unless res[:spt]
@@ -1718,6 +1746,16 @@ module OSut
           res[:spt] = min     if res[:spt] > min
         end
       end
+
+      unless sched.to_ScheduleInterval.empty?
+        sched = sched.to_ScheduleInterval.get
+        min = scheduleIntervalMinMax(sched)[:min]
+
+        if min
+          res[:spt] = min unless res[:spt]
+          res[:spt] = min     if res[:spt] > min
+        end
+      end
     end
 
     return res if zone.thermostat.empty?
@@ -1768,6 +1806,16 @@ module OSut
         unless sched.to_ScheduleCompact.empty?
           sched = sched.to_ScheduleCompact.get
           min = scheduleCompactMinMax(sched)[:min]
+
+          if min
+            res[:spt] = min unless res[:spt]
+            res[:spt] = min     if res[:spt] > min
+          end
+        end
+
+        unless sched.to_ScheduleInterval.empty?
+          sched = sched.to_ScheduleInerval.get
+          min = scheduleIntervalMinMax(sched)[:min]
 
           if min
             res[:spt] = min unless res[:spt]
@@ -2362,7 +2410,7 @@ module OSut
   # @return [OpenStudio::Vector3d] true normal vector
   # @return [nil] if invalid input (see logs)
   def trueNormal(s = nil, r = 0)
-    mth = "TBD::#{__callee__}"
+    mth = "OSut::#{__callee__}"
     cl  = OpenStudio::Model::PlanarSurface
     return mismatch("surface", s, cl, mth)   unless s.is_a?(cl)
     return invalid("rotation angle", mth, 2) unless r.respond_to?(:to_f)
@@ -2891,7 +2939,7 @@ module OSut
   # @param pts [Set<OpenStudio::Point3d>] 3D points
   #
   # @return [Bool] whether set is a valid triad (i.e. a trio of 3D points)
-  # @return [false] if invalid input (see logs)
+  # @return [false] if invalid input (see 'to_p3Dv' logs)
   def triad?(pts = nil)
     pts = to_p3Dv(pts)
     return false     if pts.empty?
@@ -5153,7 +5201,7 @@ module OSut
     end
 
     # Once joined, re-adjust Z-axis coordinates.
-    unless z.zero?
+    unless z.round(2) == 0.00
       vtx = OpenStudio::Point3dVector.new
       slb.each { |pt| vtx << OpenStudio::Point3d.new(pt.x, pt.y, z) }
       slb = vtx
