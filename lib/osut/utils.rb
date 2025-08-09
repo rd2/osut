@@ -2975,7 +2975,7 @@ module OSut
     abn = b - a
     abn.normalize
     ap  = p0 - a
-    sp = ap.dot(abn)
+    sp  = ap.dot(abn)
     return false if sp < 0
 
     apd = scalar(abn, sp)
@@ -3018,8 +3018,8 @@ module OSut
   # @return [OpenStudio::Point3d] point of intersection of both lines
   # @return [nil] if no intersection, equal, or invalid input (see logs)
   def getLineIntersection(s1 = [], s2 = [])
-    s1  = getSegments(s1)
-    s2  = getSegments(s2)
+    s1 = getSegments(s1)
+    s2 = getSegments(s2)
     return nil if s1.empty?
     return nil if s2.empty?
 
@@ -3030,10 +3030,10 @@ module OSut
     return nil if same?(s1, s2)
     return nil if same?(s1, s2.to_a.reverse)
 
-    a1 = s1[0]
-    a2 = s1[1]
-    b1 = s2[0]
-    b2 = s2[1]
+    a1 = s1.first
+    b1 = s2.first
+    a2 = s1.last
+    b2 = s2.last
 
     # Matching segment endpoints?
     return a1 if same?(a1, b1)
@@ -3042,18 +3042,18 @@ module OSut
     return a2 if same?(a2, b2)
 
     # Segment endpoint along opposite segment?
-    return a1 if pointAlongSegments?(a1, s2)
-    return a2 if pointAlongSegments?(a2, s2)
-    return b1 if pointAlongSegments?(b1, s1)
-    return b2 if pointAlongSegments?(b2, s1)
+    return a1 if pointAlongSegment?(a1, s2)
+    return a2 if pointAlongSegment?(a2, s2)
+    return b1 if pointAlongSegment?(b1, s1)
+    return b2 if pointAlongSegment?(b2, s1)
 
-    # Line segments as vectors. Skip if colinear.
+    # Line segments as vectors. Skip if collinear or parallel.
     a   = a2 - a1
     b   = b2 - b1
     xab = a.cross(b)
     return nil if xab.length.round(4) < TOL2
 
-    # Link 1st point to other segment endpoints as vectors. Must be coplanar.
+    # Link 1st point to other segment endpoints, as vectors. Must be coplanar.
     a1b1  = b1 - a1
     a1b2  = b2 - a1
     xa1b1 = a.cross(a1b1)
@@ -3094,7 +3094,7 @@ module OSut
     return nil if a.dot(p0 - a1) < 0
 
     # Ensure intersection is sandwiched between endpoints.
-    return nil unless pointAlongSegments?(p0, s2) && pointAlongSegments?(p0, s1)
+    return nil unless pointAlongSegment?(p0, s2) && pointAlongSegment?(p0, s1)
 
     p0
   end
@@ -3253,8 +3253,11 @@ module OSut
     pts = getUniques(pts)
     ok  = n.respond_to?(:to_i)
     v   = OpenStudio::Point3dVector.new
+    a   = []
     return pts if pts.size < 3
     return mismatch("n collinears", n, Integer, mth, DBG, v) unless ok
+    return invalid("+n collinears", mth, 0, ERR, v) if n > pts.size
+    return invalid("-n collinears", mth, 0, ERR, v) if n < 0 && n.abs > pts.size
 
     ncolls = getNonCollinears(pts)
     return pts if ncolls.empty?
@@ -3654,21 +3657,16 @@ module OSut
       cw1 = clockwise?(p01)
       a1  = cw1 ? p01.to_a.reverse : p01.to_a
       a2  = p02.to_a
-      a2  = flatten(a2).to_a if flat
-      return invalid("points 2", mth, 2, DBG, face) unless xyz?(a2, :z)
-
-      cw2 = clockwise?(a2)
-      a2  = a2.reverse if cw2
     else
       t   = OpenStudio::Transformation.alignFace(p01)
       a1  = t.inverse * p01
       a2  = t.inverse * p02
-      a2  = flatten(a2).to_a if flat
-      return invalid("points 2", mth, 2, DBG, face) unless xyz?(a2, :z)
-
-      cw2 = clockwise?(a2)
-      a2  = a2.reverse if cw2
     end
+
+    a2  = flatten(a2).to_a if flat
+    cw2 = clockwise?(a2)
+    a2  = a2.reverse if cw2
+    return invalid("points 2", mth, 2, DBG, face) unless xyz?(a2, :z)
 
     # Return either (transformed) polygon if one fits into the other.
     p1t = p01
@@ -3749,7 +3747,7 @@ module OSut
     p2   = poly(p2)
     return face if p1.empty?
     return face if p2.empty?
-    return mismatch("ray", ray, cl, mth) unless ray.is_a?(cl)
+    return mismatch("ray", ray, cl, mth, face) unless ray.is_a?(cl)
 
     # From OpenStudio SDK v3.7.0 onwards, one could/should rely on:
     #
@@ -4082,7 +4080,7 @@ module OSut
   #
   # @param [Set<OpenStudio::Point3d>] a triad (3D points)
   #
-  # @return [Set<OpenStudio::Point3D>] a rectangular ULC box (see logs if empty)
+  # @return [Set<OpenStudio::Point3D>] a rectangular BLC box (see logs if empty)
   def triadBox(pts = nil)
     mth = "OSut::#{__callee__}"
     bkp = OpenStudio::Point3dVector.new
@@ -4233,7 +4231,7 @@ module OSut
         next if same?(p1, sg.first)
         next if same?(p1, sg.last)
         next if same?(p2, sg.first)
-        next if same?(p2, sg.first)
+        next if same?(p2, sg.last)
 
         out = triadBox(OpenStudio::Point3dVector.new([m0, p1, p2]))
         next if out.empty?
@@ -4500,7 +4498,7 @@ module OSut
   # @param pts [Set<OpenStudio::Point3d>] 3D points, once re/aligned
   # @param force [Bool] whether to force rotation of (narrow) bounded box
   #
-  # @return [Float] width al©ong X-axis, once re/aligned
+  # @return [Float] width along X-axis, once re/aligned
   # @return [0.0] if invalid inputs
   def alignedWidth(pts = nil, force = false)
     mth = "OSut::#{__callee__}"
@@ -5150,7 +5148,7 @@ module OSut
     pltz.each_with_index do |plt, i|
       id = "plate # #{i+1} (index #{i})"
 
-      return mismatch(id, plt, cl1, mth, DBG, slb) unless plt.is_a?(cl2)
+      return mismatch(id, plt, cl2, mth, DBG, slb) unless plt.is_a?(cl2)
       return hashkey( id, plt,  :x, mth, DBG, slb) unless plt.key?(:x )
       return hashkey( id, plt,  :y, mth, DBG, slb) unless plt.key?(:y )
       return hashkey( id, plt, :dx, mth, DBG, slb) unless plt.key?(:dx)
@@ -7447,7 +7445,7 @@ module OSut
             pattern = "array"
           elsif fpm2.keys.include?("strips")
             pattern = "strips"
-          else fpm2.keys.include?("strip")
+          else # fpm2.keys.include?("strip")
             pattern = "strip"
           end
         else
@@ -7458,7 +7456,7 @@ module OSut
             pattern = "strip"
           elsif fpm2.keys.include?("strips")
             pattern = "strips"
-          else fpm2.keys.include?("array")
+          else # fpm2.keys.include?("array")
             pattern = "array"
           end
         end
@@ -7561,7 +7559,7 @@ module OSut
     # Size contraction: round 2: prioritize larger sets.
     adm2 = 0
 
-    sets.each_with_index do |set, i|
+    sets.each_with_index do |set|
       next if set[:w].round(2) <= w0
       next if set[:d].round(2) <= w0
 

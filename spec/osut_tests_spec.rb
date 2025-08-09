@@ -1306,8 +1306,8 @@ RSpec.describe OSut do
     expect(schedule.setScheduleTypeLimits(limits)).to be true
 
     tvals = schedule.timeSeries.values
-    expect(tvals).is_a?(OpenStudio::Vector)
-    tvals.each { |tval| expect(tval.is_a?(Numeric)) }
+    expect(tvals).to be_a(OpenStudio::Vector)
+    tvals.each { |tval| expect(tval).to be_a(Numeric) }
 
     availability = M.availabilitySchedule(model)
 
@@ -2354,10 +2354,10 @@ RSpec.describe OSut do
     glazing = OpenStudio::Model::SubSurface.new(vec, model)
 
     # Glazing fits?, overlaps? parallel?
-    expect(mod1.parallel?(glazing, wall)).to be(true)
+    expect(mod1.parallel?(glazing, wall)).to be true
     expect(mod1.fits?(glazing, wall)).to be true
     expect(mod1.overlaps?(glazing, wall)).to be true
-    expect(mod1.parallel?(wall, glazing)).to be(true)
+    expect(mod1.parallel?(wall, glazing)).to be true
     expect(mod1.fits?(wall, glazing)).to be true
     expect(mod1.overlaps?(wall, glazing)).to be true
 
@@ -2510,7 +2510,7 @@ RSpec.describe OSut do
     # Overlap between roof and vertically-cast ceiling onto roof plane.
     olap02 = mod1.overlap(roof, cast02)
     expect(olap02.size).to eq(3) # not 5
-    expect(mod1.fits?(olap02, roof)).to be(true)
+    expect(mod1.fits?(olap02, roof)).to be true
 
     olap02.each { |pt| expect(pl2.pointOnPlane(pt)) }
 
@@ -2782,7 +2782,7 @@ RSpec.describe OSut do
 
     collinears = mod1.getCollinears( [p0, p1, p2, p3] )
     expect(collinears.size).to eq(1)
-    expect(mod1.same?(collinears[0], p1)).to be true
+    expect(mod1.same?(collinears.first, p1)).to be true
 
     # CASE a1: 2x end-to-end line segments (returns matching endpoints).
     expect(mod1.lineIntersects?(   [p0, p1], [p1, p2] )).to be true
@@ -2832,6 +2832,7 @@ RSpec.describe OSut do
     expect(mod1.pointWithinPolygon?(p5, [p0, p1, p2, p3])).to be true
     expect(mod1.pointWithinPolygon?(p6, [p0, p1, p2, p3])).to be false
     expect(mod1.pointWithinPolygon?(p7, [p0, p1, p2, p3])).to be true
+
     expect(mod1.status).to be_zero
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
@@ -2848,6 +2849,7 @@ RSpec.describe OSut do
     expect(mod1.logs.first[:message]).to include("Empty 'plane'")
     expect(mod1.clean!).to eq(DBG)
 
+
     # Test self-intersecting polygon. If reactivated, OpenStudio logs to stdout:
     # [utilities.Transformation] <1> Cannot compute outward normal for vertices
     # vtx  = OpenStudio::Point3dVector.new
@@ -2855,11 +2857,11 @@ RSpec.describe OSut do
     # vtx << OpenStudio::Point3d.new( 0, 0, 10)
     # vtx << OpenStudio::Point3d.new(20, 0,  0)
     # vtx << OpenStudio::Point3d.new( 0, 0,  0)
-    #
-    # expect(mod1.poly(vtx)).to be_empty
-    # expect(mod1.status).to eq(ERR)
-    # expect(mod1.logs.size).to eq(1)
-    # expect(mod1.logs.first[:message]).to include("'(unaligned) points'")
+
+    # Original polygon remains unaltered.
+    # vtx2 = mod1.poly(vtx)
+    # expect(mod1.same?(vtx, vtx2)).to be true
+    # expect(mod1.status).to eq(0)
     # expect(mod1.clean!).to eq(DBG)
 
     # Regular polygon, counterclockwise yet not UpperLeftCorner (ULC).
@@ -5441,6 +5443,17 @@ RSpec.describe OSut do
     expect(surface).to be_a(OpenStudio::Model::Surface)
     expect(surface.vertices.size).to eq(12)
     expect(surface.grossArea).to be_within(TOL).of(5 * 20 - 1)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Invalid input case.
+    plates = ["osut"]
+    slab = mod1.genSlab(plates, z0)
+    expect(mod1.debug?).to be true
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to include("String? expecting Hash")
+    expect(slab).to be_a(OpenStudio::Point3dVector)
+    expect(slab).to be_empty
+
   end
 
   it "checks roller shades" do
