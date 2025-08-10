@@ -2779,10 +2779,172 @@ RSpec.describe OSut do
 
     # Independent point.
     p7 = OpenStudio::Point3d.new(14, 20, -5)
+    p8 = OpenStudio::Point3d.new(-9, -9, -5)
 
-    collinears = mod1.getCollinears( [p0, p1, p2, p3] )
+    # Stress test 'to_p3Dv'. 4 valid input cases.
+    # Valid case #1: a single Point3d.
+    vtx = mod1.to_p3Dv(p0)
+    expect(vtx).to be_a(OpenStudio::Point3dVector)
+    expect(vtx[0]).to eq(p0) # same object ID
+
+    # Valid case #2: a Point3dVector.
+    vtxx = OpenStudio::Point3dVector.new
+    vtxx << p0
+    vtxx << p1
+    vtxx << p2
+    vtxx << p3
+    vtx = mod1.to_p3Dv(vtxx)
+    expect(vtx).to be_a(OpenStudio::Point3dVector)
+    expect(vtx[ 0]).to eq(p0) # same object ID
+    expect(vtx[ 1]).to eq(p1) # same object ID
+    expect(vtx[ 2]).to eq(p2) # same object ID
+    expect(vtx[-1]).to eq(p3) # same object ID
+
+    # Valid case #3: Surface vertices.
+    model = OpenStudio::Model::Model.new
+    surface = OpenStudio::Model::Surface.new(vtxx, model)
+    expect(surface.vertices).to be_an(Array) # not an OpenStudio::Point3dVector
+    expect(surface.vertices.size).to eq(4)
+    vtx = mod1.to_p3Dv(vtxx)
+    expect(vtx).to be_a(OpenStudio::Point3dVector)
+    expect(vtx.size).to eq(4)
+    expect(vtx[0]).to eq(p0)
+    expect(vtx[1]).to eq(p1)
+    expect(vtx[2]).to eq(p2)
+    expect(vtx[3]).to eq(p3)
+
+    # Valid case #4: Array.
+    vtx = mod1.to_p3Dv([p0, p1, p2, p3])
+    expect(vtx).to be_a(OpenStudio::Point3dVector)
+    expect(vtx.size).to eq(4)
+    expect(vtx[0]).to eq(p0)
+    expect(vtx[1]).to eq(p1)
+    expect(vtx[2]).to eq(p2)
+    expect(vtx[3]).to eq(p3)
+    expect(mod1.status).to eq(0)
+
+    # Stress test 'nextUp'. Invalid case.
+    m0 = "Invalid 'points (2+)' arg #1 (OSut::nextUp)"
+    pt = mod1.nextUp([], p0)
+    expect(pt).to be nil
+    expect(mod1.warn?).to be true
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m0)
+    expect(mod1.clean!).to eq(DBG)
+
+    # Valid case.
+    pt = mod1.nextUp([p0, p1, p2, p3], p0)
+    expect(pt).to be_a(OpenStudio::Point3d)
+    expect(pt).to eq(p1)
+    expect(mod1.status).to eq(0)
+
+    pt = mod1.nextUp([p0, p0, p0], p0)
+    expect(pt).to be_a(OpenStudio::Point3d)
+    expect(pt).to eq(p0)
+    expect(mod1.status).to eq(0)
+
+    # Stress test 'getSegments'. Invalid case.
+    sgs = mod1.getSegments(p3)
+    expect(sgs).to be_a(OpenStudio::Point3dVectorVector)
+    expect(sgs).to be_empty
+    expect(mod1.status).to eq(0) # nothing logged
+
+    sgs = mod1.getSegments([p3, p3])
+    expect(sgs).to be_a(OpenStudio::Point3dVectorVector)
+    expect(sgs).to be_empty
+    expect(mod1.status).to eq(0) # nothing logged
+
+    # Valid case.
+    sgs = mod1.getSegments([p0, p1, p2, p3])
+    expect(sgs).to be_a(OpenStudio::Point3dVectorVector)
+    expect(sgs.size).to eq(4)
+    expect(sgs).to respond_to(:first)
+    expect(sgs).to_not respond_to(:last)
+    expect(sgs[-1]).to be_an(Array) # not an OpenStudio::Point3dVector
+
+    # Stress test 'uniques'.
+    m0 = "'n points' String? expecting Integer (OSut::getUniques)"
+
+    # Invalid number case - simply returns entire list of unique points.
+    uniks = mod1.getUniques([p0, p1, p2, p3], "osut")
+    expect(uniks).to be_a(OpenStudio::Point3dVector)
+    expect(uniks.size).to eq(4)
+    expect(mod1.debug?).to be true
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m0)
+    expect(mod1.clean!).to eq(DBG)
+
+    # Valid, basic case.
+    uniks = mod1.getUniques([p0, p1, p2, p3])
+    expect(uniks).to be_a(OpenStudio::Point3dVector)
+    expect(uniks.size).to eq(4)
+
+    uniks = mod1.getUniques([p0, p1, p2, p3], 0)
+    expect(uniks).to be_a(OpenStudio::Point3dVector)
+    expect(uniks.size).to eq(4)
+
+    # Valid, first 3 points.
+    uniks = mod1.getUniques([p0, p1, p2, p3], 3)
+    expect(uniks).to be_a(OpenStudio::Point3dVector)
+    expect(uniks.size).to eq(3)
+
+    # Valid, last 3 points.
+    uniks = mod1.getUniques([p0, p1, p2, p3], -3)
+    expect(uniks).to be_a(OpenStudio::Point3dVector)
+    expect(uniks.size).to eq(3)
+
+    # Valid, n = 5: returns original 4 uniques points.
+    uniks = mod1.getUniques([p0, p1, p2, p3], 5)
+    expect(uniks).to be_a(OpenStudio::Point3dVector)
+    expect(uniks.size).to eq(4)
+
+    # Valid, n = -5: returns original 4 uniques points.
+    uniks = mod1.getUniques([p0, p1, p2, p3], -5)
+    expect(uniks).to be_a(OpenStudio::Point3dVector)
+    expect(uniks.size).to eq(4)
+
+    # Stress tests collinears.
+    m0 = "'n points' String? expecting Integer (OSut::getCollinears)"
+
+    # Invalid case - raise DEBUG message, yet returns valid collinears.
+    collinears = mod1.getCollinears([p0, p1, p3, p8], "osut")
+    expect(collinears).to be_a(OpenStudio::Point3dVector)
     expect(collinears.size).to eq(1)
-    expect(mod1.same?(collinears.first, p1)).to be true
+    expect(collinears[0]).to eq(p0)
+    expect(mod1.debug?).to be true
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m0)
+    expect(mod1.clean!).to eq(DBG)
+
+    # Valid, basic case
+    collinears = mod1.getCollinears([p0, p1, p3, p8])
+    expect(collinears.size).to eq(1)
+    expect(collinears[0]).to eq(p0)                     # same object ID
+    expect(mod1.same?(collinears.first, p0)).to be true # more expensive way
+
+    collinears = mod1.getCollinears([p0, p1, p3, p8], 0)
+    expect(collinears.size).to eq(1)
+    expect(collinears[0]).to eq(p0)
+
+    collinears = mod1.getCollinears([p0, p1, p2, p3, p8])
+    expect(collinears.size).to eq(2)
+    expect(collinears[0]).to eq(p0)
+    expect(collinears[-1]).to eq(p1)
+    expect(mod1.pointAlongSegment?(p0, sgs.first)) # sg is an Array (size = 2)
+
+    # Stress test pointAlongSegment? Invalid case.
+    m0 = "'points' String? expecting Array (OSut::to_p3Dv)"
+    expect(mod1.pointAlongSegment?(p3, "osut")).to be false
+    expect(mod1.debug?).to be true
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m0)
+    expect(mod1.clean!).to eq(DBG)
+
+    # Valid case.
+    pts = OpenStudio::Point3dVector.new
+    pts << p0
+    pts << p1
+    expect(mod1.pointAlongSegment?(p3, pts)).to be false
 
     # CASE a1: 2x end-to-end line segments (returns matching endpoints).
     expect(mod1.lineIntersects?(   [p0, p1], [p1, p2] )).to be true
@@ -2875,8 +3037,8 @@ RSpec.describe OSut do
     expect(segments.size).to eq(3)
 
     segments.each_with_index do |segment, i|
-      unless mod1.xyz?(segment, :x, segment.first.x)
-        vplane = mod1.verticalPlane(segment.first, segment.last)
+      unless mod1.xyz?(segment, :x, segment[0].x)
+        vplane = mod1.verticalPlane(segment[0], segment[-1])
         expect(vplane).to be_a(OpenStudio::Plane)
       end
     end
@@ -5182,7 +5344,7 @@ RSpec.describe OSut do
     file = File.join(__dir__, "files/osms/out/warehouse_sky.osm")
     model.save(file, true)
   end
-
+  
   it "checks facet retrieval" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.reset(DBG)).to eq(DBG)

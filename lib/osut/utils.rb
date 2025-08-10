@@ -2443,31 +2443,31 @@ module OSut
 
   ##
   # Returns OpenStudio 3D points as an OpenStudio point vector, validating
-  # points in the process (if Array).
+  # points in the process (e.g. if Array).
   #
   # @param pts [Set<OpenStudio::Point3d>] OpenStudio 3D points
   #
   # @return [OpenStudio::Point3dVector] 3D vector (see logs if empty)
   def to_p3Dv(pts = nil)
     mth = "OSut::#{__callee__}"
-    cl1 = OpenStudio::Point3d
-    cl2 = OpenStudio::Point3dVector
-    cl3 = OpenStudio::Model::PlanarSurface
-    cl4 = Array
     v   = OpenStudio::Point3dVector.new
 
-    if pts.is_a?(cl1)
+    if pts.is_a?(OpenStudio::Point3d)
       v << pts
+      return v
+    elsif pts.is_a?(OpenStudio::Point3dVector)
+      return pts
+    elsif pts.is_a?(OpenStudio::Model::PlanarSurface)
+      pts.vertices.each { |pt| v << OpenStudio::Point3d.new(pt.x, pt.y, pt.z) }
       return v
     end
 
-    return pts if pts.is_a?(cl2)
-    return pts.vertices if pts.is_a?(cl3)
-
-    return mismatch("points", pts, cl1, mth, DBG, v) unless pts.is_a?(cl4)
+    return mismatch("points", pts, Array, mth, DBG, v) unless pts.is_a?(Array)
 
     pts.each do |pt|
-      return mismatch("point", pt, cl4, mth, DBG, v) unless pt.is_a?(cl1)
+      unless pt.is_a?(OpenStudio::Point3d)
+        return mismatch("point", pt, OpenStudio::Point3d, mth, DBG, v)
+      end
     end
 
     pts.each { |pt| v << OpenStudio::Point3d.new(pt.x, pt.y, pt.z) }
@@ -2743,7 +2743,7 @@ module OSut
 
     pair = pts.each_cons(2).find { |p1, _| same?(p1, pt) }
 
-    pair.nil? ? pts.first : pair.last
+    pair.nil? ? pts[0] : pair[-1]
   end
 
   ##
@@ -2834,21 +2834,25 @@ module OSut
   # @param pts [Set<OpenStudio::Point3d] 3D points
   # @param n [#to_i] requested number of unique points (0 returns all)
   #
-  # @return [OpenStudio::Point3dVector] unique points (see logs if empty)
+  # @return [OpenStudio::Point3dVector] unique points (see logs)
   def getUniques(pts = nil, n = 0)
     mth = "OSut::#{__callee__}"
     pts = to_p3Dv(pts)
-    ok  = n.respond_to?(:to_i)
     v   = OpenStudio::Point3dVector.new
     return v if pts.empty?
-    return mismatch("n unique points", n, Integer, mth, DBG, v) unless ok
+
+    if n.is_a?(Numeric)
+      n = n.to_i
+    else
+      mismatch("n points", n, Integer, mth, DBG)
+      n = 0
+    end
 
     pts.each { |pt| v << pt unless holds?(v, pt) }
 
-    n = n.to_i
-    n = 0    unless n.abs < v.size
-    v = v[0..n]  if n > 0
-    v = v[n..-1] if n < 0
+    n = 0         if n.abs > v.size
+    v = v[0..n-1] if n > 0
+    v = v[n..-1]  if n < 0
 
     v
   end
@@ -2965,12 +2969,11 @@ module OSut
     cl1 = OpenStudio::Point3d
     cl2 = OpenStudio::Point3dVector
     return mismatch(  "point", p0, cl1, mth, DBG, false) unless p0.is_a?(cl1)
-    return mismatch("segment", sg, cl2, mth, DBG, false) unless segment?(sg)
-
+    return false unless segment?(sg)
     return true if holds?(sg, p0)
 
-    a   = sg.first
-    b   = sg.last
+    a   = sg[ 0]
+    b   = sg[-1]
     ab  = b - a
     abn = b - a
     abn.normalize
@@ -3201,28 +3204,33 @@ module OSut
   end
 
   ##
-  # Returns sequential non-collinear points in an OpenStudio 3D point vector.
+  # Returns non-collinear points in an OpenStudio 3D point vector.
   #
   # @param pts [Set<OpenStudio::Point3d] 3D points
   # @param n [#to_i] requested number of non-collinears (0 returns all)
   #
-  # @return [OpenStudio::Point3dVector] non-collinears (see logs if empty)
+  # @return [OpenStudio::Point3dVector] non-collinears (see logs)
   def getNonCollinears(pts = nil, n = 0)
     mth = "OSut::#{__callee__}"
-    pts = getUniques(pts)
-    ok  = n.respond_to?(:to_i)
-    v   = OpenStudio::Point3dVector.new
     a   = []
+    pts = getUniques(pts)
     return pts if pts.size < 3
-    return mismatch("n non-collinears", n, Integer, mth, DBG, v) unless ok
+
+    if n.is_a?(Numeric)
+      n = n.to_i
+    else
+      mismatch("n points", n, Integer, mth, DBG)
+      n = 0
+    end
 
     # Evaluate cross product of vectors of 3x sequential points.
     pts.each_with_index do |p2, i2|
-      i1  = i2 - 1
-      i3  = i2 + 1
-      i3  = 0 if i3 == pts.size
-      p1  = pts[i1]
-      p3  = pts[i3]
+      i1 = i2 - 1
+      i3 = i2 + 1
+      i3 = 0 if i3 == pts.size
+      p1 = pts[i1]
+      p3 = pts[i3]
+
       v13 = p3 - p1
       v12 = p2 - p1
       next if v12.cross(v13).length < TOL2
@@ -3230,39 +3238,47 @@ module OSut
       a << p2
     end
 
-    if holds?(a, pts[0])
+    if a.include?(pts[0])
       a = a.rotate(-1) unless same?(a[0], pts[0])
     end
 
-    n = n.to_i
-    a = a[0..n-1]  if n > 0
-    a = a[n-1..-1] if n < 0
+    n = 0         if n.abs > a.size
+    a = a[0..n-1] if n > 0
+    a = a[n..-1]  if n < 0
 
     to_p3Dv(a)
   end
 
   ##
-  # Returns sequential collinear points in an OpenStudio 3D point vector.
+  # Returns collinear points in an OpenStudio 3D point vector.
   #
   # @param pts [Set<OpenStudio::Point3d] 3D points
   # @param n [#to_i] requested number of collinears (0 returns all)
   #
-  # @return [OpenStudio::Point3dVector] collinears (see logs if empty)
+  # @return [OpenStudio::Point3dVector] collinears (see logs)
   def getCollinears(pts = nil, n = 0)
     mth = "OSut::#{__callee__}"
+    a   = OpenStudio::Point3dVector.new
     pts = getUniques(pts)
-    ok  = n.respond_to?(:to_i)
-    v   = OpenStudio::Point3dVector.new
-    a   = []
     return pts if pts.size < 3
-    return mismatch("n collinears", n, Integer, mth, DBG, v) unless ok
-    return invalid("+n collinears", mth, 0, ERR, v) if n > pts.size
-    return invalid("-n collinears", mth, 0, ERR, v) if n < 0 && n.abs > pts.size
+
+    if n.is_a?(Numeric)
+      n = n.to_i
+    else
+      mismatch("n points", n, Integer, mth, DBG, pts)
+      n = 0
+    end
 
     ncolls = getNonCollinears(pts)
-    return pts if ncolls.empty?
+    return a if ncolls.empty?
 
-    to_p3Dv( pts.delete_if { |pt| holds?(ncolls, pt) } )
+    a = pts.delete_if { |pt| holds?(ncolls, pt) }
+
+    n = 0         if n.abs > a.size
+    a = a[0..n-1] if n > 0
+    a = a[n..-1]  if n < 0
+
+    a
   end
 
   ##
@@ -7735,8 +7751,8 @@ module OSut
           sX = getSegments(t0 * vX)
 
           s0.each_with_index do |sg, j|
-            sg0 = sg.to_a
-            sgX = sX[j].to_a
+            sg0 = sg
+            sgX = sX[j]
             vec = OpenStudio::Point3dVector.new
             vec << sg0.first
             vec << sg0.last
