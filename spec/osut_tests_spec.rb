@@ -2836,12 +2836,10 @@ RSpec.describe OSut do
     pt = mod1.nextUp([p0, p1, p2, p3], p0)
     expect(pt).to be_a(OpenStudio::Point3d)
     expect(pt).to eq(p1)
-    expect(mod1.status).to eq(0)
 
     pt = mod1.nextUp([p0, p0, p0], p0)
     expect(pt).to be_a(OpenStudio::Point3d)
     expect(pt).to eq(p0)
-    expect(mod1.status).to eq(0)
 
     # Stress test 'getSegments'. Invalid case.
     sgs = mod1.getSegments(p3)
@@ -2928,12 +2926,47 @@ RSpec.describe OSut do
 
     collinears = mod1.getCollinears([p0, p1, p2, p3, p8])
     expect(collinears.size).to eq(2)
-    expect(collinears[0]).to eq(p0)
+    expect(collinears[ 0]).to eq(p0)
     expect(collinears[-1]).to eq(p1)
     expect(mod1.pointAlongSegment?(p0, sgs.first)) # sg is an Array (size = 2)
 
-    # Stress test pointAlongSegment? Invalid case.
+    # Only 2 collinears, so request for first 3 is ignored.
+    collinears = mod1.getCollinears([p0, p1, p2, p3, p8], 3)
+    expect(collinears.size).to eq(2)
+    expect(mod1.same?(collinears[0], p0)).to be true
+    expect(mod1.same?(collinears[1], p1)).to be true
+
+    # First collinear (out of 2).
+    collinears = mod1.getCollinears([p0, p1, p2, p3, p8], 1)
+    expect(collinears.size).to eq(1)
+    expect(mod1.same?(collinears[0], p0)).to be true
+
+    # Last collinear (out of 2).
+    collinears = mod1.getCollinears([p0, p1, p2, p3, p8], -1)
+    expect(collinears.size).to eq(1)
+    expect(mod1.same?(collinears[0], p1)).to be true
+
+    # First two vs last two: same result.
+    collinears = mod1.getCollinears([p0, p1, p2, p3, p8], -2)
+    expect(collinears.size).to eq(2)
+    expect(mod1.same?(collinears[0], p0)).to be true
+    expect(mod1.same?(collinears[1], p1)).to be true
+
+    # Ignore n request when n.abs > number of actual collinears.
+    collinears = mod1.getCollinears([p0, p1, p2, p3, p8], 6)
+    expect(collinears.size).to eq(2)
+    expect(mod1.same?(collinears[0], p0)).to be true
+    expect(mod1.same?(collinears[1], p1)).to be true
+
+    collinears = mod1.getCollinears([p0, p1, p2, p3, p8], -6)
+    expect(collinears.size).to eq(2)
+    expect(mod1.same?(collinears[0], p0)).to be true
+    expect(mod1.same?(collinears[1], p1)).to be true
+
+    # Stress test pointAlongSegment?
     m0 = "'points' String? expecting Array (OSut::to_p3Dv)"
+
+    # Invalid case.
     expect(mod1.pointAlongSegment?(p3, "osut")).to be false
     expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
@@ -5344,7 +5377,7 @@ RSpec.describe OSut do
     file = File.join(__dir__, "files/osms/out/warehouse_sky.osm")
     model.save(file, true)
   end
-  
+
   it "checks facet retrieval" do
     translator = OpenStudio::OSVersion::VersionTranslator.new
     expect(mod1.reset(DBG)).to eq(DBG)

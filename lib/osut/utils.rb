@@ -2896,7 +2896,6 @@ module OSut
   # @return [false] if invalid input (see logs)
   def segment?(pts = nil)
     pts = to_p3Dv(pts)
-    return false     if pts.empty?
     return false unless pts.size == 2
     return false     if same?(pts[0], pts[1])
 
@@ -2968,7 +2967,7 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Point3d
     cl2 = OpenStudio::Point3dVector
-    return mismatch(  "point", p0, cl1, mth, DBG, false) unless p0.is_a?(cl1)
+    return mismatch("point", p0, cl1, mth, DBG, false) unless p0.is_a?(cl1)
     return false unless segment?(sg)
     return true if holds?(sg, p0)
 
@@ -3004,8 +3003,8 @@ module OSut
     cl1 = OpenStudio::Point3d
     cl2 = OpenStudio::Point3dVectorVector
     sgs = sgs.is_a?(cl2) ? sgs : getSegments(sgs)
-    return empty("segments",         mth, DBG, false)     if sgs.empty?
-    return mismatch("point", p0, cl, mth, DBG, false) unless p0.is_a?(cl1)
+    return empty("segments",          mth, DBG, false)     if sgs.empty?
+    return mismatch("point", p0, cl1, mth, DBG, false) unless p0.is_a?(cl1)
 
     sgs.each { |sg| return true if pointAlongSegment?(p0, sg) }
 
@@ -3111,8 +3110,8 @@ module OSut
   # @return [Bool] whether 3D line intersects 3D segments
   # @return [false] if invalid input (see logs)
   def lineIntersects?(l = [], s = [])
-    l   = getSegments(l)
-    s   = getSegments(s)
+    l = getSegments(l)
+    s = getSegments(s)
     return nil if l.empty?
     return nil if s.empty?
 
@@ -4759,8 +4758,9 @@ module OSut
     set.each_with_index do |st, i|
       str1 = id + "subset ##{i+1}"
       str2 = str1 + " #{tag.to_s}"
-      next if st.key?(:void) && st[:void]
       return mismatch(str1, st,  Hash, mth, DBG, a) unless st.respond_to?(:key?)
+      next if st.key?(:void) && st[:void]
+
       return hashkey( str1, st,   tag, mth, DBG, a) unless st.key?(tag)
       return empty("#{str2} vertices", mth, DBG, a) if st[tag].empty?
       return hashkey( str1, st,   :ld, mth, DBG, a) unless st.key?(:ld)
@@ -4769,9 +4769,9 @@ module OSut
       return invalid("#{str2} polygon", mth, 0, DBG, a) if stt.empty?
 
       ld = st[:ld]
-      return mismatch(str, ld,  Hash, mth, DBG, a) unless ld.is_a?(Hash)
-      return hashkey( str, ld,     s, mth, DBG, a) unless ld.key?(s)
-      return mismatch(str, ld[s], cl, mth, DBG, a) unless ld[s].is_a?(cl)
+      return mismatch(str2, ld,  Hash, mth, DBG, a) unless ld.is_a?(Hash)
+      return hashkey( str2, ld,     s, mth, DBG, a) unless ld.key?(s)
+      return mismatch(str2, ld[s], cl, mth, DBG, a) unless ld[s].is_a?(cl)
     end
 
     # Re-sequence polygon vertices.
@@ -6056,7 +6056,6 @@ module OSut
           # previously-added leader lines.
           #
           # @todo: revise approach for attics ONCE skylight wells have been added.
-          olap = nil
           olap = overlap(cst, rvi, false)
           next if olap.empty?
 
@@ -6173,7 +6172,7 @@ module OSut
       if opts[:size].respond_to?(:to_f)
         w  = opts[:size].to_f
         w2 = w * w
-        return invalid(size, mth, 0, ERR, []) if w.round(2) < gap4
+        return invalid("size", mth, 0, ERR, []) if w.round(2) < gap4
       else
         return mismatch("size", opts[:size], Numeric, mth, DBG, [])
       end
@@ -6199,9 +6198,9 @@ module OSut
       spaces = spaces.reject { |sp| getRoofs(sp).empty? }
       spaces = spaces.reject { |sp| sp.floorArea < 4 * w2 }
       spaces = spaces.sort_by(&:floorArea).reverse
-      return empty("spaces", mth, WRN, 0) if spaces.empty?
+      return empty("spaces", mth, WRN, []) if spaces.empty?
     else
-      return mismatch("spaces", spaces, Array, mth, DBG, 0)
+      return mismatch("spaces", spaces, Array, mth, DBG, [])
     end
 
     # Unfenestrated spaces have no windows, glazed doors or skylights. By
@@ -6317,6 +6316,7 @@ module OSut
     bfr   = 0.005 # minimum array perimeter buffer (no wells)
     w     = 1.22  # default 48" x 48" skylight base
     w2    = w * w # m2
+    v     = OpenStudio.openStudioVersion.split(".").join.to_i
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Excerpts of ASHRAE 90.1 2022 definitions:
@@ -6433,10 +6433,10 @@ module OSut
 
       if frame.respond_to?(:frameWidth)
         frame = nil if v < 321
-        frame = nil if f.frameWidth.round(2) < 0
-        frame = nil if f.frameWidth.round(2) > gap
+        frame = nil if frame.frameWidth.round(2) < 0
+        frame = nil if frame.frameWidth.round(2) > gap
 
-        f = f.frameWidth                            if frame
+        f = frame.frameWidth if frame
         log(WRN, "Skip Frame&Divider (#{mth})") unless frame
       else
         frame = nil
@@ -6661,14 +6661,14 @@ module OSut
       next unless opts[opt] == false
 
       case opt
-      when :sidelit then filters.map! { |f| f.include?("b") ? f.delete("b") : f }
-      when :sloped  then filters.map! { |f| f.include?("c") ? f.delete("c") : f }
-      when :plenum  then filters.map! { |f| f.include?("d") ? f.delete("d") : f }
-      when :attic   then filters.map! { |f| f.include?("e") ? f.delete("e") : f }
+      when :sidelit then filters.map! { |fl| fl.include?("b") ? fl.delete("b") : fl }
+      when :sloped  then filters.map! { |fl| fl.include?("c") ? fl.delete("c") : fl }
+      when :plenum  then filters.map! { |fl| fl.include?("d") ? fl.delete("d") : fl }
+      when :attic   then filters.map! { |fl| fl.include?("e") ? fl.delete("e") : fl }
       end
     end
 
-    filters.reject! { |f| f.empty? }
+    filters.reject! { |fl| fl.empty? }
     filters.uniq!
 
     # Remaining filters may be further pruned automatically after space/roof
