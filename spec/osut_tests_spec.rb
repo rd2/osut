@@ -3862,7 +3862,7 @@ RSpec.describe OSut do
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
 
-    # Modified NREL SEB model'
+    # Modified NREL SEB model.
     file  = File.join(__dir__, "files/osms/out/seb_ext2.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
@@ -5723,5 +5723,87 @@ RSpec.describe OSut do
 
     file = File.join(__dir__, "files/osms/out/seb_ext5.osm")
     model.save(file, true)
+  end
+
+  it "checks space height & width" do
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    expect(mod1.reset(DBG)).to eq(DBG)
+    expect(mod1.level).to eq(DBG)
+    expect(mod1.clean!).to eq(DBG)
+
+    file  = File.join(__dir__, "files/osms/in/warehouse.osm")
+    path  = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model).to_not be_empty
+    model = model.get
+
+    fine = model.getSpaceByName("Zone2 Fine Storage")
+    expect(fine).to_not be_empty
+    fine = fine.get
+
+    # The Fine Storage space has 2 floors, at different Z-axis levels:
+    # - main ground floor (slab on grade), Z=0.00m
+    # - a mezzanine floor, adjacent to the office space ceiling below, Z=4.27m
+    expect(mod1.facets(fine, "all", "floor").size).to eq(2)
+    groundfloor = model.getSurfaceByName("Fine Storage Floor")
+    mezzanine   = model.getSurfaceByName("Office Roof Reversed")
+    expect(groundfloor).to_not be_empty
+    expect(mezzanine).to_not be_empty
+    groundfloor = groundfloor.get
+    mezzanine   = mezzanine.get
+
+    # The ground floor is L-shaped, floor surfaces have differenet Z=axis
+    # levels, etc. In the context of codes/standards like ASHRAE 90.1 or the
+    # Canadian NECB, determining what constitutes a space's 'height' and/or
+    # 'width' can matter, namely with regards to geometry-based LPD rules (e.g.
+    # adjustments per corridor 'width'). Not stating here what the definitive
+    # answers should be in all cases. There are however a few OSut functions
+    # that may be useful.
+    #
+    # OSut's 'aligned' height and width functions were initially developed for
+    # non-flat surfaces, like walls and sloped roofs - particularly useful when
+    # such surfaces are rotated in 3D space. It's somewhat less intuitive when
+    # applied to horizontal surfaces like floors. In a nutshell, the functions
+    # lay out the surface in a 2D grid, aligning it along its 'bounded box'. It
+    # then determines a bounding box around the surface, once aligned:
+    #   - 'aligned height' designates the narrowest edge of the bounding box
+    #   - 'aligned width' designates the widest edge of the bounding box
+    #
+    # Useful? In some circumstances, maybe. One can argue that these may be of
+    # limited use for width-based LPD adjustment calculations.
+    expect(mod1.alignedHeight(groundfloor)).to be_within(TOL).of(30.48)
+    expect(mod1.alignedWidth(groundfloor)).to be_within(TOL).of(45.72)
+    expect(mod1.alignedHeight(mezzanine)).to be_within(TOL).of(9.14)
+    expect(mod1.alignedWidth(mezzanine)).to be_within(TOL).of(25.91)
+
+    # OSut's 'spaceHeight' and 'spaceWidth' are more suitable for height- or
+    # width-based LPD adjustement calculations. OSut sets a space's width as
+    # the widest edge of the largest bounded box it can fit within a collection
+    # of neighbouring floor surfaces. This is considered reasonable for a long
+    # corridor, with a varying width along its full length. Achtung! The
+    # function can be time consuming for very convoluted spaces (e.g. long
+    # corridors with multiple concavities).
+    expect(mod1.spaceHeight(fine)).to be_within(TOL).of(8.53)
+    expect(mod1.spaceWidth(fine)).to be_within(TOL).of(21.33)
+    expect(mod1.status).to eq(0)
+
+    file  = File.join(__dir__, "files/osms/out/seb_sky.osm")
+    path  = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model).to_not be_empty
+    model = model.get
+
+    openarea = model.getSpaceByName("Open area 1")
+    expect(openarea).to_not be_empty
+    openarea = openarea.get
+
+    floor = mod1.facets(openarea, "all", "floor")
+    expect(floor.size).to eq(1)
+    floor = floor.first
+
+    expect(mod1.alignedHeight(floor)).to be_within(TOL).of(6.88)
+    expect(mod1.alignedWidth(floor)).to be_within(TOL).of(8.22)
+    expect(mod1.spaceHeight(openarea)).to be_within(TOL).of(3.96)
+    expect(mod1.spaceWidth(openarea)).to be_within(TOL).of(7.90)
   end
 end
