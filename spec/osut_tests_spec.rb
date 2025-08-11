@@ -1914,7 +1914,7 @@ RSpec.describe OSut do
     pts = r * a
     expect(mod1.same?(pts, vtx)).to be true
 
-    output1 = mod1.getRealignedFace(vtx)
+    output1 = mod1.realignedFace(vtx)
     expect(mod1.status).to be_zero
     expect(output1).to be_a Hash
     expect(output1).to have_key(:set)
@@ -1928,7 +1928,7 @@ RSpec.describe OSut do
     ubbox1 = output1[:bbox]
 
     # Realign a previously realigned surface?
-    output2 = mod1.getRealignedFace(output1[:box])
+    output2 = mod1.realignedFace(output1[:box])
     ubox2   = output1[ :box]
     ubbox2  = output1[:bbox]
 
@@ -1957,12 +1957,12 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(  5,  2,  0)
     vtx << OpenStudio::Point3d.new(  6,  4,  0)
 
-    output3 = mod1.getRealignedFace(vtx)
+    output3 = mod1.realignedFace(vtx)
     ubox3   = output3[ :box]
     ubbox3  = output3[:bbox]
 
     # Realign a previously realigned surface?
-    output4 = mod1.getRealignedFace(output3[:box])
+    output4 = mod1.realignedFace(output3[:box])
     ubox4   = output4[ :box]
     ubbox4  = output4[:bbox]
 
@@ -1993,12 +1993,12 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(  1,  4,  0)
     vtx << OpenStudio::Point3d.new(  2,  2,  0)
 
-    output5 = mod1.getRealignedFace(vtx)
+    output5 = mod1.realignedFace(vtx)
     ubox5   = output5[ :box]
     ubbox5  = output5[:bbox]
 
     # Realign a previously realigned surface?
-    output6 = mod1.getRealignedFace(output5[:box])
+    output6 = mod1.realignedFace(output5[:box])
     ubox6   = output6[ :box]
     ubbox6  = output6[:bbox]
 
@@ -2033,12 +2033,12 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(  2,  6,  0)
     vtx << OpenStudio::Point3d.new(  1,  4,  0)
 
-    output7 = mod1.getRealignedFace(vtx)
+    output7 = mod1.realignedFace(vtx)
     ubox7   = output7[ :box]
     ubbox7  = output7[:bbox]
 
     # Realign a previously realigned surface?
-    output8 = mod1.getRealignedFace(ubox7)
+    output8 = mod1.realignedFace(ubox7)
     ubox8   = output8[ :box]
     ubbox8  = output8[:bbox]
 
@@ -2073,11 +2073,11 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(  6,  2,  0)
     vtx << OpenStudio::Point3d.new(  6,  4,  0)
 
-    output9 = mod1.getRealignedFace(vtx)
+    output9 = mod1.realignedFace(vtx)
     ubox9   = output9[ :box]
     ubbox9  = output9[:bbox]
 
-    output10 = mod1.getRealignedFace(vtx, true) # no impact
+    output10 = mod1.realignedFace(vtx, true) # no impact
     ubox10   = output10[ :box]
     ubbox10  = output10[:bbox]
     expect(mod1.same?(ubox9, ubox10)).to be true
@@ -2090,11 +2090,11 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(  4,  2,  0)
     vtx << OpenStudio::Point3d.new(  4,  6,  0)
 
-    output11 = mod1.getRealignedFace(vtx)
+    output11 = mod1.realignedFace(vtx)
     ubox11   = output11[ :box]
     ubbox11  = output11[:bbox]
 
-    output12 = mod1.getRealignedFace(vtx, true) # narrow, now wide
+    output12 = mod1.realignedFace(vtx, true) # narrow, now wide
     ubox12   = output12[ :box]
     ubbox12  = output12[:bbox]
     expect(mod1.same?(ubox11, ubox12)).to be false
@@ -2110,14 +2110,14 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new(  3,  8,  0)
     vtx << OpenStudio::Point3d.new(  1,  4,  0)
 
-    output13 = mod1.getRealignedFace(vtx)
+    output13 = mod1.realignedFace(vtx)
     uset13   = output13[ :set]
     ubox13   = output13[ :box]
     ubbox13  = output13[:bbox]
 
     # Pre-isolate bounded box (preferable with irregular surfaces).
     box      = mod1.boundedBox(vtx)
-    output14 = mod1.getRealignedFace(box)
+    output14 = mod1.realignedFace(box)
     uset14   = output14[ :set]
     ubox14   = output14[ :box]
     ubbox14  = output14[:bbox]
@@ -2226,20 +2226,20 @@ RSpec.describe OSut do
     sg2 << OpenStudio::Point3d.new(12, 14, 0)
     sg2 << OpenStudio::Point3d.new(12,  6, 0)
 
-    expect(mod1.getLineIntersection(sg1, sg2)).to be_nil
+    expect(mod1.lineIntersection(sg1, sg2)).to be_nil
 
     sg1 = OpenStudio::Point3dVector.new
     sg1 << OpenStudio::Point3d.new(0.60,19.06, 0)
     sg1 << OpenStudio::Point3d.new(0.60, 0.60, 0)
     sg1 << OpenStudio::Point3d.new(0.00, 0.00, 0)
     sg1 << OpenStudio::Point3d.new(0.00,19.66, 0)
-    sgs1 = mod1.getSegments(sg1)
+    sgs1 = mod1.segments(sg1)
 
     sg2 = OpenStudio::Point3dVector.new
     sg2 << OpenStudio::Point3d.new(9.83, 9.83, 0)
     sg2 << OpenStudio::Point3d.new(0.00, 0.00, 0)
     sg2 << OpenStudio::Point3d.new(0.00,19.66, 0)
-    sgs2 = mod1.getSegments(sg2)
+    sgs2 = mod1.segments(sg2)
 
     expect(mod1.same?(sg1[2], sg2[1])).to be true
     expect(mod1.same?(sg1[3], sg2[2])).to be true
@@ -2392,13 +2392,13 @@ RSpec.describe OSut do
     south   = south.get
 
     # Side test: triad, medial and bounded boxes.
-    pts   = mod1.getNonCollinears(ceiling.vertices, 3)
+    pts   = mod1.nonCollinears(ceiling.vertices, 3)
     box01 = mod1.triadBox(pts)
     box11 = mod1.boundedBox(ceiling)
     expect(mod1.same?(box01, box11)).to be true
     expect(mod1.fits?(box01, ceiling)).to be true
 
-    pts   = mod1.getNonCollinears(roof.vertices, 3)
+    pts   = mod1.nonCollinears(roof.vertices, 3)
     box02 = mod1.medialBox(pts)
     box12 = mod1.boundedBox(roof)
     expect(mod1.same?(box02, box12)).to be true
@@ -2841,19 +2841,19 @@ RSpec.describe OSut do
     expect(pt).to be_a(OpenStudio::Point3d)
     expect(pt).to eq(p0)
 
-    # Stress test 'getSegments'. Invalid case.
-    sgs = mod1.getSegments(p3)
+    # Stress test 'segments'. Invalid case.
+    sgs = mod1.segments(p3)
     expect(sgs).to be_a(OpenStudio::Point3dVectorVector)
     expect(sgs).to be_empty
     expect(mod1.status).to eq(0) # nothing logged
 
-    sgs = mod1.getSegments([p3, p3])
+    sgs = mod1.segments([p3, p3])
     expect(sgs).to be_a(OpenStudio::Point3dVectorVector)
     expect(sgs).to be_empty
     expect(mod1.status).to eq(0) # nothing logged
 
     # Valid case.
-    sgs = mod1.getSegments([p0, p1, p2, p3])
+    sgs = mod1.segments([p0, p1, p2, p3])
     expect(sgs).to be_a(OpenStudio::Point3dVectorVector)
     expect(sgs.size).to eq(4)
     expect(sgs).to respond_to(:first)
@@ -2861,10 +2861,10 @@ RSpec.describe OSut do
     expect(sgs[-1]).to be_an(Array) # not an OpenStudio::Point3dVector
 
     # Stress test 'uniques'.
-    m0 = "'n points' String? expecting Integer (OSut::getUniques)"
+    m0 = "'n points' String? expecting Integer (OSut::uniques)"
 
     # Invalid number case - simply returns entire list of unique points.
-    uniks = mod1.getUniques([p0, p1, p2, p3], "osut")
+    uniks = mod1.uniques([p0, p1, p2, p3], "osut")
     expect(uniks).to be_a(OpenStudio::Point3dVector)
     expect(uniks.size).to eq(4)
     expect(mod1.debug?).to be true
@@ -2873,95 +2873,95 @@ RSpec.describe OSut do
     expect(mod1.clean!).to eq(DBG)
 
     # Valid, basic case.
-    uniks = mod1.getUniques([p0, p1, p2, p3])
+    uniks = mod1.uniques([p0, p1, p2, p3])
     expect(uniks).to be_a(OpenStudio::Point3dVector)
     expect(uniks.size).to eq(4)
 
-    uniks = mod1.getUniques([p0, p1, p2, p3], 0)
+    uniks = mod1.uniques([p0, p1, p2, p3], 0)
     expect(uniks).to be_a(OpenStudio::Point3dVector)
     expect(uniks.size).to eq(4)
 
     # Valid, first 3 points.
-    uniks = mod1.getUniques([p0, p1, p2, p3], 3)
+    uniks = mod1.uniques([p0, p1, p2, p3], 3)
     expect(uniks).to be_a(OpenStudio::Point3dVector)
     expect(uniks.size).to eq(3)
 
     # Valid, last 3 points.
-    uniks = mod1.getUniques([p0, p1, p2, p3], -3)
+    uniks = mod1.uniques([p0, p1, p2, p3], -3)
     expect(uniks).to be_a(OpenStudio::Point3dVector)
     expect(uniks.size).to eq(3)
 
     # Valid, n = 5: returns original 4 uniques points.
-    uniks = mod1.getUniques([p0, p1, p2, p3], 5)
+    uniks = mod1.uniques([p0, p1, p2, p3], 5)
     expect(uniks).to be_a(OpenStudio::Point3dVector)
     expect(uniks.size).to eq(4)
 
     # Valid, n = -5: returns original 4 uniques points.
-    uniks = mod1.getUniques([p0, p1, p2, p3], -5)
+    uniks = mod1.uniques([p0, p1, p2, p3], -5)
     expect(uniks).to be_a(OpenStudio::Point3dVector)
     expect(uniks.size).to eq(4)
 
     # Stress tests collinears.
-    m0 = "'n points' String? expecting Integer (OSut::getCollinears)"
+    m0 = "'n points' String? expecting Integer (OSut::collinears)"
 
     # Invalid case - raise DEBUG message, yet returns valid collinears.
-    collinears = mod1.getCollinears([p0, p1, p3, p8], "osut")
-    expect(collinears).to be_a(OpenStudio::Point3dVector)
-    expect(collinears.size).to eq(1)
-    expect(collinears[0]).to eq(p0)
+    colls = mod1.collinears([p0, p1, p3, p8], "osut")
+    expect(colls).to be_a(OpenStudio::Point3dVector)
+    expect(colls.size).to eq(1)
+    expect(colls[0]).to eq(p0)
     expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m0)
     expect(mod1.clean!).to eq(DBG)
 
     # Valid, basic case
-    collinears = mod1.getCollinears([p0, p1, p3, p8])
-    expect(collinears.size).to eq(1)
-    expect(collinears[0]).to eq(p0)                     # same object ID
-    expect(mod1.same?(collinears.first, p0)).to be true # more expensive way
+    colls = mod1.collinears([p0, p1, p3, p8])
+    expect(colls.size).to eq(1)
+    expect(colls[0]).to eq(p0)                     # same object ID
+    expect(mod1.same?(colls.first, p0)).to be true # more expensive way
 
-    collinears = mod1.getCollinears([p0, p1, p3, p8], 0)
-    expect(collinears.size).to eq(1)
-    expect(collinears[0]).to eq(p0)
+    colls = mod1.collinears([p0, p1, p3, p8], 0)
+    expect(colls.size).to eq(1)
+    expect(colls[0]).to eq(p0)
 
-    collinears = mod1.getCollinears([p0, p1, p2, p3, p8])
-    expect(collinears.size).to eq(2)
-    expect(collinears[ 0]).to eq(p0)
-    expect(collinears[-1]).to eq(p1)
+    colls = mod1.collinears([p0, p1, p2, p3, p8])
+    expect(colls.size).to eq(2)
+    expect(colls[ 0]).to eq(p0)
+    expect(colls[-1]).to eq(p1)
     expect(mod1.pointAlongSegment?(p0, sgs.first)) # sg is an Array (size = 2)
 
     # Only 2 collinears, so request for first 3 is ignored.
-    collinears = mod1.getCollinears([p0, p1, p2, p3, p8], 3)
-    expect(collinears.size).to eq(2)
-    expect(mod1.same?(collinears[0], p0)).to be true
-    expect(mod1.same?(collinears[1], p1)).to be true
+    colls = mod1.collinears([p0, p1, p2, p3, p8], 3)
+    expect(colls.size).to eq(2)
+    expect(mod1.same?(colls[0], p0)).to be true
+    expect(mod1.same?(colls[1], p1)).to be true
 
     # First collinear (out of 2).
-    collinears = mod1.getCollinears([p0, p1, p2, p3, p8], 1)
+    collinears = mod1.collinears([p0, p1, p2, p3, p8], 1)
     expect(collinears.size).to eq(1)
     expect(mod1.same?(collinears[0], p0)).to be true
 
     # Last collinear (out of 2).
-    collinears = mod1.getCollinears([p0, p1, p2, p3, p8], -1)
-    expect(collinears.size).to eq(1)
-    expect(mod1.same?(collinears[0], p1)).to be true
+    colls = mod1.collinears([p0, p1, p2, p3, p8], -1)
+    expect(colls.size).to eq(1)
+    expect(mod1.same?(colls[0], p1)).to be true
 
     # First two vs last two: same result.
-    collinears = mod1.getCollinears([p0, p1, p2, p3, p8], -2)
-    expect(collinears.size).to eq(2)
-    expect(mod1.same?(collinears[0], p0)).to be true
-    expect(mod1.same?(collinears[1], p1)).to be true
+    colls = mod1.collinears([p0, p1, p2, p3, p8], -2)
+    expect(colls.size).to eq(2)
+    expect(mod1.same?(colls[0], p0)).to be true
+    expect(mod1.same?(colls[1], p1)).to be true
 
     # Ignore n request when n.abs > number of actual collinears.
-    collinears = mod1.getCollinears([p0, p1, p2, p3, p8], 6)
-    expect(collinears.size).to eq(2)
-    expect(mod1.same?(collinears[0], p0)).to be true
-    expect(mod1.same?(collinears[1], p1)).to be true
+    colls = mod1.collinears([p0, p1, p2, p3, p8], 6)
+    expect(colls.size).to eq(2)
+    expect(mod1.same?(colls[0], p0)).to be true
+    expect(mod1.same?(colls[1], p1)).to be true
 
-    collinears = mod1.getCollinears([p0, p1, p2, p3, p8], -6)
-    expect(collinears.size).to eq(2)
-    expect(mod1.same?(collinears[0], p0)).to be true
-    expect(mod1.same?(collinears[1], p1)).to be true
+    colls = mod1.collinears([p0, p1, p2, p3, p8], -6)
+    expect(colls.size).to eq(2)
+    expect(mod1.same?(colls[0], p0)).to be true
+    expect(mod1.same?(colls[1], p1)).to be true
 
     # Stress test pointAlongSegment?
     m0 = "'points' String? expecting Array (OSut::to_p3Dv)"
@@ -2981,41 +2981,41 @@ RSpec.describe OSut do
 
     # CASE a1: 2x end-to-end line segments (returns matching endpoints).
     expect(mod1.lineIntersects?(   [p0, p1], [p1, p2] )).to be true
-    pt = mod1.getLineIntersection( [p0, p1], [p1, p2] )
+    pt = mod1.lineIntersection( [p0, p1], [p1, p2] )
     expect(mod1.same?(pt, p1)).to be true
 
     # CASE a2: as a1, sequence of line segment endpoints doesn't matter.
     expect(mod1.lineIntersects?(   [p1, p0], [p1, p2] )).to be true
-    pt = mod1.getLineIntersection( [p1, p0], [p1, p2] )
+    pt = mod1.lineIntersection( [p1, p0], [p1, p2] )
     expect(mod1.same?(pt, p1)).to be true
 
     # CASE b1: 2x right-angle line segments, with 1x matching at corner.
     expect(mod1.lineIntersects?(   [p1, p2], [p1, p3] )).to be true
-    pt = mod1.getLineIntersection( [p1, p2], [p2, p3] )
+    pt = mod1.lineIntersection( [p1, p2], [p2, p3] )
     expect(mod1.same?(pt, p2)).to be true
 
     # CASE b2: as b1, sequence of segments doesn't matter.
     expect(mod1.lineIntersects?(   [p2, p3], [p1, p2] )).to be true
-    pt = mod1.getLineIntersection( [p2, p3], [p1, p2] )
+    pt = mod1.lineIntersection( [p2, p3], [p1, p2] )
     expect(mod1.same?(pt, p2)).to be true
 
     # CASE c: 2x right-angle line segments, yet disconnected.
     expect(mod1.lineIntersects?(     [p0, p1], [p2, p3] )).to be false
-    expect(mod1.getLineIntersection( [p0, p1], [p2, p3] )).to be_nil
+    expect(mod1.lineIntersection( [p0, p1], [p2, p3] )).to be_nil
 
     # CASE d: 2x connected line segments, acute angle.
     expect(mod1.lineIntersects?(   [p0, p2], [p3, p0] )).to be true
-    pt = mod1.getLineIntersection( [p0, p2], [p3, p0] )
+    pt = mod1.lineIntersection( [p0, p2], [p3, p0] )
     expect(mod1.same?(pt, p0)).to be true
 
     # CASE e1: 2x disconnected line segments, right angle.
     expect(mod1.lineIntersects?(   [p0, p2], [p4, p6] )).to be true
-    pt = mod1.getLineIntersection( [p0, p2], [p4, p6] )
+    pt = mod1.lineIntersection( [p0, p2], [p4, p6] )
     expect(mod1.same?(pt, p5)).to be true
 
     # CASE e2: as e1, sequence of line segment endpoints doesn't matter.
     expect(mod1.lineIntersects?(   [p0, p2], [p6, p4] )).to be true
-    pt = mod1.getLineIntersection( [p0, p2], [p6, p4] )
+    pt = mod1.lineIntersection( [p0, p2], [p6, p4] )
     expect(mod1.same?(pt, p5)).to be true
 
     # Point ENTIRELY within (vs outside) a polygon.
@@ -3065,13 +3065,13 @@ RSpec.describe OSut do
     vtx << OpenStudio::Point3d.new( 0,  0, 10)
     vtx << OpenStudio::Point3d.new( 0,  0,  0)
 
-    segments = mod1.getSegments(vtx)
-    expect(segments).to be_a(OpenStudio::Point3dVectorVector)
-    expect(segments.size).to eq(3)
+    sgments = mod1.segments(vtx)
+    expect(sgments).to be_a(OpenStudio::Point3dVectorVector)
+    expect(sgments.size).to eq(3)
 
-    segments.each_with_index do |segment, i|
-      unless mod1.xyz?(segment, :x, segment[0].x)
-        vplane = mod1.verticalPlane(segment[0], segment[-1])
+    sgments.each_with_index do |sgment, i|
+      unless mod1.xyz?(sgment, :x, sgment[0].x)
+        vplane = mod1.verticalPlane(sgment[0], sgment[-1])
         expect(vplane).to be_a(OpenStudio::Plane)
       end
     end
@@ -4629,7 +4629,7 @@ RSpec.describe OSut do
     # "Story 1 West Perimeter Space"  : "Surface 6"
 
     model.getSpaces.each do |space|
-      rufs = mod1.getRoofs(space)
+      rufs = mod1.roofs(space)
       expect(rufs.size).to eq(1)
       ruf = rufs.first
       expect(ruf).to be_a(OpenStudio::Model::Surface)
@@ -4676,7 +4676,7 @@ RSpec.describe OSut do
     model.getSpaces.each do |space|
       next unless space.partofTotalFloorArea
 
-      rufs = mod1.getRoofs(space)
+      rufs = mod1.roofs(space)
       expect(rufs.size).to eq(1)
       ruf = rufs.first
       expect(ruf).to be_a(OpenStudio::Model::Surface)
@@ -4800,7 +4800,7 @@ RSpec.describe OSut do
     ld2 = OpenStudio::Point3d.new( 8,  3, 0)
     sg1 = OpenStudio::Point3d.new(12, 14, 0)
     sg2 = OpenStudio::Point3d.new(12,  6, 0)
-    expect(mod1.getLineIntersection([sg1, sg2], [ld1, ld2])).to be_nil
+    expect(mod1.lineIntersection([sg1, sg2], [ld1, ld2])).to be_nil
 
     # To support multiple polygon inserts within a larger polygon, subset boxes
     # must be first 'aligned' (along a temporary XY plane) in a systematic way
@@ -4997,7 +4997,7 @@ RSpec.describe OSut do
 
     # TOTAL attic roof area, including overhangs.
     roofs  = mod1.facets(attic, "Outdoors", "RoofCeiling")
-    rufs   = mod1.getRoofs(model.getSpaces)
+    rufs   = mod1.roofs(model.getSpaces)
     total1 = roofs.sum(&:grossArea)
     total2 = rufs.sum(&:grossArea)
     expect(total1.round(2)).to eq(total2.round(2))
@@ -5064,11 +5064,11 @@ RSpec.describe OSut do
     expect((tot1 - net).round(2)).to eq(sky_area1.round(2))
 
     # In absence of skylight wells (more importantly, in absence of leader lines
-    # anchoring skylight base surfaces), OSut's 'getRoofs' & 'grossRoofArea'
+    # anchoring skylight base surfaces), OSut's 'roofs' & 'grossRoofArea'
     # report not only on newly-added base surfaces (or their areas), but also
     # overalpping areas of attic roofs above. Unfortunately, these become
     # unreliable with newly-added skylight wells.
-    rfs2 = mod1.getRoofs(core)
+    rfs2 = mod1.roofs(core)
     tot2 = rfs2.sum(&:grossArea)
     expect(tot2.round(2)).to eq(tot1.round(2))
     expect(tot2.round(2)).to eq(mod1.grossRoofArea(core).round(2))
@@ -5086,11 +5086,11 @@ RSpec.describe OSut do
     # if a higher-level application, relying on 'addSkylights' (e.g. an
     # OpenStudio measure), stores its output for subsequent reporting purposes.
 
-    # Deeper dive: Why are OSut's 'getRoofs' and 'grossRoofArea' unreliable
+    # Deeper dive: Why are OSut's 'roofs' and 'grossRoofArea' unreliable
     # with leader lines? Both rely on OSut's 'overlaps?', itself relying on
     # OpenStudio's 'join' and 'intersect': if neither are successful in joining
     # (or intersecting) 2x polygons (e.g. attic roof vs cast core ceiling),
-    # there can be no identifiable overlap. In such cases, both 'getRoofs' and
+    # there can be no identifiable overlap. In such cases, both 'roofs' and
     # 'grossRoofArea' ignore overlapping attic roofs. A demo:
     roof_north   = model.getSurfaceByName("Attic_roof_north")
     core_ceiling = model.getSurfaceByName("Core_ZN_ceiling")
@@ -5119,11 +5119,11 @@ RSpec.describe OSut do
     expect(OpenStudio.join(a_roof_north, c_core_ceiling, TOL2)).to be_empty
     expect(OpenStudio.intersect(a_roof_north, c_core_ceiling, TOL)).to be_empty
 
-    # A future revision of OSut's 'getRoofs' and 'grossRoofArea' would require:
+    # A future revision of OSut's 'roofs' and 'grossRoofArea' would require:
     #   - a new method identifying leader lines amongts surface vertices
     #   - a new method identifying surface cutouts amongst surface vertices
     #   - a method to purge both leader lines and cutouts from surface vertices
-    #   - have 'getRoofs' & 'grossRoofArea' rely on the remaining outer vertices
+    #   - have 'roofs' & 'grossRoofArea' rely on the remaining outer vertices
     #     ... @todo?
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
@@ -5348,8 +5348,8 @@ RSpec.describe OSut do
     gra_bulk = mod1.grossRoofArea(bulk)
     gra_fine = mod1.grossRoofArea(fine)
 
-    bulk_roof_m2 = mod1.getRoofs(bulk).sum(&:grossArea)
-    fine_roof_m2 = mod1.getRoofs(fine).sum(&:grossArea)
+    bulk_roof_m2 = mod1.roofs(bulk).sum(&:grossArea)
+    fine_roof_m2 = mod1.roofs(fine).sum(&:grossArea)
     expect(gra_bulk.round(2)).to eq(bulk_roof_m2.round(2))
     expect(gra_fine.round(2)).to eq(fine_roof_m2.round(2))
 

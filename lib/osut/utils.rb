@@ -2835,7 +2835,7 @@ module OSut
   # @param n [#to_i] requested number of unique points (0 returns all)
   #
   # @return [OpenStudio::Point3dVector] unique points (see logs)
-  def getUniques(pts = nil, n = 0)
+  def uniques(pts = nil, n = 0)
     mth = "OSut::#{__callee__}"
     pts = to_p3Dv(pts)
     v   = OpenStudio::Point3dVector.new
@@ -2866,10 +2866,10 @@ module OSut
   # @param pts [Set<OpenStudio::Point3d>] 3D points
   #
   # @return [OpenStudio::Point3dVectorVector] line segments (see logs if empty)
-  def getSegments(pts = nil)
+  def segments(pts = nil)
     mth = "OSut::#{__callee__}"
     vv  = OpenStudio::Point3dVectorVector.new
-    pts = getUniques(pts)
+    pts = uniques(pts)
     return vv if pts.size < 2
 
     pts.each_with_index do |p1, i1|
@@ -2912,10 +2912,10 @@ module OSut
   # @param pts [OpenStudio::Point3dVector] 3D points
   #
   # @return [OpenStudio::Point3dVectorVector] triads (see logs if empty)
-  def getTriads(pts = nil, co = false)
+  def triads(pts = nil, co = false)
     mth = "OSut::#{__callee__}"
     vv  = OpenStudio::Point3dVectorVector.new
-    pts = getUniques(pts)
+    pts = uniques(pts)
     return vv if pts.size < 2
 
     pts.each_with_index do |p1, i1|
@@ -3002,7 +3002,7 @@ module OSut
     mth = "OSut::#{__callee__}"
     cl1 = OpenStudio::Point3d
     cl2 = OpenStudio::Point3dVectorVector
-    sgs = sgs.is_a?(cl2) ? sgs : getSegments(sgs)
+    sgs = sgs.is_a?(cl2) ? sgs : segments(sgs)
     return empty("segments",          mth, DBG, false)     if sgs.empty?
     return mismatch("point", p0, cl1, mth, DBG, false) unless p0.is_a?(cl1)
 
@@ -3019,9 +3019,9 @@ module OSut
   #
   # @return [OpenStudio::Point3d] point of intersection of both lines
   # @return [nil] if no intersection, equal, or invalid input (see logs)
-  def getLineIntersection(s1 = [], s2 = [])
-    s1 = getSegments(s1)
-    s2 = getSegments(s2)
+  def lineIntersection(s1 = [], s2 = [])
+    s1 = segments(s1)
+    s2 = segments(s2)
     return nil if s1.empty?
     return nil if s2.empty?
 
@@ -3110,14 +3110,14 @@ module OSut
   # @return [Bool] whether 3D line intersects 3D segments
   # @return [false] if invalid input (see logs)
   def lineIntersects?(l = [], s = [])
-    l = getSegments(l)
-    s = getSegments(s)
+    l = segments(l)
+    s = segments(s)
     return nil if l.empty?
     return nil if s.empty?
 
     l = l.first
 
-    s.each { |segment| return true if getLineIntersection(l, segment) }
+    s.each { |segment| return true if lineIntersection(l, segment) }
 
     false
   end
@@ -3209,10 +3209,10 @@ module OSut
   # @param n [#to_i] requested number of non-collinears (0 returns all)
   #
   # @return [OpenStudio::Point3dVector] non-collinears (see logs)
-  def getNonCollinears(pts = nil, n = 0)
+  def nonCollinears(pts = nil, n = 0)
     mth = "OSut::#{__callee__}"
     a   = []
-    pts = getUniques(pts)
+    pts = uniques(pts)
     return pts if pts.size < 3
 
     if n.is_a?(Numeric)
@@ -3255,10 +3255,10 @@ module OSut
   # @param n [#to_i] requested number of collinears (0 returns all)
   #
   # @return [OpenStudio::Point3dVector] collinears (see logs)
-  def getCollinears(pts = nil, n = 0)
+  def collinears(pts = nil, n = 0)
     mth = "OSut::#{__callee__}"
     a   = OpenStudio::Point3dVector.new
-    pts = getUniques(pts)
+    pts = uniques(pts)
     return pts if pts.size < 3
 
     if n.is_a?(Numeric)
@@ -3268,7 +3268,7 @@ module OSut
       n = 0
     end
 
-    ncolls = getNonCollinears(pts)
+    ncolls = nonCollinears(pts)
     return a if ncolls.empty?
 
     a = pts.delete_if { |pt| holds?(ncolls, pt) }
@@ -3314,7 +3314,7 @@ module OSut
 
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Minimum 3 points?
-    p3 = getNonCollinears(pts, 3)
+    p3 = nonCollinears(pts, 3)
     return empty("polygon (non-collinears < 3)", mth, ERR, v) if p3.size < 3
 
     # Coplanar?
@@ -3345,8 +3345,8 @@ module OSut
     # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     # Ensure uniqueness and/or non-collinearity. Preserve original sequence.
     p0 = a.first
-    a  = getUniques(a).to_a       if uq
-    a  = getNonCollinears(a).to_a if co
+    a  = uniques(a).to_a       if uq
+    a  = nonCollinears(a).to_a if co
     i0 = a.index { |pt| same?(pt, p0) }
     a  = a.rotate(i0)             unless i0.nil?
 
@@ -3355,7 +3355,7 @@ module OSut
     if vx && a.size > 3
       zen = OpenStudio::Point3d.new(0, 0, 1000)
 
-      getTriads(a).each do |trio|
+      triads(a).each do |trio|
         p1  = trio[0]
         p2  = trio[1]
         p3  = trio[2]
@@ -3421,31 +3421,31 @@ module OSut
     return false unless pl.pointOnPlane(p0)
 
     entirely = false unless [true, false].include?(entirely)
-    segments = getSegments(s)
+    sgments  = segments(s)
 
     # Along polygon edges, or near vertices?
-    if pointAlongSegments?(p0, segments)
+    if pointAlongSegments?(p0, sgments)
       return false    if entirely
       return true unless entirely
     end
 
-    segments.each do |segment|
+    sgments.each do |sgment|
       #   - draw vector from segment midpoint to point
       #   - scale 1000x (assuming no building surface would be 1km wide)
       #   - convert vector to an independent line segment
       #   - loop through polygon segments, tally the number of intersections
       #   - avoid double-counting polygon vertices as intersections
       #   - return false if number of intersections is even
-      mid = midpoint(segment.first, segment.last)
+      mid = midpoint(sgment.first, sgment.last)
       mpV = scalar(mid - p0, 1000)
       p1  = p0 + mpV
       ctr = 0
 
       # Skip if ~collinear.
-      next if mpV.cross(segment.last - segment.first).length.round(4) < TOL2
+      next if mpV.cross(sgment.last - sgment.first).length.round(4) < TOL2
 
-      segments.each do |sg|
-        intersect = getLineIntersection([p0, p1], sg)
+      sgments.each do |sg|
+        intersect = lineIntersection([p0, p1], sg)
         next unless intersect
 
         # Skip test altogether if one of the polygon vertices.
@@ -3595,7 +3595,7 @@ module OSut
     return false if pts.empty?
     return false unless rectangular?(pts)
 
-    getSegments(pts).each do |pt|
+    segments(pts).each do |pt|
       l = (pt[1] - pt[0]).length
       d = l unless d
       return false unless l.round(2) == d.round(2)
@@ -3629,7 +3629,7 @@ module OSut
     p2.each { |p0| return false if pointWithinPolygon?(p0, p1, true) }
 
     # p1 segment mid-points must not lie OUTSIDE of p2.
-    getSegments(p1).each do |sg|
+    segments(p1).each do |sg|
       mp = midpoint(sg.first, sg.last)
       return false unless pointWithinPolygon?(mp, p2)
     end
@@ -4100,7 +4100,7 @@ module OSut
     mth = "OSut::#{__callee__}"
     bkp = OpenStudio::Point3dVector.new
     box = []
-    pts = getNonCollinears(pts)
+    pts = nonCollinears(pts)
     return bkp if pts.empty?
 
     t   = xyz?(pts, :z) ? nil : OpenStudio::Transformation.alignFace(pts)
@@ -4137,7 +4137,7 @@ module OSut
     box << OpenStudio::Point3d.new(p1.x, p1.y, p1.z)
     box << OpenStudio::Point3d.new(p2.x, p2.y, p2.z)
     box << OpenStudio::Point3d.new(p3.x, p3.y, p3.z)
-    box = getNonCollinears(box, 4)
+    box = nonCollinears(box, 4)
     return bkp unless box.size == 4
 
     box = blc(box)
@@ -4170,7 +4170,7 @@ module OSut
 
     # Generate vertical plane along longest segment.
     mpoints = []
-    sgs     = getSegments(pts)
+    sgs     = segments(pts)
     longest = sgs.max_by { |s| OpenStudio.getDistanceSquared(s.first, s.last) }
     plane   = verticalPlane(longest.first, longest.last)
 
@@ -4184,7 +4184,7 @@ module OSut
     box << mpoints.first
     box << mpoints.last
     box << plane.project(mpoints.last)
-    box = getNonCollinears(box).to_a
+    box = nonCollinears(box).to_a
     return bkp unless box.size == 4
 
     box = clockwise?(box) ? blc(box.reverse) : blc(box)
@@ -4237,10 +4237,10 @@ module OSut
     aire = 0
 
     # PATH C : Right-angle, midpoint triad approach.
-    getSegments(pts).each do |sg|
+    segments(pts).each do |sg|
       m0 = midpoint(sg.first, sg.last)
 
-      getSegments(pts).each do |seg|
+      segments(pts).each do |seg|
         p1 = seg.first
         p2 = seg.last
         next if same?(p1, sg.first)
@@ -4266,7 +4266,7 @@ module OSut
     end
 
     # PATH D : Right-angle triad approach, may override PATH C boxes.
-    getSegments(pts).each do |sg|
+    segments(pts).each do |sg|
       p0 = sg.first
       p1 = sg.last
 
@@ -4299,7 +4299,7 @@ module OSut
     # PATH E : Medial box, segment approach.
     aire = 0
 
-    getSegments(pts).each do |sg|
+    segments(pts).each do |sg|
       p0 = sg.first
       p1 = sg.last
 
@@ -4332,7 +4332,7 @@ module OSut
     # PATH F : Medial box, triad approach.
     aire = 0
 
-    getTriads(pts).each do |sg|
+    triads(pts).each do |sg|
       p0 = sg[0]
       p1 = sg[1]
       p2 = sg[2]
@@ -4364,7 +4364,7 @@ module OSut
     holes = OpenStudio::Point3dVectorVector.new
 
     OpenStudio.computeTriangulation(outer, holes).each do |triangle|
-      getSegments(triangle).each do |sg|
+      segments(triangle).each do |sg|
         p0 = sg.first
         p1 = sg.last
 
@@ -4421,7 +4421,7 @@ module OSut
   #
   # @return [Hash] :set, :box, :bbox, :t, :r & :o
   # @return [Hash] :set, :box, :bbox, :t, :r & :o (nil) if invalid (see logs)
-  def getRealignedFace(pts = nil, force = false)
+  def realignedFace(pts = nil, force = false)
     mth = "OSut::#{__callee__}"
     out = { set: nil, box: nil, bbox: nil, t: nil, r: nil, o: nil }
     pts = poly(pts, false, true)
@@ -4444,11 +4444,11 @@ module OSut
     box = boundedBox(pts)
     return invalid("bounded box", mth, 0, DBG, out) if box.empty?
 
-    segments = getSegments(box)
-    return invalid("bounded box segments", mth, 0, DBG, out) if segments.empty?
+    sgments = segments(box)
+    return invalid("bounded box segments", mth, 0, DBG, out) if sgments.empty?
 
     # Deterministic ID of box rotation/translation 'origin'.
-    segments.each_with_index do |sg, idx|
+    sgments.each_with_index do |sg, idx|
       sgs[sg]       = {}
       sgs[sg][:idx] = idx
       sgs[sg][:mid] = midpoint(sg[0], sg[1])
@@ -4468,10 +4468,10 @@ module OSut
       i = sg0[:idx]
     end
 
-    k = i + 2 < segments.size ? i + 2 : i - 2
+    k = i + 2 < sgments.size ? i + 2 : i - 2
 
-    origin   = midpoint(segments[i][0], segments[i][1])
-    terminal = midpoint(segments[k][0], segments[k][1])
+    origin   = midpoint(sgments[i][0], sgments[i][1])
+    terminal = midpoint(sgments[k][0], sgments[k][1])
     seg      = terminal - origin
     right    = OpenStudio::Point3d.new(origin.x + d, origin.y    , 0) - origin
     north    = OpenStudio::Point3d.new(origin.x,     origin.y + d, 0) - origin
@@ -4525,7 +4525,7 @@ module OSut
       force = false
     end
 
-    pts = getRealignedFace(pts, force)[:set]
+    pts = realignedFace(pts, force)[:set]
     return 0 if pts.size < 2
 
     pts.max_by(&:x).x - pts.min_by(&:x).x
@@ -4549,7 +4549,7 @@ module OSut
       force = false
     end
 
-    pts = getRealignedFace(pts, force)[:set]
+    pts = realignedFace(pts, force)[:set]
     return 0 if pts.size < 2
 
     pts.max_by(&:y).y - pts.min_by(&:y).y
@@ -4648,7 +4648,7 @@ module OSut
       else
         st[:t] = OpenStudio::Transformation.alignFace(pts) unless st.key?(:t)
         tpts   = st[:t].inverse * st[tag]
-        o      = getRealignedFace(tpts, true)
+        o      = realignedFace(tpts, true)
         tpts   = st[:t] * (o[:r] * (o[:t] * o[:set]))
 
         st[:out] = o
@@ -4666,7 +4666,7 @@ module OSut
         nb = 0
 
         # Check for intersections between leader line and larger polygon edges.
-        getSegments(pts).each do |sg|
+        segments(pts).each do |sg|
           break unless nb.zero?
           next if holds?(sg, pt)
 
@@ -4680,7 +4680,7 @@ module OSut
 
           ost = other[tag]
 
-          getSegments(ost).each { |sg| nb += 1 if lineIntersects?(ld, sg) }
+          segments(ost).each { |sg| nb += 1 if lineIntersects?(ld, sg) }
         end
 
         # ... and previous leader lines (first come, first serve basis).
@@ -4698,7 +4698,7 @@ module OSut
         end
 
         # Finally, check for self-intersections.
-        getSegments(tpts).each do |sg|
+        segments(tpts).each do |sg|
           break unless nb.zero?
           next if holds?(sg, tpts.first)
 
@@ -5235,18 +5235,18 @@ module OSut
   # @param spaces [Set<OpenStudio::Model::Space>] target spaces
   #
   # @return [Array<OpenStudio::Model::Surface>] roofs (may be empty)
-  def getRoofs(spaces = [])
+  def roofs(spaces = [])
     mth    = "OSut::#{__callee__}"
     up     = OpenStudio::Point3d.new(0,0,1) - OpenStudio::Point3d.new(0,0,0)
-    roofs  = []
+    rfs    = []
     spaces = spaces.is_a?(OpenStudio::Model::Space) ? [spaces] : spaces
     spaces = spaces.respond_to?(:to_a) ? spaces.to_a : []
 
     spaces = spaces.select { |space| space.is_a?(OpenStudio::Model::Space) }
 
     # Space-specific outdoor-facing roof surfaces.
-    roofs = facets(spaces, "Outdoors", "RoofCeiling")
-    roofs = roofs.select { |roof| roof?(roof) }
+    rfs = facets(spaces, "Outdoors", "RoofCeiling")
+    rfs = rfs.select { |rf| roof?(rf) }
 
     spaces.each do |space|
       # When unoccupied spaces are involved (e.g. plenums, attics), the target
@@ -5282,12 +5282,12 @@ module OSut
           cst = cast(cv0, rvi, up)
           next unless overlaps?(cst, rvi, false)
 
-          roofs << ruf unless roofs.include?(ruf)
+          rfs << ruf unless rfs.include?(ruf)
         end
       end
     end
 
-    roofs
+    rfs
   end
 
   ##
@@ -5313,10 +5313,10 @@ module OSut
     return invalid("baselit"          , mth, 4, DBG, false) unless ck4
 
     walls  = sidelit ? facets(space, "Outdoors", "Wall")        : []
-    roofs  =  toplit ? facets(space, "Outdoors", "RoofCeiling") : []
+    rufs   =  toplit ? facets(space, "Outdoors", "RoofCeiling") : []
     floors = baselit ? facets(space, "Outdoors", "Floor")       : []
 
-    (walls + roofs + floors).each do |surface|
+    (walls + rufs + floors).each do |surface|
       surface.subSurfaces.each do |sub|
         # All fenestrated subsurface types are considered, as user can set these
         # explicitly (e.g. skylight in a wall) in OpenStudio.
@@ -5443,11 +5443,11 @@ module OSut
       box = boundedBox(s0)
 
       if realign
-        s00 = getRealignedFace(box, true)
+        s00 = realignedFace(box, true)
         return invalid("bound realignment", mth, 0, DBG, false) unless s00[:set]
       end
     elsif realign
-      s00 = getRealignedFace(s0, false)
+      s00 = realignedFace(s0, false)
       return invalid("unbound realignment", mth, 0, DBG, false) unless s00[:set]
     end
 
@@ -6085,24 +6085,24 @@ module OSut
   # (Array of 2x linked surfaces). Each surface may be linked to more than one
   # horizontal ridge.
   #
-  # @param roofs [Array<OpenStudio::Model::Surface>] target surfaces
+  # @param rfs [Array<OpenStudio::Model::Surface>] target surfaces
   #
   # @return [Array] horizontal ridges (see logs if empty)
-  def getHorizontalRidges(roofs = [])
+  def horizontalRidges(rfs = [])
     mth    = "OSut::#{__callee__}"
     ridges = []
-    return ridges unless roofs.is_a?(Array)
+    return ridges unless rfs.is_a?(Array)
 
-    roofs = roofs.select { |s| s.is_a?(OpenStudio::Model::Surface) }
-    roofs = roofs.select { |s| sloped?(s) }
+    rfs = rfs.select { |s| s.is_a?(OpenStudio::Model::Surface) }
+    rfs = rfs.select { |s| sloped?(s) }
 
-    roofs.each do |roof|
-      maxZ = roof.vertices.max_by(&:z).z
-      next if roof.space.empty?
+    rfs.each do |rf|
+      maxZ = rf.vertices.max_by(&:z).z
+      next if rf.space.empty?
 
-      space = roof.space.get
+      space = rf.space.get
 
-      getSegments(roof).each do |edge|
+      segments(rf).each do |edge|
         next unless xyz?(edge, :z, maxZ)
 
         # Skip if already tracked.
@@ -6117,18 +6117,18 @@ module OSut
 
         next if match
 
-        ridge = { edge: edge, length: (edge[1] - edge[0]).length, roofs: [roof] }
+        ridge = { edge: edge, length: (edge[1] - edge[0]).length, roofs: [rf] }
 
         # Links another roof (same space)?
         match = false
 
-        roofs.each do |ruf|
+        rfs.each do |ruf|
           break if match
-          next  if ruf == roof
+          next  if ruf == rf
           next  if ruf.space.empty?
           next  unless ruf.space.get == space
 
-          getSegments(ruf).each do |edg|
+          segments(ruf).each do |edg|
             break    if match
             next unless same?(edge, edg) || same?(edge, edg.reverse)
 
@@ -6195,7 +6195,7 @@ module OSut
       spaces = spaces.select { |sp| sp.partofTotalFloorArea }
       spaces = spaces.reject { |sp| unconditioned?(sp) }
       spaces = spaces.reject { |sp| vestibule?(sp) }
-      spaces = spaces.reject { |sp| getRoofs(sp).empty? }
+      spaces = spaces.reject { |sp| roofs(sp).empty? }
       spaces = spaces.reject { |sp| sp.floorArea < 4 * w2 }
       spaces = spaces.sort_by(&:floorArea).reverse
       return empty("spaces", mth, WRN, []) if spaces.empty?
@@ -6241,7 +6241,7 @@ module OSut
 
     # Gather roof surfaces - possibly those of attics or plenums above.
     spaces.each do |sp|
-      getRoofs(sp).each do |rf|
+      roofs(sp).each do |rf|
         espaces[sp] = {roofs: []} unless espaces.key?(sp)
         espaces[sp][:roofs] << rf unless espaces[sp][:roofs].include?(rf)
       end
@@ -6493,7 +6493,7 @@ module OSut
     end
 
     # Purge if requested.
-    getRoofs(spaces).each { |s| s.subSurfaces.map(&:remove) } if clear
+    roofs(spaces).each { |s| s.subSurfaces.map(&:remove) } if clear
 
     # Safely exit, e.g. if strictly called to purge existing roof subsurfaces.
     return 0 if area && area.round(2) == 0
@@ -6771,7 +6771,7 @@ module OSut
     # Process outdoor-facing roof surfaces of plenums and attics above.
     rooms.each do |space, room|
       t0   = room[:t0]
-      rufs = getRoofs(space) - room[:roofs]
+      rufs = roofs(space) - room[:roofs]
 
       rufs.each do |ruf|
         next unless roof?(ruf)
@@ -6933,12 +6933,12 @@ module OSut
     # Ensure uniqueness of plenum roofs.
     attics.values.each do |attic|
       attic[:roofs ].uniq!
-      attic[:ridges] = getHorizontalRidges(attic[:roofs]) # @todo
+      attic[:ridges] = horizontalRidges(attic[:roofs]) # @todo
     end
 
     plenums.values.each do |plenum|
       plenum[:roofs ].uniq!
-      plenum[:ridges] = getHorizontalRidges(plenum[:roofs]) # @todo
+      plenum[:ridges] = horizontalRidges(plenum[:roofs]) # @todo
     end
 
     # Regardless of the selected skylight arrangement pattern, the solution only
@@ -7747,8 +7747,8 @@ module OSut
 
           # Generate well walls.
           vX = cast(roof, tile, ray)
-          s0 = getSegments(t0 * roof.vertices)
-          sX = getSegments(t0 * vX)
+          s0 = segments(t0 * roof.vertices)
+          sX = segments(t0 * vX)
 
           s0.each_with_index do |sg, j|
             sg0 = sg
