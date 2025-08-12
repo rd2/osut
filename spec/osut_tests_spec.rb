@@ -5785,8 +5785,8 @@ RSpec.describe OSut do
     # corridors with multiple concavities).
     expect(mod1.spaceHeight(fine)).to be_within(TOL).of(8.53)
     expect(mod1.spaceWidth(fine)).to be_within(TOL).of(21.33)
-    expect(mod1.status).to eq(0)
 
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     file  = File.join(__dir__, "files/osms/out/seb_sky.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
@@ -5804,6 +5804,8 @@ RSpec.describe OSut do
     expect(mod1.alignedHeight(floor)).to be_within(TOL).of(6.88)
     expect(mod1.alignedWidth(floor)).to be_within(TOL).of(8.22)
     expect(mod1.spaceHeight(openarea)).to be_within(TOL).of(3.96)
-    expect(mod1.spaceWidth(openarea)).to be_within(TOL).of(7.90)
+    expect(mod1.spaceWidth(openarea)).to be_within(TOL).of(3.77)
+
+    expect(mod1.status).to eq(0)
   end
 end

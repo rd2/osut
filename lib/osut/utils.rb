@@ -4615,10 +4615,14 @@ module OSut
         polygs = polygs.map    { |plg| plg.to_a.reverse }
         union  = OpenStudio.joinAll(polygs, 0.01).first
         polyg  = poly(union, false, true, true)
+        return 0 if polyg.empty?
       end
     end
 
-    height(boundedBox(polyg))
+    res = realignedFace(polyg.to_a.reverse)
+    return 0 if res[:box].nil?
+
+    height(res[:box])
   end
 
   ##
