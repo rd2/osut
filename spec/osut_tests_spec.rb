@@ -5743,7 +5743,7 @@ RSpec.describe OSut do
 
     # The Fine Storage space has 2 floors, at different Z-axis levels:
     # - main ground floor (slab on grade), Z=0.00m
-    # - a mezzanine floor, adjacent to the office space ceiling below, Z=4.27m
+    # - mezzanine floor, adjacent to the office space ceiling below, Z=4.27m
     expect(mod1.facets(fine, "all", "floor").size).to eq(2)
     groundfloor = model.getSurfaceByName("Fine Storage Floor")
     mezzanine   = model.getSurfaceByName("Office Roof Reversed")
@@ -5755,10 +5755,10 @@ RSpec.describe OSut do
     # The ground floor is L-shaped, floor surfaces have differenet Z=axis
     # levels, etc. In the context of codes/standards like ASHRAE 90.1 or the
     # Canadian NECB, determining what constitutes a space's 'height' and/or
-    # 'width' can matter, namely with regards to geometry-based LPD rules (e.g.
-    # adjustments per corridor 'width'). Not stating here what the definitive
-    # answers should be in all cases. There are however a few OSut functions
-    # that may be useful.
+    # 'width' matters, namely with regards to geometry-based LPD rules (e.g.
+    # adjustments based on corridor 'width'). Not stating here what the
+    # definitive answers should be in all cases. There are however a few OSut
+    # functions that may be helpful.
     #
     # OSut's 'aligned' height and width functions were initially developed for
     # non-flat surfaces, like walls and sloped roofs - particularly useful when
@@ -5778,11 +5778,13 @@ RSpec.describe OSut do
 
     # OSut's 'spaceHeight' and 'spaceWidth' are more suitable for height- or
     # width-based LPD adjustement calculations. OSut sets a space's width as
-    # the widest edge of the largest bounded box it can fit within a collection
-    # of neighbouring floor surfaces. This is considered reasonable for a long
-    # corridor, with a varying width along its full length. Achtung! The
-    # function can be time consuming for very convoluted spaces (e.g. long
-    # corridors with multiple concavities).
+    # the length of the narrowest edge of the largest bounded box that fits
+    # within a collection of neighbouring floor surfaces. This is considered
+    # reasonable for a long corridor, with varying widths along its full
+    # length (e.g. occasional alcoves).
+    #
+    # Achtung! The function can be time consuming (multiple iterations) for
+    # very convoluted spaces (e.g. long corridors with multiple concavities).
     expect(mod1.spaceHeight(fine)).to be_within(TOL).of(8.53)
     expect(mod1.spaceWidth(fine)).to be_within(TOL).of(21.33)
 

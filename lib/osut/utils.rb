@@ -4565,8 +4565,8 @@ module OSut
   def spaceHeight(space = nil)
     return 0 unless space.is_a?(OpenStudio::Model::Space)
 
-    minZ = 1000
-    maxZ = 0
+    minZ =  10000
+    maxZ = -10000
 
     space.surfaces.each do |surface|
       minZ = [surface.vertices.min_by(&:z).z, minZ].min
@@ -4599,6 +4599,7 @@ module OSut
     #   - retain only other floor surfaces sharing same 3D plane
     #   - recover potential union between floor surfaces
     #   - fall back to largest floor surface if invalid union
+    #   - return width of largest bounded box
     floors = floors.sort_by(&:grossArea).reverse
     floor  = floors.first
     plane  = floor.plane
@@ -4622,6 +4623,7 @@ module OSut
     res = realignedFace(polyg.to_a.reverse)
     return 0 if res[:box].nil?
 
+    # A bounded box's 'height', at its narrowest, is its 'width'.
     height(res[:box])
   end
 
