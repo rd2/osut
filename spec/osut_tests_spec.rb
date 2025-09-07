@@ -103,7 +103,7 @@ RSpec.describe OSut do
     expect(surface).to_not be_nil
     expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(1)
-    expect(surface.layers.first.nameString).to eq("OSut|material|015")
+    expect(surface.layers.first.nameString).to eq("OSut:material:015")
 
     # A single-layered, uninsulated e.g. 5/8" :partition (alternative :shading).
     specs   = {type: :partition, clad: :none, finish: :none}
@@ -113,7 +113,7 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(1)
     u = 1 / cls1.rsi(surface, film[:wall])
     expect(u).to be_within(TOL).of(uo3)
-    expect(surface.layers.first.nameString).to eq("OSut|material|015")
+    expect(surface.layers.first.nameString).to eq("OSut:material:015")
 
     # A single-layered, uninsulated e.g. 4" concrete :partition.
     specs   = {type: :partition, clad: :none, finish: :none, frame: :medium}
@@ -123,7 +123,7 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(1)
     u = 1 / cls1.rsi(surface, film[:wall])
     expect(u).to be_within(TOL).of(uo4)
-    expect(surface.layers.first.nameString).to eq("OSut|concrete|100")
+    expect(surface.layers.first.nameString).to eq("OSut:concrete:100")
 
     # A single-layered, uninsulated e.g. 8" concrete :partition.
     specs   = {type: :partition, clad: :none, finish: :none, frame: :heavy}
@@ -133,7 +133,7 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(1)
     u = 1 / cls1.rsi(surface, film[:wall])
     expect(u).to be_within(TOL).of(uo5)
-    expect(surface.layers.first.nameString).to eq("OSut|concrete|200")
+    expect(surface.layers.first.nameString).to eq("OSut:concrete:200")
 
     # A light (minimal, 1x layer), uninsulated attic roof (alternative: shading).
     specs   = {type: :roof, uo: nil, clad: :none, finish: :none}
@@ -161,8 +161,8 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(3)
     u = 1 / cls1.rsi(surface, film[:roof])
     expect(u).to be_within(TOL).of(uo2)
-    expect(surface.layers[1].nameString).to eq("OSut|polyiso|108")
-    expect(surface.layers[2].nameString).to eq("OSut|concrete|100")
+    expect(surface.layers[1].nameString).to eq("OSut:polyiso:K0.023:100")
+    expect(surface.layers[2].nameString).to eq("OSut:concrete:100")
 
     # Roof above conditioned parking garage (polyiso under 8" slab).
     specs   = {type: :roof, uo: uo2, clad: :heavy, frame: :medium, finish: :none}
@@ -172,8 +172,8 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(2)
     u = 1 / cls1.rsi(surface, film[:roof])
     expect(u).to be_within(TOL).of(uo2)
-    expect(surface.layers[0].nameString).to eq("OSut|concrete|200")
-    expect(surface.layers[1].nameString).to eq("OSut|polyiso|110")
+    expect(surface.layers[0].nameString).to eq("OSut:concrete:200")
+    expect(surface.layers[1].nameString).to eq("OSut:polyiso:K0.023:100")
 
     # Uninsulated plenum ceiling tiles (alternative :shading).
     specs   = {type: :roof, uo: nil, clad: :none, finish: :none}
@@ -192,7 +192,7 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(2)
     u = 1 / cls1.rsi(surface, film[:floor])
     expect(u).to be_within(TOL).of(uo2)
-    expect(surface.layers[1].nameString).to eq("OSut|cellulose|217")
+    expect(surface.layers[1].nameString).to eq("OSut:cellulose:K0.023:100")
 
     # Finished, insulated exposed floor (e.g. wood-framed, residential).
     specs   = {type: :floor, uo: uo2}
@@ -202,7 +202,7 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(3)
     u = 1 / cls1.rsi(surface, film[:floor])
     expect(u).to be_within(TOL).of(uo2)
-    expect(surface.layers[1].nameString).to eq("OSut|mineral|211")
+    expect(surface.layers[1].nameString).to eq("OSut:mineral:K0.024:100")
 
     # Finished, insulated exposed floor (e.g. 4" slab, steel web joists).
     specs   = {type: :floor, uo: uo2, finish: :medium}
@@ -212,8 +212,8 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(3)
     u = 1 / cls1.rsi(surface, film[:floor])
     expect(u).to be_within(TOL).of(uo2)
-    expect(surface.layers[1].nameString).to eq("OSut|mineral|214")
-    expect(surface.layers[2].nameString).to eq("OSut|concrete|100")
+    expect(surface.layers[1].nameString).to eq("OSut:mineral:K0.023:100")
+    expect(surface.layers[2].nameString).to eq("OSut:concrete:100")
 
     # Uninsulated slab-on-grade.
     specs   = {type: :slab, frame: :none, finish: :none}
@@ -221,8 +221,8 @@ RSpec.describe OSut do
     expect(surface).to_not be_nil
     expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(2)
-    expect(surface.layers[0].nameString).to eq("OSut|sand|100")
-    expect(surface.layers[1].nameString).to eq("OSut|concrete|100")
+    expect(surface.layers[0].nameString).to eq("OSut:sand:100")
+    expect(surface.layers[1].nameString).to eq("OSut:concrete:100")
 
     # Insulated slab-on-grade.
     specs   = {type: :slab, uo: uo2, finish: :none}
@@ -232,9 +232,9 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(3)
     u = 1 / cls1::rsi(surface, film[:slab])
     expect(u).to be_within(TOL).of(uo2)
-    expect(surface.layers[0].nameString).to eq("OSut|sand|100")
-    expect(surface.layers[1].nameString).to eq("OSut|polyiso|109")
-    expect(surface.layers[2].nameString).to eq("OSut|concrete|100")
+    expect(surface.layers[0].nameString).to eq("OSut:sand:100")
+    expect(surface.layers[1].nameString).to eq("OSut:polyiso:K0.010:043")
+    expect(surface.layers[2].nameString).to eq("OSut:concrete:100")
 
     # 8" uninsulated basement wall.
     specs   = {type: :basement, clad: :none, finish: :none}
@@ -243,7 +243,7 @@ RSpec.describe OSut do
     expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
     expect(surface.layers.size).to eq(1)
     u = 1 / cls1::rsi(surface, film[:basement])
-    expect(surface.layers[0].nameString).to eq("OSut|concrete|200")
+    expect(surface.layers[0].nameString).to eq("OSut:concrete:200")
     expect(u).to be_within(TOL).of(uo7)
 
     # 8" interior-insulated, finished basement wall.
@@ -254,9 +254,9 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(3)
     u = 1 / cls1::rsi(surface, film[:basement])
     expect(u).to be_within(TOL).of(2 * uo2)
-    expect(surface.layers[0].nameString).to eq("OSut|concrete|200")
-    expect(surface.layers[1].nameString).to eq("OSut|mineral|100")
-    expect(surface.layers[2].nameString).to eq("OSut|drywall|015")
+    expect(surface.layers[0].nameString).to eq("OSut:concrete:200")
+    expect(surface.layers[1].nameString).to eq("OSut:mineral:K0.037:075")
+    expect(surface.layers[2].nameString).to eq("OSut:drywall:015")
 
     # Standard, insulated steel door (default Uo = 1.8 W/K•m).
     specs   = {type: :door}
@@ -350,16 +350,16 @@ RSpec.describe OSut do
 
       case ratio
       when 0.1
-        expect(d.nameString).to eq("OSut|InternalMassDefinition|0.10")
+        expect(d.nameString).to eq("OSut:InternalMassDefinition:0.10")
         expect(m.nameString.downcase).to include("entrance")
       when 0.3
-        expect(d.nameString).to eq("OSut|InternalMassDefinition|0.30")
+        expect(d.nameString).to eq("OSut:InternalMassDefinition:0.30")
         expect(m.nameString.downcase).to include("lobby")
       when 1.0
-        expect(d.nameString).to eq("OSut|InternalMassDefinition|1.00")
+        expect(d.nameString).to eq("OSut:InternalMassDefinition:1.00")
         expect(m.nameString.downcase).to include("meeting")
       else
-        expect(d.nameString).to eq("OSut|InternalMassDefinition|2.00")
+        expect(d.nameString).to eq("OSut:InternalMassDefinition:2.00")
         expect(ratio).to eq(2.0)
       end
 
@@ -371,7 +371,7 @@ RSpec.describe OSut do
 
       construction = c if construction.nil?
       expect(construction).to eq(c)
-      expect(c.nameString).to eq("OSut|MASS|Construction")
+      expect(c.nameString).to eq("OSut:MASS:Construction")
       expect(c.numLayers).to eq(1)
 
       m = c.layers.first
@@ -4945,32 +4945,75 @@ RSpec.describe OSut do
     expect(model).to_not be_empty
     model = model.get
 
+    s = model.getSurfaceByName("Perimeter_ZN_1_ceiling")
+    expect(s).to_not be_empty
+    s = s.get
+    expect(s.isConstructionDefaulted).to be true # yet which set?
+
+    type = s.surfaceType
+    base = s.construction
+    expect(base).to_not be_empty
+    base = base.get
+
+    # Check OpenStudio space-to-building hierarchy.
+    space = s.space
+    expect(space).to_not be_empty
+    space = space.get
+    expect(space.defaultConstructionSet).to be_empty
+
+    spacetype = space.spaceType
+    expect(spacetype).to_not be_empty
+    spacetype = spacetype.get
+    expect(spacetype.defaultConstructionSet).to be_empty
+
+    story = space.buildingStory
+    expect(story).to_not be_empty
+    story = story.get
+    expect(story.defaultConstructionSet).to be_empty
+
+    building = model.getBuilding
+    expect(building.defaultConstructionSet).to_not be_empty
+    bset = building.defaultConstructionSet.get
+    oID = bset.nameString
+    expect(oID).to eq("90.1-2010 - SmOffice - ASHRAE 169-2013-3B")
+    expect(mod1.holdsConstruction?(bset, base, false, false, type)).to be false
+
+    # Check for adjacent surface.
+    adjacent = s.adjacentSurface
+    expect(adjacent).to_not be_empty
+    adjacent = adjacent.get
+    atype    = adjacent.surfaceType
+    expect(atype.downcase).to eq("floor")
+
+    attic = adjacent.space
+    expect(attic).to_not be_empty
+    attic = attic.get
+    expect(attic.defaultConstructionSet).to be_empty
+
+    spacetype = attic.spaceType
+    expect(spacetype).to_not be_empty
+    spacetype = spacetype.get
+    aset = spacetype.defaultConstructionSet
+    expect(aset).to_not be_empty
+    aset = aset.get
+    aID = aset.nameString
+    expect(aID).to eq("90.1-2010 -  - Attic - ASHRAE 169-2013-3B")
+    expect(mod1.holdsConstruction?(aset, base, false, false, atype)).to be true
+    expect(mod1.defaultConstructionSet(s)).to eq(aset)
+
+    expect(bset.defaultInteriorSurfaceConstructions).to_not be_empty
+    expect(aset.defaultInteriorSurfaceConstructions).to_not be_empty
+    ib_set = bset.defaultInteriorSurfaceConstructions.get
+    ia_set = aset.defaultInteriorSurfaceConstructions.get
+    expect(ib_set.wallConstruction).to_not be_empty
+    expect(ia_set.wallConstruction).to be_empty
+    ib_wall = ib_set.wallConstruction.get.to_LayeredConstruction
+    expect(ib_wall).to_not be_empty
+    ib_wall = ib_wall.get
+    expect(mod1.rsi(ib_wall, 0.150)).to be_within(TOL).of(0.31)
+
     core  = []
     attic = []
-
-    # Fetch default construction sets.
-    oID = "90.1-2010 - SmOffice - ASHRAE 169-2013-3B" # building
-    aID = "90.1-2010 -  - Attic - ASHRAE 169-2013-3B" # attic spacetype level
-    o_set = model.getDefaultConstructionSetByName(oID)
-    a_set = model.getDefaultConstructionSetByName(oID)
-    expect(o_set).to_not be_empty
-    expect(a_set).to_not be_empty
-    o_set = o_set.get
-    a_set = a_set.get
-    expect(o_set.defaultInteriorSurfaceConstructions).to_not be_empty
-    expect(a_set.defaultInteriorSurfaceConstructions).to_not be_empty
-    io_set = o_set.defaultInteriorSurfaceConstructions.get
-    ia_set = a_set.defaultInteriorSurfaceConstructions.get
-    expect(io_set.wallConstruction).to_not be_empty
-    expect(ia_set.wallConstruction).to_not be_empty
-    io_wall = io_set.wallConstruction.get.to_LayeredConstruction
-    ia_wall = ia_set.wallConstruction.get.to_LayeredConstruction
-    expect(io_wall).to_not be_empty
-    expect(ia_wall).to_not be_empty
-    io_wall = io_wall.get
-    ia_wall = ia_wall.get
-    expect(io_wall).to eq(ia_wall) # 2x drywall layers
-    expect(mod1.rsi(io_wall, 0.150)).to be_within(TOL).of(0.31)
 
     model.getSpaces.each do |space|
       id = space.nameString
