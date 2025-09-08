@@ -528,7 +528,11 @@ module OSut
 
       mt = m.clone(m.model).to_MasslessOpaqueMaterial.get
       mt.setName(id)
-      mt.setThermalResistance(r)
+
+      unless mt.setThermalResistance(r)
+        return invalid("Failed #{id}: RSi#{de_r.round(2)}", mth)
+      end
+
       lc.setLayer(index, mt)
 
       return r
@@ -558,8 +562,15 @@ module OSut
 
       mt = m.clone(m.model).to_StandardOpaqueMaterial.get
       mt.setName(id)
-      mt.setConductivity(k)
-      mt.setThickness(d)
+
+      unless mt.setThermalConductivity(k)
+        return invalid("Failed #{id}: K#{k.round(3)}", mth)
+      end
+
+      unless mt.setThickness(d)
+        return invalid("Failed #{id}: #{(d*1000).to_i}mm", mth)
+      end
+
       lc.setLayer(index, mt)
 
       return r
