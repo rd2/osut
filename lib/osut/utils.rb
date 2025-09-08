@@ -43,10 +43,10 @@ module OSut
   TOL2 = TOL * TOL       # default area tolerance (m2)
   HEAD = 2.032           # standard 80" door
   SILL = 0.762           # standard 30" window sill
-  DMIN = 0.010           # min. material thickness
-  DMAX = 1.000           # max. material thickness
-  KMIN = 0.010           # min. material thermal conductivity
-  KMAX = 2.000           # max. material thermal conductivity
+  DMIN = 0.010           # min. insulating material thickness
+  DMAX = 1.000           # max. insulating material thickness
+  KMIN = 0.010           # min. insulating material thermal conductivity
+  KMAX = 2.000           # max. insulating material thermal conductivity
   UMAX = KMAX / DMIN     # material USi upper limit, 200.000
   UMIN = KMIN / DMAX     # material USi lower limit,   0.010
   RMIN = 1.0 / UMAX      # material RSi lower limit,   0.005 (or R-IP   0.03)
