@@ -154,6 +154,7 @@ RSpec.describe OSut do
     expect(u).to be_within(TOL).of(uo2)
 
     # Insulated, unfinished outdoor-facing plenum roof (polyiso above 4" slab).
+    model   = OpenStudio::Model::Model.new
     specs   = {type: :roof, uo: uo2, frame: :medium, finish: :medium}
     surface = cls1.genConstruction(model, specs)
     expect(surface).to_not be_nil
@@ -161,10 +162,11 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(3)
     u = 1 / cls1.rsi(surface, film[:roof])
     expect(u).to be_within(TOL).of(uo2)
-    expect(surface.layers[1].nameString).to eq("OSut:polyiso:K0.023:100")
+    expect(surface.layers[1].nameString).to eq("OSut:K0.023:100")
     expect(surface.layers[2].nameString).to eq("OSut:concrete:100")
 
     # Roof above conditioned parking garage (polyiso under 8" slab).
+    model   = OpenStudio::Model::Model.new
     specs   = {type: :roof, uo: uo2, clad: :heavy, frame: :medium, finish: :none}
     surface = cls1.genConstruction(model, specs)
     expect(surface).to_not be_nil
@@ -173,9 +175,10 @@ RSpec.describe OSut do
     u = 1 / cls1.rsi(surface, film[:roof])
     expect(u).to be_within(TOL).of(uo2)
     expect(surface.layers[0].nameString).to eq("OSut:concrete:200")
-    expect(surface.layers[1].nameString).to eq("OSut:polyiso:K0.023:100")
+    expect(surface.layers[1].nameString).to eq("OSut:K0.023:100")
 
     # Uninsulated plenum ceiling tiles (alternative :shading).
+    model   = OpenStudio::Model::Model.new
     specs   = {type: :roof, uo: nil, clad: :none, finish: :none}
     surface = cls1.genConstruction(model, specs)
     expect(surface).to_not be_nil
@@ -185,6 +188,7 @@ RSpec.describe OSut do
     expect(u).to be_within(TOL).of(uo6)
 
     # Unfinished, insulated, framed attic floor (blown cellulose).
+    model   = OpenStudio::Model::Model.new
     specs   = {type: :floor, uo: uo2, frame: :heavy, finish: :none}
     surface = cls1.genConstruction(model, specs)
     expect(surface).to_not be_nil
@@ -192,9 +196,10 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(2)
     u = 1 / cls1.rsi(surface, film[:floor])
     expect(u).to be_within(TOL).of(uo2)
-    expect(surface.layers[1].nameString).to eq("OSut:cellulose:K0.023:100")
+    expect(surface.layers[1].nameString).to eq("OSut:K0.023:100")
 
     # Finished, insulated exposed floor (e.g. wood-framed, residential).
+    model   = OpenStudio::Model::Model.new
     specs   = {type: :floor, uo: uo2}
     surface = cls1.genConstruction(model, specs)
     expect(surface).to_not be_nil
@@ -202,9 +207,10 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(3)
     u = 1 / cls1.rsi(surface, film[:floor])
     expect(u).to be_within(TOL).of(uo2)
-    expect(surface.layers[1].nameString).to eq("OSut:mineral:K0.024:100")
+    expect(surface.layers[1].nameString).to eq("OSut:K0.024:100")
 
     # Finished, insulated exposed floor (e.g. 4" slab, steel web joists).
+    model   = OpenStudio::Model::Model.new
     specs   = {type: :floor, uo: uo2, finish: :medium}
     surface = cls1.genConstruction(model, specs)
     expect(surface).to_not be_nil
@@ -212,10 +218,11 @@ RSpec.describe OSut do
     expect(surface.layers.size).to eq(3)
     u = 1 / cls1.rsi(surface, film[:floor])
     expect(u).to be_within(TOL).of(uo2)
-    expect(surface.layers[1].nameString).to eq("OSut:mineral:K0.023:100")
+    expect(surface.layers[1].nameString).to eq("OSut:K0.023:100")
     expect(surface.layers[2].nameString).to eq("OSut:concrete:100")
 
     # Uninsulated slab-on-grade.
+    model   = OpenStudio::Model::Model.new
     specs   = {type: :slab, frame: :none, finish: :none}
     surface = cls1::genConstruction(model, specs)
     expect(surface).to_not be_nil
@@ -225,6 +232,7 @@ RSpec.describe OSut do
     expect(surface.layers[1].nameString).to eq("OSut:concrete:100")
 
     # Insulated slab-on-grade.
+    model   = OpenStudio::Model::Model.new
     specs   = {type: :slab, uo: uo2, finish: :none}
     surface = cls1::genConstruction(model, specs)
     expect(surface).to_not be_nil
@@ -233,7 +241,7 @@ RSpec.describe OSut do
     u = 1 / cls1::rsi(surface, film[:slab])
     expect(u).to be_within(TOL).of(uo2)
     expect(surface.layers[0].nameString).to eq("OSut:sand:100")
-    expect(surface.layers[1].nameString).to eq("OSut:polyiso:K0.010:043")
+    expect(surface.layers[1].nameString).to eq("OSut:K0.010:043")
     expect(surface.layers[2].nameString).to eq("OSut:concrete:100")
 
     # 8" uninsulated basement wall.
@@ -247,6 +255,7 @@ RSpec.describe OSut do
     expect(u).to be_within(TOL).of(uo7)
 
     # 8" interior-insulated, finished basement wall.
+    model   = OpenStudio::Model::Model.new
     specs   = {type: :basement, uo: 2 * uo2, clad: :none}
     surface = cls1::genConstruction(model, specs)
     expect(surface).to_not be_nil
@@ -255,7 +264,7 @@ RSpec.describe OSut do
     u = 1 / cls1::rsi(surface, film[:basement])
     expect(u).to be_within(TOL).of(2 * uo2)
     expect(surface.layers[0].nameString).to eq("OSut:concrete:200")
-    expect(surface.layers[1].nameString).to eq("OSut:mineral:K0.037:075")
+    expect(surface.layers[1].nameString).to eq("OSut:K0.037:075")
     expect(surface.layers[2].nameString).to eq("OSut:drywall:015")
 
     # Standard, insulated steel door (default Uo = 1.8 W/K•m).
@@ -291,7 +300,7 @@ RSpec.describe OSut do
     u = 1 / cls1::rsi(surface)
     expect(u).to be_within(TOL).of(uo9)
 
-    # Invalid Uo (here, skylights and windows inherit default Uo values)
+    # Invalid Uo (here, skylights and windows inherit default Uo values).
     specs   = {type: :skylight, uo: nil}
     surface = cls1::genConstruction(model, specs)
     expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
@@ -299,7 +308,7 @@ RSpec.describe OSut do
     u = 1 / cls1::rsi(surface)
     expect(u).to be_within(TOL).of(uo[:skylight])
 
-    # Invalid Uo (here, Uo-adjustments are ignored altogether)
+    # Invalid Uo (here, Uo-adjustments are ignored altogether).
     specs   = {type: :wall, uo: nil}
     surface = cls1::genConstruction(model, specs)
     expect(surface).to be_a(OpenStudio::Model::LayeredConstruction)
