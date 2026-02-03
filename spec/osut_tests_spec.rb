@@ -5783,6 +5783,33 @@ RSpec.describe OSut do
     expect(mod1.level).to eq(DBG)
     expect(mod1.clean!).to eq(DBG)
 
+    # Basic test: 'deep' space (vs X-axis).
+    vtx  = OpenStudio::Point3dVector.new
+    vtx << OpenStudio::Point3d.new(2,9,1)
+    vtx << OpenStudio::Point3d.new(2,1,1)
+    vtx << OpenStudio::Point3d.new(1,1,1)
+    vtx << OpenStudio::Point3d.new(1,9,1)
+
+    model = OpenStudio::Model::Model.new
+    space = OpenStudio::Model::Space.new(model)
+    floor = OpenStudio::Model::Surface.new(vtx, model)
+    floor.setSpace(space)
+    expect(mod1.spaceWidth(space).round(2)).to eq(1)
+
+    vtx  = OpenStudio::Point3dVector.new
+    vtx << OpenStudio::Point3d.new(9,2,1)
+    vtx << OpenStudio::Point3d.new(9,1,1)
+    vtx << OpenStudio::Point3d.new(1,1,1)
+    vtx << OpenStudio::Point3d.new(1,2,1)
+
+    # Basic test: 'narrow' space (vs X-axis).
+    model = OpenStudio::Model::Model.new
+    space = OpenStudio::Model::Space.new(model)
+    floor = OpenStudio::Model::Surface.new(vtx, model)
+    floor.setSpace(space)
+    expect(mod1.spaceWidth(space).round(2)).to eq(1)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
     file  = File.join(__dir__, "files/osms/in/warehouse.osm")
     path  = OpenStudio::Path.new(file)
     model = translator.loadModel(path)
