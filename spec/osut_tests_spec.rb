@@ -676,133 +676,6 @@ RSpec.describe OSut do
     expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)
     expect(mod1.logs.first[:message]).to eq(m3)
-
-    # PlanarSurface class method 'filmResistance' reports standard interior or
-    # exterior air film resistances (ref: ASHRAE Fundamentals), e.g.:
-    types = {}
-    types["StillAir_HorizontalSurface_HeatFlowsUpward"  ] = 0.107
-    types["StillAir_45DegreeSurface_HeatFlowsUpward"    ] = 0.109
-    types["StillAir_VerticalSurface"                    ] = 0.120
-    types["StillAir_45DegreeSurface_HeatFlowsDownward"  ] = 0.134
-    types["StillAir_HorizontalSurface_HeatFlowsDownward"] = 0.162
-    types["MovingAir_15mph"                             ] = 0.030
-    types["MovingAir_7p5mph"                            ] = 0.044
-    #   https://github.com/NREL/OpenStudio/blob/
-    #   1c6fe48c49987c16e95e90ee3bd088ad0649ab9c/src/model/
-    #   PlanarSurface.cpp#L854
-
-    OpenStudio::Model::FilmResistanceType.getValues.each do |i|
-      t1 = OpenStudio::Model::FilmResistanceType.new(i)
-      t2 = OpenStudio::Model::FilmResistanceType.new(types.keys.at(i))
-      r  = OpenStudio::Model::PlanarSurface.filmResistance(t1)
-      expect(t1).to eq(t2)
-      expect(r).to be_within(0.001).of(types.values.at(i))
-      next if i > 4
-
-      # PlanarSurface class method 'stillAirFilmResistance' offers a
-      # tilt-dependent interior air film resistance, e.g.:
-      deg = i * 45
-      rad = deg * Math::PI/180
-      rsi = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(rad)
-      # puts "#{i}: #{deg}: #{r}: #{rsi}"
-      # 0:   0: 0.107: 0.106
-      # 1:  45: 0.109: 0.109 # ... OK
-      # 2:  90: 0.120: 0.120 # ... OK
-      # 3: 135: 0.134: 0.137
-      # 4: 180: 0.162: 0.160
-      next if deg < 45 || deg > 90
-
-      expect(rsi).to be_within(0.001).of(r)
-      # The method is used for (opaque) Surfaces. The correlation/regression
-      # isn't perfect, yet appears fairly reliable for intermediate angles
-      # between ~0° and 90°.
-      #   https://github.com/NREL/OpenStudio/blob/
-      #   1c6fe48c49987c16e95e90ee3bd088ad0649ab9c/src/model/
-      #   PlanarSurface.cpp#L878
-    end
-  end
-
-  it "checks rsi calculations" do
-    translator = OpenStudio::OSVersion::VersionTranslator.new
-    expect(mod1.clean!).to eq(DBG)
-
-    file  = File.join(__dir__, "files/osms/out/seb2.osm")
-    path  = OpenStudio::Path.new(file)
-    model = translator.loadModel(path)
-    expect(model).to_not be_empty
-    model = model.get
-
-    m  = "OSut::rsi"
-    m1 = "Invalid 'lc' arg #1 (#{m})"
-    m2 = "Negative 'film' (#{m})"
-    m3 = "'film' NilClass? expecting Numeric (#{m})"
-    m4 = "Negative 'temp K' (#{m})"
-    m5 = "'temp K' NilClass? expecting Numeric (#{m})"
-
-    model.getSurfaces.each do |s|
-      next unless s.isPartOfEnvelope
-
-      lc = s.construction
-      expect(lc).to_not be_empty
-      lc = lc.get.to_LayeredConstruction
-      expect(lc).to_not be_empty
-      lc = lc.get
-
-      if s.isGroundSurface # 4x slabs on grade in SEB model
-        expect(s.filmResistance).to be_within(TOL).of(0.160)
-        expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.448)
-        expect(mod1.status).to be_zero
-      else
-        if s.surfaceType == "Wall"
-          expect(s.filmResistance).to be_within(TOL).of(0.150)
-          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(2.616)
-          expect(mod1.status).to be_zero
-        else # RoofCeiling
-          expect(s.filmResistance).to be_within(TOL).of(0.136)
-          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(5.631)
-          expect(mod1.status).to be_zero
-        end
-      end
-    end
-
-    expect(mod1.rsi("", 0.150)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be true
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.rsi(nil, 0.150)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be true
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m1)
-
-    lc = model.getLayeredConstructionByName("SLAB-ON-GRADE-FLOOR")
-    expect(lc).to_not be_empty
-    lc = lc.get
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.rsi(lc, -1)).to be_within(TOL).of(0)
-    expect(mod1.error?).to be true
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m2)
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.rsi(lc, nil)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be true
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m3)
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.rsi(lc, 0.150, -300)).to be_within(TOL).of(0)
-    expect(mod1.error?).to be true
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m4)
-
-    expect(mod1.clean!).to eq(DBG)
-    expect(mod1.rsi(lc, 0.150, nil)).to be_within(TOL).of(0)
-    expect(mod1.debug?).to be true
-    expect(mod1.logs.size).to eq(1)
-    expect(mod1.logs.first[:message]).to eq(m5)
   end
 
   it "checks (opaque) insulating layers within a layered construction" do
@@ -5497,6 +5370,332 @@ RSpec.describe OSut do
 
     # Without arguments, the method returns ALL surfaces and subsurfaces.
     expect(mod1.facets(spaces).size).to eq(surfs.size + subs.size)
+  end
+
+  it "checks rsi calculations" do
+    translator = OpenStudio::OSVersion::VersionTranslator.new
+    expect(mod1.clean!).to eq(DBG)
+
+    # PlanarSurface method 'filmResistance' reports standard interior or
+    # exterior air film resistances for DISCRETE tilts, per ASHRAE Fundamentals.
+    #   https://github.com/NatLabRockies/OpenStudio/blob/
+    #   8008ef767fdc0f9d3dd3fabd383da15d009aef76/src/model/
+    #   PlanarSurface.cpp#L843
+
+    # Surface type identifiers to fetch filmResistance values.
+    fts = {}
+    fts["STILLAIR_HORIZONTALSURFACE_HEATFLOWSUPWARD"  ] = 0.107427212046
+    fts["STILLAIR_45DEGREESURFACE_HEATFLOWSUPWARD"    ] = 0.109188313883
+    fts["STILLAIR_VERTICALSURFACE"                    ] = 0.119754924904
+    fts["STILLAIR_45DEGREESURFACE_HEATFLOWSDOWNWARD"  ] = 0.133843739599
+    fts["STILLAIR_HORIZONTALSURFACE_HEATFLOWSDOWNWARD"] = 0.162021368988
+    fts["MOVINGAIR_15MPH"                             ] = 0.029938731226
+    fts["MOVINGAIR_7P5MPH"                            ] = 0.044027545921
+
+    OpenStudio::Model::FilmResistanceType.getValues.each do |i|
+      t1 = OpenStudio::Model::FilmResistanceType.new(i)
+      t2 = OpenStudio::Model::FilmResistanceType.new(fts.keys.at(i))
+      r  = OpenStudio::Model::PlanarSurface.filmResistance(t1)
+      expect(t1).to eq(t2)
+      expect(r).to be_within(0.001).of(fts.values.at(i))
+      next if i > 4
+
+      # PlanarSurface method 'stillAirFilmResistance' supports a CONTINUOUS
+      # tilt-dependent interior air film resistance.
+      #   https://github.com/NatLabRockies/OpenStudio/blob/
+      #   8008ef767fdc0f9d3dd3fabd383da15d009aef76/src/model/
+      #   PlanarSurface.cpp#L867
+      deg = i * 45
+      rad = deg * Math::PI/180
+      rsi = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(rad)
+      per = "%.2f" % (100 * (r - rsi) / r)
+      # puts "#{i}: #{deg}: #{r.round(5)}: #{rsi.round(5)} #{per} %"
+      #
+      # 0:   0: 0.10743: 0.10604  1.29 % horizontal, facing up
+      # 1:  45: 0.10919: 0.10944 -0.23 %
+      # 2:  90: 0.11975: 0.11965  0.09 % vertical
+      # 3: 135: 0.13384: 0.13665 -2.10 %
+      # 4: 180: 0.16202: 0.16045  0.97 % horizontal, facing down
+      next if deg < 45 || deg > 90
+
+      # The method is used for (opaque) Surfaces. The correlation/regression
+      # isn't perfect, yet appears fairly reliable for intermediate angles
+      # between ~0° and 90°.
+      expect(rsi).to be_within(0.001).of(r)
+    end
+
+    # Surface class method 'filmResistance' is different (than PlanarSurface).
+    # It reports the sum of interior and exterior surface air film resistances,
+    # specific to a given surface.
+    #   https://github.com/NatLabRockies/OpenStudio/blob/
+    #   8008ef767fdc0f9d3dd3fabd383da15d009aef76/src/model/
+    #   Surface.cpp#L1400-L1419
+    #
+    # The method relies on 'isPartOfEnvelope', which unfortunately returns
+    # FALSE for insulated INTERZONE surfaces, e.g.:
+    #   - floors of an UNCONDITIONED attic
+    #   - ceiling of an UNCONDITIONED crawlspace
+    #
+    # These are definitely envelope surfaces.
+    #   https://github.com/NatLabRockies/OpenStudio/blob/
+    #   8008ef767fdc0f9d3dd3fabd383da15d009aef76/src/model/
+    #   Surface.cpp#L1243-L1247
+    #
+    # In cases such as insulated INTERZONE surfaces, 'filmResistance' simply
+    # doubles the reported still air (interior) film resistance. This overshoots
+    # calculated thermal resistance. Although such an approximation is less of
+    # an issue when dealing with highly insulated constructions, caution may be
+    # required when attempting to accommodate key standards like ASHRAE 90.1:
+    #
+    # "building envelope" (90.1 2022, 2025):
+    #   "the EXTERIOR plus the SEMIEXTERIOR portions of a building. For the
+    #    purposes of determining building envelope requirements, the
+    #    classifications are defined as follows:
+    #      - EXTERIOR building envelope: the elements of a building that
+    #        separate CONDITIONED spaces from the exterior.
+    #      - SEMIEXTERIOR building envelope: the elements of a building that
+    #        separate CONDITIONED space from UNCONDITIONED space or that enclose
+    #        SEMIHEATED spaces through which thermal energy may be transferred
+    #        to or from the EXTERIOR, to or from UNCONDITIONED spaces, or to or
+    #        from CONDITIONED spaces."
+    #
+    # This issue is discussed here:
+    #   https://github.com/NatLabRockies/EnergyPlus/issues/9470
+    #
+    # And in part discussed here:
+    #  https://www.ashrae.org/file%20library/technical%20resources/
+    #  standards%20and%20guidelines/standards%20intepretations/
+    #  ic-90.1-2019-8.pdf
+
+    # Testing this outcome, first with an UNCONDITIONED attic case.
+    expect(mod1.clean!).to eq(DBG)
+
+    file  = File.join(__dir__, "files/osms/out/office_attic.osm")
+    path  = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model).to_not be_empty
+    model = model.get
+
+    attic = model.getSpaceByName("Attic")
+    expect(attic).to_not be_empty
+    attic = attic.get
+    expect(mod1.unconditioned?(attic)).to be true
+
+    # Test attic (insulated) floors, then their adjacent ceilings.
+    model.getSurfaces.each do |surface|
+      next unless surface.surfaceType.downcase == "floor"
+      next unless surface.outsideBoundaryCondition.downcase == "surface"
+
+      id   = surface.nameString
+      tilt = surface.tilt
+      expect(id.downcase.include?("attic_floor"))
+      space = surface.space
+      expect(space).to_not be_empty
+      space = space.get
+      expect(space).to eq(attic)
+
+      # A surface's 'tilt' points outward (from its parent space), e.g. a
+      # horizontal attic floor faces downward, or 180°.
+      expect(tilt.round(4)).to eq(Math::PI.round(4))
+
+      r1 = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt) * 2
+      r2 = surface.filmResistance
+      expect(r1.round(3)).to eq(0.321)
+      expect(r2.round(3)).to eq(0.321)
+
+      # Test adjacent ceilings.
+      ceiling = surface.adjacentSurface
+      expect(ceiling).to_not be_empty
+      ceiling = ceiling.get
+
+      nom  = ceiling.nameString
+      tilt = ceiling.tilt
+      expect(nom.downcase.include?("_ceiling"))
+
+      # A horizontal ceiling faces upward, or 0°.
+      expect(tilt.round(4)).to eq(0)
+
+      r1 = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt) * 2
+      r2 = ceiling.filmResistance
+      expect(r1.round(3)).to eq(0.212) # not 0.321!
+      expect(r2.round(3)).to eq(0.212) # not 0.321!
+
+      # OS-reported film resistances: 0.212 vs 0.321 - which one should apply?
+      #
+      # ----------------------------------------------------------------------
+      # FYI, EnergyPlus reported (standard condition) U-factors:
+      #
+      #   - attic floors:
+      #       - U    with film: 0.151 (R    with film: 6.623)
+      #       - U without film: 0.158 (R without film: 6.329)
+      #     TOTAL film resistance = 0.267 ?
+      #
+      #   - adjacent ceilings below:
+      #       - U    with film: 0.151 (R    with film: 6.623)
+      #       - U without film: 0.158 (R without film: 6.329)
+      #     TOTAL film resistance = 0.267 !
+      #
+      # Reminder:
+      #   fts["STILLAIR_HORIZONTALSURFACE_HEATFLOWSUPWARD"  ] = ~0.107
+      #   fts["STILLAIR_HORIZONTALSURFACE_HEATFLOWSDOWNWARD"] = ~0.162
+      #
+      # ... the sum of both = 0.269 (pretty close)
+      #
+      # Similarly:
+      #   OpenStudio::Model::PlanarSurface.stillAirFilmResistance(  0°) = 0.106
+      #   OpenStudio::Model::PlanarSurface.stillAirFilmResistance(180°) = 0.160
+      #
+      # ... the sum of both = 0.266 (even closer)
+      #
+      # Regardless of how EnergyPlus determines combined film resistances, they
+      # are reported consistently, from either adjacent surface.
+    end
+
+    # Skylight well walls?
+    attic.surfaces.each do |surface|
+      next unless surface.surfaceType.downcase == "wall"
+
+      tilt = surface.tilt
+      expect(surface.outsideBoundaryCondition.downcase).to eq("surface")
+
+      # Skylight well walls are vertical.
+      expect(tilt.round(4)).to eq((Math::PI / 2).round(4))
+      r1 = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt) * 2
+      r2 = surface.filmResistance
+      expect(r1.round(3)).to eq(0.239)
+      expect(r2.round(3)).to eq(0.239)
+
+      # Adjacent skylight well walls?
+      adjacent = surface.adjacentSurface
+      expect(adjacent).to_not be_empty
+      adjacent = adjacent.get
+      id = adjacent.nameString
+
+      expect(tilt.round(4)).to eq((Math::PI / 2).round(4))
+      r1 = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt) * 2
+      r2 = surface.filmResistance
+      expect(r1.round(3)).to eq(0.239)
+      expect(r2.round(3)).to eq(0.239)
+    end
+
+    # Different from interzone walls in CONDITIONED, occupied spaces?
+    model.getSpaces.each do |space|
+      next if space == attic
+
+      space.surfaces.each do |surface|
+        next unless surface.surfaceType.downcase == "wall"
+        next unless surface.outsideBoundaryCondition == "surface"
+
+        tilt = surface.tilt
+        expect(tilt.round(4)).to eq((Math::PI / 2).round(4))
+        r1 = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt) * 2
+        r2 = surface.filmResistance
+        expect(r1.round(3)).to eq(0.239) # same as skylight well walls.
+        expect(r2.round(3)).to eq(0.239)
+      end
+    end
+
+    # EnergyPlus reported film resistances for INTERZONE walls.
+    #   - insulated INTERZONE skylight well walls:
+    #     - U    with film: 0.292 (R    with film: 3.425)
+    #     - U without film: 0.314 (R without film: 3.185)
+    #   TOTAL film resistance = 0.240 (same as OpenStudio)
+    #
+    # ... vs other INTERZONE walls:
+    #     - U    with film: 2.511 (R    with film: 0.398)
+    #     - U without film: 6.299 (R without film: 0.159)
+    #   TOTAL film resistance = 0.239 (same as OpenStudio)
+
+    # --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- #
+    # Repeat for plenum cases.
+    file  = File.join(__dir__, "files/osms/out/seb2.osm")
+    path  = OpenStudio::Path.new(file)
+    model = translator.loadModel(path)
+    expect(model).to_not be_empty
+    model = model.get
+
+    m  = "OSut::rsi"
+    m1 = "Invalid 'lc' arg #1 (#{m})"
+    m2 = "Negative 'film' (#{m})"
+    m3 = "'film' NilClass? expecting Numeric (#{m})"
+    m4 = "Negative 'temp K' (#{m})"
+    m5 = "'temp K' NilClass? expecting Numeric (#{m})"
+
+    model.getSurfaces.each do |s|
+      id = s.nameString
+      lc = s.construction
+      expect(lc).to_not be_empty
+      lc = lc.get.to_LayeredConstruction
+      expect(lc).to_not be_empty
+      lc = lc.get
+
+      if s.isPartOfEnvelope # i.e. outdoor-facing or ground-facing only
+        if s.isGroundSurface # 4x slabs on grade in SEB model
+          expect(s.filmResistance).to be_within(TOL).of(0.160)
+          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.448)
+          expect(mod1.status).to be_zero
+        elsif s.surfaceType == "Wall"
+          expect(s.filmResistance).to be_within(TOL).of(0.150)
+          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(2.616)
+          expect(mod1.status).to be_zero
+        else # RoofCeiling
+          expect(s.filmResistance).to be_within(TOL).of(0.136)
+          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(5.631)
+          expect(mod1.status).to be_zero
+        end
+      else
+        expect(s.outsideBoundaryCondition.downcase).to eq("surface")
+
+        if s.surfaceType.downcase == "wall"
+          expect(s.filmResistance.round(3)).to eq(0.239) # as above walls
+        elsif s.surfaceType.downcase == "roofceiling"
+          expect(s.filmResistance.round(3)).to eq(0.212) # as interzone ceilings
+        else
+          expect(s.surfaceType.downcase).to eq("floor")
+          expect(s.filmResistance.round(3)).to eq(0.321) # as attic floors
+        end
+      end
+    end
+
+    # Testing 'rsi' method. Invalid cases.
+    expect(mod1.rsi("", 0.150)).to be_within(TOL).of(0)
+    expect(mod1.debug?).to be true
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m1)
+
+    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.rsi(nil, 0.150)).to be_within(TOL).of(0)
+    expect(mod1.debug?).to be true
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m1)
+
+    lc = model.getLayeredConstructionByName("SLAB-ON-GRADE-FLOOR")
+    expect(lc).to_not be_empty
+    lc = lc.get
+
+    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.rsi(lc, -1)).to be_within(TOL).of(0)
+    expect(mod1.error?).to be true
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m2)
+
+    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.rsi(lc, nil)).to be_within(TOL).of(0)
+    expect(mod1.debug?).to be true
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m3)
+
+    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.rsi(lc, 0.150, -300)).to be_within(TOL).of(0)
+    expect(mod1.error?).to be true
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m4)
+
+    expect(mod1.clean!).to eq(DBG)
+    expect(mod1.rsi(lc, 0.150, nil)).to be_within(TOL).of(0)
+    expect(mod1.debug?).to be true
+    expect(mod1.logs.size).to eq(1)
+    expect(mod1.logs.first[:message]).to eq(m5)
   end
 
   it "checks slab generation" do
