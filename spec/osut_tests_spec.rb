@@ -5508,8 +5508,10 @@ RSpec.describe OSut do
 
       r1 = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt) * 2
       r2 = ceiling.filmResistance
+      r3 = mod1.film(:ceiling)
       expect(r1.round(3)).to eq(0.212) # not 0.321!
       expect(r2.round(3)).to eq(0.212) # not 0.321!
+      expect(r3.round(3)).to eq(0.267)
 
       # OS-reported film resistances: 0.212 vs 0.321 - which one should apply?
       #
@@ -5527,7 +5529,7 @@ RSpec.describe OSut do
       #     TOTAL film resistance = 0.267 !
       #
       # Regardless of how EnergyPlus determines combined film resistances, they
-      # are reported consistently, from either diection.
+      # are reported consistently, from either direction.
       #
       # Reminder:
       #   fts["STILLAIR_HORIZONTALSURFACE_HEATFLOWSUPWARD"  ] = ~0.107
@@ -5566,8 +5568,10 @@ RSpec.describe OSut do
 
       r1 = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt) * 2
       r2 = surface.filmResistance
+      r3 = mod1.film(:partition)
       expect(r1.round(3)).to eq(0.239)
       expect(r2.round(3)).to eq(0.239)
+      expect(r3.round(3)).to eq(0.239)
     end
 
     # Different from interzone walls in CONDITIONED, occupied spaces?
@@ -5583,8 +5587,10 @@ RSpec.describe OSut do
 
         r1 = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt) * 2
         r2 = surface.filmResistance
+        r3 = mod1.film(:partition)
         expect(r1.round(3)).to eq(0.239) # same as skylight well walls.
         expect(r2.round(3)).to eq(0.239)
+        expect(r3.round(3)).to eq(0.239)
       end
     end
 
@@ -5592,7 +5598,7 @@ RSpec.describe OSut do
     #   - insulated INTERZONE skylight well walls:
     #     - U    with film: 0.292 (R    with film: 3.425)
     #     - U without film: 0.314 (R without film: 3.185)
-    #   TOTAL film resistance = 0.240 (same as OpenStudio)
+    #   TOTAL film resistance = 0.240 (~same as OpenStudio)
     #
     # ... vs other INTERZONE walls:
     #     - U    with film: 2.511 (R    with film: 0.398)
@@ -5626,31 +5632,39 @@ RSpec.describe OSut do
         if s.isGroundSurface # 4x slabs on grade in SEB model
           expect(s.filmResistance).to be_within(TOL).of(0.160)
           expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.448)
-          expect(mod1.status).to be_zero
+          expect(mod1.rsi(lc, mod1.film(:slab))).to be_within(TOL).of(0.448)
         elsif s.surfaceType == "Wall"
           expect(s.filmResistance).to be_within(TOL).of(0.150)
           expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(2.616)
-          expect(mod1.status).to be_zero
+          expect(mod1.rsi(lc, mod1.film(:wall))).to be_within(TOL).of(2.616)
         else # RoofCeiling
           expect(s.filmResistance).to be_within(TOL).of(0.136)
           expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(5.631)
-          expect(mod1.status).to be_zero
+          expect(mod1.rsi(lc, mod1.film(:roof))).to be_within(TOL).of(5.631)
         end
       else
         expect(s.outsideBoundaryCondition.downcase).to eq("surface")
 
         if s.surfaceType.downcase == "wall"
+          # puts "#{s.nameString} : #{mod1.rsi(lc, s.filmResistance)}" 0.6798199211260842
+          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.680)
+          expect(mod1.rsi(lc, mod1.film(:partition))).to be_within(TOL).of(0.680)
           expect(s.filmResistance.round(3)).to eq(0.239) # as above walls
         elsif s.surfaceType.downcase == "roofceiling"
           expect(s.filmResistance.round(3)).to eq(0.212) # as interzone ceilings
+          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.331)
+          expect(mod1.rsi(lc, mod1.film(:ceiling))).to be_within(TOL).of(0.386)
         else
           expect(s.surfaceType.downcase).to eq("floor")
           expect(s.filmResistance.round(3)).to eq(0.321) # as attic floors
+          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.440)
+          expect(mod1.rsi(lc, mod1.film(:ceiling))).to be_within(TOL).of(0.386)
         end
       end
     end
 
     # Testing 'rsi' method. Invalid cases.
+    expect(mod1.status).to be_zero
     expect(mod1.rsi("", 0.150)).to be_within(TOL).of(0)
     expect(mod1.debug?).to be true
     expect(mod1.logs.size).to eq(1)

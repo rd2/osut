@@ -107,7 +107,7 @@ module OSut
   @@film = {
       shading: 0.000, # NA
       ceiling: 0.267, # interzone floor/ceiling
-    partition: 0.240, # interzone wall partition
+    partition: 0.239, # interzone wall partition
          wall: 0.150, # exposed wall
          roof: 0.135, # exposed roof
         floor: 0.192, # exposed floor
@@ -198,6 +198,21 @@ module OSut
   @@mats[:door     ][:k  ] =    0.080
   @@mats[:door     ][:rho] =  600.000
   @@mats[:door     ][:cp ] = 1000.000
+
+  ##
+  # Returns OSut surface air film resistances.
+  #
+  # @param [:to_sym] surface type, e.g. :wall
+  #
+  # @return [Hash] OSut collection of surface
+  def film(type = :wall)
+    return 0.0 unless type.respond_to?(:to_sym)
+
+    type = type.to_s.downcase.to_sym
+    type = :wall unless @@film.key?(type)
+
+    @@film[type]
+  end
 
   ##
   # Validates if every material in a layered construction is standard & opaque.
