@@ -5431,11 +5431,12 @@ RSpec.describe OSut do
     #   8008ef767fdc0f9d3dd3fabd383da15d009aef76/src/model/
     #   Surface.cpp#L1243-L1247
     #
-    # In cases such as insulated INTERZONE surfaces, 'filmResistance' simply
-    # doubles the reported still air (interior) film resistance. This overshoots
-    # calculated thermal resistance. Although such an approximation is less of
-    # an issue when dealing with highly insulated constructions, caution may be
-    # required when attempting to accommodate key standards like ASHRAE 90.1:
+    # For INTERZONE surfaces, 'filmResistance' simply doubles the reported still
+    # air (interior) film resistance. The solution either underestimates or
+    # overestimates calculated surface air film resistances for non-vertical
+    # surfaces. Although such an approximation is less of an issue when dealing
+    # with highly insulated constructions, caution may be required when
+    # attempting to accommodate key standards like ASHRAE 90.1:
     #
     # "building envelope" (90.1 2022, 2025):
     #   "the EXTERIOR plus the SEMIEXTERIOR portions of a building. For the
@@ -5508,10 +5509,12 @@ RSpec.describe OSut do
 
       r1 = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt) * 2
       r2 = ceiling.filmResistance
-      r3 = mod1.film(:ceiling)
+      r3 = mod1.filmResistances(:ceiling)
+      r4 = mod1.filmResistances(:ceiling, tilt)
       expect(r1.round(3)).to eq(0.212) # not 0.321!
       expect(r2.round(3)).to eq(0.212) # not 0.321!
-      expect(r3.round(3)).to eq(0.267)
+      expect(r3.round(3)).to eq(0.266)
+      expect(r4.round(3)).to eq(0.266)
 
       # OS-reported film resistances: 0.212 vs 0.321 - which one should apply?
       #
@@ -5568,10 +5571,12 @@ RSpec.describe OSut do
 
       r1 = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt) * 2
       r2 = surface.filmResistance
-      r3 = mod1.film(:partition)
+      r3 = mod1.filmResistances(:partition)
+      r4 = mod1.filmResistances(:partition, tilt)
       expect(r1.round(3)).to eq(0.239)
       expect(r2.round(3)).to eq(0.239)
       expect(r3.round(3)).to eq(0.239)
+      expect(r4.round(3)).to eq(0.239)
     end
 
     # Different from interzone walls in CONDITIONED, occupied spaces?
@@ -5587,10 +5592,12 @@ RSpec.describe OSut do
 
         r1 = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt) * 2
         r2 = surface.filmResistance
-        r3 = mod1.film(:partition)
+        r3 = mod1.filmResistances(:partition)
+        r4 = mod1.filmResistances(:partition, tilt)
         expect(r1.round(3)).to eq(0.239) # same as skylight well walls.
         expect(r2.round(3)).to eq(0.239)
         expect(r3.round(3)).to eq(0.239)
+        expect(r3.round(4)).to eq(0.239)
       end
     end
 
@@ -5627,38 +5634,68 @@ RSpec.describe OSut do
       lc = lc.get.to_LayeredConstruction
       expect(lc).to_not be_empty
       lc = lc.get
+      r1 = s.filmResistance
 
       if s.isPartOfEnvelope # i.e. outdoor-facing or ground-facing only
         if s.isGroundSurface # 4x slabs on grade in SEB model
-          expect(s.filmResistance).to be_within(TOL).of(0.160)
-          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.448)
-          expect(mod1.rsi(lc, mod1.film(:slab))).to be_within(TOL).of(0.448)
+          r2 = mod1.filmResistances(:slab)
+          r3 = mod1.filmResistances(:slab, s.tilt)
+          expect(r1).to be_within(TOL).of(0.160)
+          expect(r2).to be_within(TOL).of(0.160)
+          expect(r3).to be_within(TOL).of(0.160)
+          expect(mod1.rsi(lc, r1)).to be_within(TOL).of(0.448)
+          expect(mod1.rsi(lc, r2)).to be_within(TOL).of(0.448)
+          expect(mod1.rsi(lc, r3)).to be_within(TOL).of(0.448)
         elsif s.surfaceType == "Wall"
-          expect(s.filmResistance).to be_within(TOL).of(0.150)
-          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(2.616)
-          expect(mod1.rsi(lc, mod1.film(:wall))).to be_within(TOL).of(2.616)
+          r2 = mod1.filmResistances(:wall)
+          r3 = mod1.filmResistances(:wall, s.tilt)
+          expect(r1).to be_within(TOL).of(0.150)
+          expect(r2).to be_within(TOL).of(0.150)
+          expect(r3).to be_within(TOL).of(0.150)
+          expect(mod1.rsi(lc, r1)).to be_within(TOL).of(2.616)
+          expect(mod1.rsi(lc, r2)).to be_within(TOL).of(2.616)
+          expect(mod1.rsi(lc, r3)).to be_within(TOL).of(2.616)
         else # RoofCeiling
-          expect(s.filmResistance).to be_within(TOL).of(0.136)
-          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(5.631)
-          expect(mod1.rsi(lc, mod1.film(:roof))).to be_within(TOL).of(5.631)
+          r2 = mod1.filmResistances(:roof)
+          r3 = mod1.filmResistances(:roof, s.tilt)
+          expect(r1).to be_within(TOL).of(0.136)
+          expect(r2).to be_within(TOL).of(0.136)
+          expect(r3).to be_within(TOL).of(0.136)
+          expect(mod1.rsi(lc, r1)).to be_within(TOL).of(5.631)
+          expect(mod1.rsi(lc, r2)).to be_within(TOL).of(5.631)
+          expect(mod1.rsi(lc, r3)).to be_within(TOL).of(5.631)
         end
       else
         expect(s.outsideBoundaryCondition.downcase).to eq("surface")
 
         if s.surfaceType.downcase == "wall"
-          # puts "#{s.nameString} : #{mod1.rsi(lc, s.filmResistance)}" 0.6798199211260842
-          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.680)
-          expect(mod1.rsi(lc, mod1.film(:partition))).to be_within(TOL).of(0.680)
-          expect(s.filmResistance.round(3)).to eq(0.239) # as above walls
+          r2 = mod1.filmResistances(:partition)
+          r3 = mod1.filmResistances(:partition, s.tilt)
+          expect(r1.round(3)).to eq(0.239) # as above walls
+          expect(r2.round(3)).to eq(0.239)
+          expect(r3.round(3)).to eq(0.239)
+          expect(mod1.rsi(lc, r1)).to be_within(TOL).of(0.680)
+          expect(mod1.rsi(lc, r2)).to be_within(TOL).of(0.680)
+          expect(mod1.rsi(lc, r3)).to be_within(TOL).of(0.680)
         elsif s.surfaceType.downcase == "roofceiling"
-          expect(s.filmResistance.round(3)).to eq(0.212) # as interzone ceilings
-          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.331)
-          expect(mod1.rsi(lc, mod1.film(:ceiling))).to be_within(TOL).of(0.386)
+          r2 = mod1.filmResistances(:ceiling)
+          r3 = mod1.filmResistances(:ceiling, s.tilt)
+          expect(r1.round(3)).to eq(0.212) # as interzone ceilings
+          expect(r2.round(3)).to eq(0.266)
+          expect(r3.round(3)).to eq(0.266)
+          expect(mod1.rsi(lc, r1)).to be_within(TOL).of(0.331)
+          expect(mod1.rsi(lc, r2)).to be_within(TOL).of(0.386)
+          expect(mod1.rsi(lc, r3)).to be_within(TOL).of(0.386)
         else
           expect(s.surfaceType.downcase).to eq("floor")
-          expect(s.filmResistance.round(3)).to eq(0.321) # as attic floors
-          expect(mod1.rsi(lc, s.filmResistance)).to be_within(TOL).of(0.440)
-          expect(mod1.rsi(lc, mod1.film(:ceiling))).to be_within(TOL).of(0.386)
+          r2 = mod1.filmResistances(:ceiling)
+          r3 = mod1.filmResistances(:ceiling, s.tilt)
+          expect(r1.round(3)).to eq(0.321) # as attic floors
+          expect(r2.round(3)).to eq(0.266)
+          expect(r3.round(3)).to eq(0.266)
+          expect(mod1.rsi(lc, r1)).to be_within(TOL).of(0.440)
+          expect(mod1.rsi(lc, r2)).to be_within(TOL).of(0.386)
+          expect(mod1.rsi(lc, r3)).to be_within(TOL).of(0.386)
         end
       end
     end

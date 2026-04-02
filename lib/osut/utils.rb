@@ -106,7 +106,7 @@ module OSut
   # default inside + outside air film resistances (m2.K/W)
   @@film = {
       shading: 0.000, # NA
-      ceiling: 0.267, # interzone floor/ceiling
+      ceiling: 0.266, # interzone floor/ceiling
     partition: 0.239, # interzone wall partition
          wall: 0.150, # exposed wall
          roof: 0.135, # exposed roof
@@ -200,18 +200,58 @@ module OSut
   @@mats[:door     ][:cp ] = 1000.000
 
   ##
-  # Returns OSut surface air film resistances.
+  # Returns surface air film resistance(s). Surface tilt-dependent values are
+  # returned if a valid surface tilt [0, PI] is provided. Otherwise, generic
+  # tilt-independent air film resistances are returned instead.
   #
-  # @param [:to_sym] surface type, e.g. :wall
+  # @param [:to_sym] surface type, e.g. :roof, :wall, :partition, :ceiling
+  # @param [Numeric] surface tilt (in rad), optional
   #
-  # @return [Hash] OSut collection of surface
-  def film(type = :wall)
-    return 0.0 unless type.respond_to?(:to_sym)
+  # @return [Float] surface air film resistance(s)
+  # @return [0.0] if invalid input (see logs)
+  def filmResistances(type = :wall, tilt = 2 * Math::PI)
+    mth = "OSut::#{__callee__}"
+
+    unless tilt.is_a?(Numeric)
+      return mismatch("tilt", tilt, Float, mth, DBG, 0.0)
+    end
+
+    unless type.respond_to?(:to_sym)
+      return mismatch("type", type, Symbol, mth, DBG, 0.0)
+    end
 
     type = type.to_s.downcase.to_sym
-    type = :wall unless @@film.key?(type)
 
-    @@film[type]
+    unless @@film.key?(type)
+      return invalid("type", mth, 1, DBG, 0.0)
+    end
+
+    # Generic, tilt-independent values.
+    r = @@film[type]
+    return r if type == :shading
+
+    # Valid tilt?
+    if tilt.between?(0, Math::PI)
+      r = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt)
+      return r if type == :basement || type == :slab
+
+      if type == :ceiling || type == :partition
+        # Interzone. Fetch reciprocal tilt, e.g. if tilt == 0°, tiltx = 180°
+        tiltx = tilt + Math::PI
+
+        # Assuming tilt is contrained [0°, 180°] - constrain tiltx [0° 180°]:
+        #   e.g. tiltx == 210° if tilt ==  30°, so convert tiltx to 150°
+        #   e.g. tiltx == 330° if tilt == 150°, so convert tiltx to  30°
+        #   e.g. tiltx == 275° if tilt ==  95°, so convert tiltx to  85°
+        tiltx = Math::PI - tilt if tiltx > Math::PI
+
+        r += OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tiltx)
+      else
+        r += 0.03 # "MOVINGAIR_15MPH"
+      end
+    end
+
+    r
   end
 
   ##
