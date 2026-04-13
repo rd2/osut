@@ -4960,8 +4960,9 @@ RSpec.describe OSut do
     expect(ratio.round(2)).to eq(srr)
 
     # Reset attic default construction set for insulated interzone walls.
+    filmRSI      = mod1.filmResistances(:partition)
     construction = mod1.genConstruction(model, {type: :partition, uo: 0.3})
-    expect(mod1.rsi(construction, 0.240)).to be_within(TOL).of(1/0.3)
+    expect(mod1.rsi(construction, filmRSI).round(3)).to eq((1/0.3).round(3))
     expect(ia_set.setWallConstruction(construction)).to be true
     expect(mod1.status).to be_zero
 
@@ -5492,8 +5493,12 @@ RSpec.describe OSut do
 
       r1 = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt) * 2
       r2 = surface.filmResistance
+      r3 = mod1.filmResistances(:ceiling)
+      r4 = mod1.filmResistances(:ceiling, tilt)
       expect(r1.round(3)).to eq(0.321)
       expect(r2.round(3)).to eq(0.321)
+      expect(r3.round(3)).to eq(0.266)
+      expect(r4.round(3)).to eq(0.266)
 
       # Test adjacent ceilings.
       ceiling = surface.adjacentSurface
@@ -5513,8 +5518,8 @@ RSpec.describe OSut do
       r4 = mod1.filmResistances(:ceiling, tilt)
       expect(r1.round(3)).to eq(0.212) # not 0.321!
       expect(r2.round(3)).to eq(0.212) # not 0.321!
-      expect(r3.round(3)).to eq(0.266)
-      expect(r4.round(3)).to eq(0.266)
+      expect(r3.round(3)).to eq(0.266) # same as above
+      expect(r4.round(3)).to eq(0.266) # same as above
 
       # OS-reported film resistances: 0.212 vs 0.321 - which one should apply?
       #
