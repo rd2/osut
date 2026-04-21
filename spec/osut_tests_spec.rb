@@ -5399,7 +5399,7 @@ RSpec.describe OSut do
       deg = i * 45
       rad = deg * Math::PI/180
       rsi = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(rad)
-      per = "%.2f" % (100 * (r - rsi) / r)
+      # per = "%.2f" % (100 * (r - rsi) / r)
       # puts "#{i}: #{deg}: #{r.round(5)}: #{rsi.round(5)} #{per} %"
       #
       # 0:   0: 0.10743: 0.10604  1.29 % horizontal, facing up
@@ -5575,7 +5575,7 @@ RSpec.describe OSut do
       expect(tilt.round(4)).to eq((Math::PI / 2).round(4))
 
       r1 = OpenStudio::Model::PlanarSurface.stillAirFilmResistance(tilt) * 2
-      r2 = surface.filmResistance
+      r2 = adjacent.filmResistance
       r3 = mod1.filmResistances(:partition)
       r4 = mod1.filmResistances(:partition, tilt)
       expect(r1.round(3)).to eq(0.239)
